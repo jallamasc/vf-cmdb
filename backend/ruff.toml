@@ -1,0 +1,13 @@
+# Ruff linter/formatter config for the FastAPI backend.
+line-length = 100
+target-version = "py311"
+
+[lint]
+select = ["E", "F", "W", "I", "B", "UP", "C4"]
+ignore = [
+  "E501",  # line length handled by formatter
+  "B008",  # FastAPI Depends() in defaults is idiomatic
+]
+
+[lint.per-file-ignores]
+"alembic/*" = ["E402", "F401"]

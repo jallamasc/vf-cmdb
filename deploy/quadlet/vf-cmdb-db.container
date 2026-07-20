@@ -6,6 +6,8 @@ After=vf-cmdb-network.service
 [Container]
 ContainerName=vf_cmdb_db
 Image=docker.io/library/postgres:16
+# Let `podman auto-update` refresh this base image when a new postgres:16 is published
+AutoUpdate=registry
 Network=vf-cmdb.network
 Volume=vf-cmdb-pgdata.volume:/var/lib/postgresql/data:Z
 # Load POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB from here

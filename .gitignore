@@ -17,6 +17,17 @@ pgdata/
 *.log
 
 # Editor / OS
-.vscode/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
 .idea/
 .DS_Store
+.abacus.donotdelete
+
+# Local backups (should live outside the repo, but guard anyway)
+vf-cmdb-backups/
+*.tar.gz
+*.dump
+*.sql
+*.sql.gz
+.env.restored

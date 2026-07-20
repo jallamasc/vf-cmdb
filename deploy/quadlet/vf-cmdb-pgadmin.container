@@ -6,6 +6,8 @@ After=vf-cmdb-db.service
 [Container]
 ContainerName=vf_cmdb_pgadmin
 Image=docker.io/dpage/pgadmin4:latest
+# Let `podman auto-update` refresh this base image when a new pgadmin4 is published
+AutoUpdate=registry
 Network=vf-cmdb.network
 Volume=vf-cmdb-pgadmin.volume:/var/lib/pgadmin:Z
 EnvironmentFile=%h/vf-cmdb/.env

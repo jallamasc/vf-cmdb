@@ -1,0 +1,13 @@
+[Unit]
+Description=Virtualfactor CMDB — scheduled auto-update
+Documentation=file:%h/vf-cmdb/docs/OPERATIONS.md
+
+[Timer]
+# Every day at 03:30 local time, with up to 30 min random spread to avoid
+# hammering GitHub / registries at a fixed second.
+OnCalendar=*-*-* 03:30:00
+RandomizedDelaySec=1800
+Persistent=true
+
+[Install]
+WantedBy=timers.target

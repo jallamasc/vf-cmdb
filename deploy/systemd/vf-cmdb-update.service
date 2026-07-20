@@ -1,0 +1,13 @@
+[Unit]
+Description=Virtualfactor CMDB — pull latest code & redeploy (auto-update)
+Documentation=file:%h/vf-cmdb/docs/OPERATIONS.md
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+# %h expands to the user's home. Repo is expected at ~/vf-cmdb.
+ExecStart=%h/vf-cmdb/deploy/scripts/vf-cmdb-update.sh
+# Never let an update run hang forever
+TimeoutStartSec=1800
+Nice=10

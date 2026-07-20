@@ -1,0 +1,65 @@
+#cloud-config
+# ===========================================================================
+# Virtualfactor IT CMDB — cloud-init user-data (Ubuntu 22.04/24.04)
+#
+# Attach this to a Proxmox VM's cloud-init drive to provision a ready-to-run
+# CMDB node with ZERO manual steps. On first boot it creates the app user,
+# installs your SSH key, installs Podman, clones the repo, and runs bootstrap.
+#
+# >>> BEFORE USE, replace the two placeholders below:
+#       1. <YOUR_SSH_PUBLIC_KEY>   (contents of ~/.ssh/id_ed25519.pub)
+#       2. (optional) the CORS_ORIGINS value in runcmd
+#
+# On Proxmox you normally set user/password/ssh-key/IP in the VM's Cloud-Init
+# tab; this file is the advanced "custom user-data" form that ALSO performs the
+# app deployment. See deploy/cloud-init/README.md for how to wire it up.
+# ===========================================================================
+
+hostname: cmdb
+manage_etc_hosts: true
+
+users:
+  - name: vfadmin
+    groups: [sudo]
+    shell: /bin/bash
+    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+    lock_passwd: false
+    ssh_authorized_keys:
+      - <YOUR_SSH_PUBLIC_KEY>
+
+# Optional: set a password too (change it!). SSH keys are strongly preferred.
+chpasswd:
+  expire: false
+  users:
+    - name: vfadmin
+      password: "changeme-on-first-login"
+      type: text
+
+package_update: true
+package_upgrade: true
+packages:
+  - git
+  - curl
+  - podman
+  - ufw
+  - uidmap
+  - slirp4netns
+  - fuse-overlayfs
+  - python3-pip
+
+write_files:
+  - path: /etc/profile.d/vf-cmdb.sh
+    permissions: "0644"
+    content: |
+      # Convenience aliases for CMDB operators
+      alias cmdb-status='systemctl --user status vf-cmdb-backend.service'
+      alias cmdb-logs='journalctl --user -u vf-cmdb-backend.service -f'
+      alias cmdb-update='~/vf-cmdb/deploy/scripts/vf-cmdb-update.sh'
+      alias cmdb-backup='~/vf-cmdb/deploy/scripts/vf-cmdb-backup.sh'
+
+runcmd:
+  # Run the whole bootstrap as the app user (rootless podman requires this).
+  - ["sudo", "-iu", "vfadmin", "bash", "-lc",
+     "REPO_BRANCH=master CORS_ORIGINS='*' bash <(curl -fsSL https://raw.githubusercontent.com/jallamasc/vf-cmdb/master/deploy/scripts/bootstrap.sh)"]
+
+final_message: "Virtualfactor IT CMDB provisioned. UI on :8080, API on :8000/docs, pgAdmin on :5050 after boot completes."

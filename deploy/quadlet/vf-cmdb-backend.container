@@ -1,0 +1,22 @@
+[Unit]
+Description=Virtualfactor CMDB FastAPI backend
+Wants=vf-cmdb-db.service
+After=vf-cmdb-db.service
+
+[Container]
+ContainerName=vf_cmdb_backend
+# Build this image first:  podman build -t localhost/vf_cmdb_backend:latest ./backend
+Image=localhost/vf_cmdb_backend:latest
+# alias "backend" so the frontend nginx proxy_pass http://backend:8000 resolves
+Network=vf-cmdb.network:alias=backend
+EnvironmentFile=%h/vf-cmdb/.env
+Environment=POSTGRES_HOST=vf_cmdb_db
+Environment=POSTGRES_PORT=5432
+PublishPort=8000:8000
+
+[Service]
+Restart=always
+TimeoutStartSec=300
+
+[Install]
+WantedBy=default.target

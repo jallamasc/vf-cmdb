@@ -1,0 +1,9 @@
+[Unit]
+Description=Virtualfactor CMDB internal network
+
+[Network]
+NetworkName=vf-cmdb
+Driver=bridge
+
+[Install]
+WantedBy=default.target

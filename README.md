@@ -40,9 +40,11 @@ devices, interfaces) and IP address management — with **auto-generated naming*
 
 ---
 
-## Quick start (Docker Compose)
+## Quick start (Podman)
 
-Requires Docker Engine + the Docker Compose plugin.
+Requires **Podman 4.x+**. For the compose workflow you also need either the
+built-in `podman compose` (Podman 4.7+) or the `podman-compose` Python tool.
+Podman runs **rootless** and **daemonless** — no root daemon, no `docker` group.
 
 ```bash
 git clone <your-repo-url> vf_cmdb
@@ -51,7 +53,11 @@ cd vf_cmdb
 cp .env.example .env
 # edit .env and set a real POSTGRES_PASSWORD
 
-docker compose up -d --build
+# easiest — the helper script picks up podman compose / podman-compose for you:
+./deploy-podman.sh up
+
+# ...or call compose directly:
+podman compose -f podman-compose.yml up -d --build
 ```
 
 On first start the backend automatically:
@@ -68,59 +74,104 @@ Then open:
 * **API docs** → http://localhost:8000/docs
 * **pgAdmin**  → http://localhost:5050
 
+### Two ways to run on Podman
+
+| Approach | Command | Best for |
+|----------|---------|----------|
+| **Compose** | `./deploy-podman.sh up` / `podman compose -f podman-compose.yml up -d` | quick start, dev, familiar workflow |
+| **Quadlet (systemd)** | `./deploy-podman.sh quadlet` | always-on production; native auto-start, journald logging |
+
+The **Quadlet** units in `deploy/quadlet/` are the Podman-native way to run the
+stack as systemd services — they replace Docker's `restart:` policy with proper
+systemd supervision. See "Production: Quadlet + systemd" below.
+
 ### Deploying on a Proxmox Ubuntu VM
 
-1. Create an Ubuntu 22.04/24.04 VM in Proxmox and install Docker:
+1. Create an Ubuntu 22.04/24.04 VM in Proxmox and install Podman:
    ```bash
    sudo apt-get update
-   sudo apt-get install -y docker.io docker-compose-plugin
-   sudo usermod -aG docker "$USER"    # then log out / back in
+   sudo apt-get install -y podman
+   # optional compose front-end:
+   sudo apt-get install -y podman-compose      # or: pip install podman-compose
    ```
+   (On Fedora/Rocky/RHEL: `sudo dnf install -y podman podman-compose`.)
 2. Copy this project onto the VM (git clone or `scp`).
 3. `cp .env.example .env`, set a strong `POSTGRES_PASSWORD`, and (recommended)
    set `CORS_ORIGINS` to the UI URL, e.g. `http://cmdb.home.lan:8080`.
-4. `docker compose up -d --build`.
+4. `./deploy-podman.sh up` (or the Quadlet path for always-on).
 5. Point a DNS record (e.g. `cmdb.home.lan`) at the VM, or use its IP.
 
-The stack uses `restart: unless-stopped`, so it comes back automatically after
-a reboot.
+Everything runs rootless — no `sudo` needed for day-to-day operation.
+
+### Production: Quadlet + systemd
+
+Quadlet lets systemd manage the containers natively (auto-start on boot,
+restart on failure, `journalctl` logs). One command installs and starts them:
+
+```bash
+./deploy-podman.sh quadlet
+```
+
+This builds the backend/frontend images, copies the units from
+`deploy/quadlet/` into `~/.config/containers/systemd/`, runs
+`systemctl --user daemon-reload`, and starts the services. To keep them running
+after you log out of the VM:
+
+```bash
+loginctl enable-linger "$USER"
+```
+
+Manage them like any systemd service:
+
+```bash
+systemctl --user status  vf-cmdb-backend.service
+systemctl --user restart vf-cmdb-frontend.service
+journalctl --user -u vf-cmdb-db.service -f
+```
 
 ---
 
 ## Everyday operations
 
+Using the helper script (delegates to whichever compose front-end is present):
+
+```bash
+./deploy-podman.sh ps        # running containers
+./deploy-podman.sh logs      # follow all logs
+./deploy-podman.sh restart   # rebuild + restart
+./deploy-podman.sh down      # stop & remove (named volumes survive)
+```
+
+Or with Podman directly:
+
 ```bash
 # status / logs
-docker compose ps
-docker compose logs -f backend
-
-# stop / start
-docker compose stop
-docker compose start
+podman ps --filter name=vf_cmdb_
+podman logs -f vf_cmdb_backend
 
 # update after pulling new code
 git pull
-docker compose up -d --build
+podman compose -f podman-compose.yml up -d --build
 
 # tear down (KEEPS data — named volumes survive)
-docker compose down
+podman compose -f podman-compose.yml down
 
 # tear down AND wipe the database
-docker compose down -v
+podman compose -f podman-compose.yml down -v
 ```
 
 ### Database backup & restore
 
 ```bash
 # backup
-docker compose exec -T db pg_dump -U vfcmdb vfcmdb > cmdb_backup_$(date +%F).sql
+podman exec -t vf_cmdb_db pg_dump -U vfcmdb vfcmdb > cmdb_backup_$(date +%F).sql
 
 # restore (into a fresh/empty db)
-cat cmdb_backup_2026-07-20.sql | docker compose exec -T db psql -U vfcmdb vfcmdb
+cat cmdb_backup_2026-07-20.sql | podman exec -i vf_cmdb_db psql -U vfcmdb vfcmdb
 ```
 
 The Postgres data also lives in the `pgdata` named volume, so it persists across
-container recreation unless you run `docker compose down -v`.
+container recreation unless you run `... down -v`.
 
 ---
 
@@ -197,7 +248,7 @@ Resource slugs use hyphens, e.g. `physical-servers`, `subnets-ipv4`,
 
 ---
 
-## Local development (without Docker)
+## Local development (without containers)
 
 **Backend**
 
@@ -237,13 +288,15 @@ vf_cmdb/
 │   │   ├── seed.py         idempotent data seeder
 │   │   └── seed_subnets.json
 │   ├── alembic/            migrations
-│   ├── Dockerfile · entrypoint.sh · requirements.txt
+│   ├── Containerfile · entrypoint.sh · requirements.txt
 ├── frontend/           React + Vite + AG Grid UI
 │   ├── src/pages/          Dashboard, Sites, RackView, compute, IPAM, …
 │   ├── src/components/      Layout, EntityGrid
-│   ├── Dockerfile · nginx.conf
+│   ├── Containerfile · nginx.conf
 ├── ansible/            cmdb_inventory.py + README
-├── docker-compose.yml
+├── deploy/quadlet/     systemd Quadlet units (.container/.network/.volume)
+├── deploy-podman.sh    build / up / down / logs / quadlet helper
+├── podman-compose.yml
 ├── .env.example
 └── README.md
 ```

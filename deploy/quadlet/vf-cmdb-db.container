@@ -1,0 +1,24 @@
+[Unit]
+Description=Virtualfactor CMDB PostgreSQL database
+Wants=vf-cmdb-network.service
+After=vf-cmdb-network.service
+
+[Container]
+ContainerName=vf_cmdb_db
+Image=docker.io/library/postgres:16
+Network=vf-cmdb.network
+Volume=vf-cmdb-pgdata.volume:/var/lib/postgresql/data:Z
+# Load POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB from here
+EnvironmentFile=%h/vf-cmdb/.env
+PublishPort=5432:5432
+HealthCmd=pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}
+HealthInterval=10s
+HealthTimeout=5s
+HealthRetries=10
+
+[Service]
+Restart=always
+TimeoutStartSec=300
+
+[Install]
+WantedBy=default.target

@@ -5,7 +5,7 @@
 A complete, production-ready IT Configuration Management Database with:
 - ✅ **64 files** tracked in Git, ready to push to GitHub
 - ✅ **Full-stack application**: FastAPI backend + React frontend + PostgreSQL
-- ✅ **Docker Compose** setup for easy deployment
+- ✅ **Podman** setup for easy, rootless, daemonless deployment (compose + Quadlet)
 - ✅ **Auto-generated device naming** following your TIA-606-B conventions
 - ✅ **IPAM** with subnet utilization and next-free-IP
 - ✅ **Ansible dynamic inventory** integration
@@ -86,21 +86,24 @@ On your Proxmox server, create a new Ubuntu VM (or use existing):
 # - Bridge network (so you can access from your workstation)
 ```
 
-### 3b. Install Docker
+### 3b. Install Podman
 
 SSH into your VM and run:
 
 ```bash
-# Install Docker
-curl -fsSL https://get.docker.com | sh
+# Ubuntu/Debian
+sudo apt-get update
+sudo apt-get install -y podman
+sudo apt-get install -y podman-compose   # optional; or: pip install podman-compose
 
-# Add your user to docker group
-sudo usermod -aG docker $USER
-newgrp docker
+# Fedora/Rocky/RHEL
+# sudo dnf install -y podman podman-compose
 
-# Install Docker Compose (if not included)
-docker compose version  # Check if already installed
+# Verify
+podman --version
 ```
+
+Podman is rootless and daemonless — no `docker` group, no background daemon.
 
 ### 3c. Clone and Deploy
 
@@ -113,14 +116,15 @@ cd vf-cmdb
 cp .env.example .env
 nano .env  # Set your passwords (important!)
 
-# Start everything
-docker compose up -d
-
-# Wait for database to be ready, then run migrations and seed
-sleep 10
-docker compose exec backend alembic upgrade head
-docker compose exec backend python seed.py
+# Start everything (builds images, runs migrations + seeding automatically)
+./deploy-podman.sh up
 ```
+
+> The backend entrypoint waits for the DB, runs Alembic migrations, and seeds
+> the data on first boot — no manual migrate/seed step needed.
+>
+> For an always-on production setup managed by systemd, use the Quadlet path
+> instead: `./deploy-podman.sh quadlet` then `loginctl enable-linger $USER`.
 
 ### 3d. Access the Application
 
@@ -136,43 +140,47 @@ From your workstation browser:
 
 ### Check Status
 ```bash
-docker compose ps
+./deploy-podman.sh ps
+# or: podman ps --filter name=vf_cmdb_
 ```
 
 ### View Logs
 ```bash
-docker compose logs -f backend    # Backend logs
-docker compose logs -f frontend   # Nginx logs
-docker compose logs -f db         # PostgreSQL logs
+podman logs -f vf_cmdb_backend    # Backend logs
+podman logs -f vf_cmdb_frontend   # Nginx logs
+podman logs -f vf_cmdb_db         # PostgreSQL logs
 ```
 
 ### Restart Services
 ```bash
-docker compose restart backend
-docker compose restart frontend
+podman restart vf_cmdb_backend
+podman restart vf_cmdb_frontend
 ```
 
 ### Stop Everything
 ```bash
-docker compose down
+./deploy-podman.sh down
 ```
 
 ### Update Code (After Git Pull)
 ```bash
 git pull
-docker compose down
-docker compose up -d --build
+./deploy-podman.sh restart
 ```
 
 ### Backup Database
 ```bash
-docker compose exec db pg_dump -U cmdbuser cmdb > backup_$(date +%Y%m%d).sql
+podman exec -t vf_cmdb_db pg_dump -U vfcmdb vfcmdb > backup_$(date +%Y%m%d).sql
 ```
 
 ### Restore Database
 ```bash
-docker compose exec -T db psql -U cmdbuser cmdb < backup_20260719.sql
+cat backup_20260719.sql | podman exec -i vf_cmdb_db psql -U vfcmdb vfcmdb
 ```
+
+> Using the Quadlet/systemd deployment? Manage services with
+> `systemctl --user {status,restart,stop} vf-cmdb-backend.service` and view logs
+> with `journalctl --user -u vf-cmdb-backend.service -f`.
 
 ---
 
@@ -184,7 +192,9 @@ docker compose exec -T db psql -U cmdbuser cmdb < backup_20260719.sql
 | `GITHUB_SETUP.md` | GitHub push instructions |
 | `VSCODE_REMOTE_SETUP.md` | VS Code remote development guide |
 | `.env.example` | Environment variables template |
-| `docker-compose.yml` | Full stack orchestration |
+| `podman-compose.yml` | Full stack orchestration (Podman) |
+| `deploy-podman.sh` | Deploy helper (up/down/logs/quadlet) |
+| `deploy/quadlet/` | systemd Quadlet units for always-on production |
 | `backend/seed.py` | Initial data seeder |
 | `ansible/cmdb_inventory.py` | Ansible dynamic inventory |
 

@@ -1,0 +1,20 @@
+[Unit]
+Description=Virtualfactor CMDB pgAdmin
+Wants=vf-cmdb-db.service
+After=vf-cmdb-db.service
+
+[Container]
+ContainerName=vf_cmdb_pgadmin
+Image=docker.io/dpage/pgadmin4:latest
+Network=vf-cmdb.network
+Volume=vf-cmdb-pgadmin.volume:/var/lib/pgadmin:Z
+EnvironmentFile=%h/vf-cmdb/.env
+Environment=PGADMIN_CONFIG_SERVER_MODE=False
+PublishPort=5050:80
+
+[Service]
+Restart=always
+TimeoutStartSec=120
+
+[Install]
+WantedBy=default.target

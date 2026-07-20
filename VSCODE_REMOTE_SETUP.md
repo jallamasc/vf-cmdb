@@ -19,7 +19,7 @@ code .
 
 ### 3. Install Extensions (VS Code will prompt)
 
-- **Docker** - For managing containers
+- **Podman** (or **Container Tools**) - For managing containers
 - **Python** - For backend development
 - **Pylance** - Python IntelliSense
 - **ESLint** - For frontend linting
@@ -43,10 +43,10 @@ npm install
 npm run dev  # Runs on http://localhost:5173
 ```
 
-**Database (Docker):**
+**Database (Podman):**
 ```bash
-# From project root
-docker compose up -d db pgadmin
+# From project root — start just the db (+ pgadmin) for local dev
+podman compose -f podman-compose.yml up -d db pgadmin
 ```
 
 ## Option 2: VS Code Remote - SSH (Work on Proxmox VM)
@@ -80,7 +80,7 @@ All files are edited on the VM. Terminal commands run on the VM. Perfect for tes
 ## Option 3: Hybrid Approach
 
 - **Code locally** on your workstation (faster, better IntelliSense)
-- **Test on VM** using Docker Compose before committing
+- **Test on VM** using Podman before committing
 - **Git push/pull** to sync between environments
 
 ```bash
@@ -91,12 +91,12 @@ git push
 
 # On your Proxmox VM
 git pull
-docker compose down && docker compose up -d --build
+./deploy-podman.sh restart
 ```
 
 ## Recommended Extensions for This Project
 
-- **Docker** (ms-azuretools.vscode-docker)
+- **Podman** / **Container Tools** (ms-azuretools.vscode-containers)
 - **Python** (ms-python.python)
 - **Pylance** (ms-python.vscode-pylance)
 - **ESLint** (dbaeumer.vscode-eslint)
@@ -109,7 +109,7 @@ docker compose down && docker compose up -d --build
 ## Tips
 
 1. **Use `.env` for local development** - Copy `.env.example` to `.env` and adjust for local ports
-2. **Run backend + frontend separately** - Faster iteration than rebuilding Docker containers
+2. **Run backend + frontend separately** - Faster iteration than rebuilding Podman containers
 3. **Use Thunder Client or Postman** - Test API endpoints at http://localhost:8000/docs
 4. **Database GUI** - pgAdmin at http://localhost:5050 or use VS Code PostgreSQL extension
 5. **Hot reload works** - Backend (FastAPI) and frontend (Vite) both auto-reload on file changes
@@ -134,5 +134,7 @@ vf_cmdb/
 │   └── vite.config.ts
 ├── ansible/           # Ansible integration
 │   └── cmdb_inventory.py
-└── docker-compose.yml # Full stack deployment
+├── deploy/quadlet/    # systemd Quadlet units (production)
+├── deploy-podman.sh   # Deploy helper script
+└── podman-compose.yml # Full stack deployment
 ```

@@ -1,6 +1,22 @@
+# ---------------------------------------------------------------------------
+# Virtualfactor IT CMDB — Podman Compose stack
+#
+# Run with either:
+#   podman compose up -d          (podman v4.7+ built-in compose)
+#   podman-compose up -d          (the podman-compose Python tool)
+#
+# Notes for Podman:
+#   * Volume mounts use the ":Z" suffix so SELinux (Fedora/RHEL/Rocky) relabels
+#     them for the container. On non-SELinux hosts (Debian/Ubuntu) the ":Z" is
+#     harmless and simply ignored.
+#   * Builds reference "Containerfile" (Podman's native name) explicitly.
+#   * Works rootless — all published host ports are >1024.
+#   * For always-on production start-up, prefer the Quadlet units in
+#     deploy/quadlet/ (systemd-managed). See README.
+# ---------------------------------------------------------------------------
 services:
   db:
-    image: postgres:16
+    image: docker.io/library/postgres:16
     container_name: vf_cmdb_db
     restart: unless-stopped
     environment:
@@ -8,7 +24,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vfcmdb}
       POSTGRES_DB: ${POSTGRES_DB:-vfcmdb}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data:Z
     ports:
       - "${DB_PORT:-5432}:5432"
     healthcheck:
@@ -20,7 +36,10 @@ services:
       - cmdb
 
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: Containerfile
+    image: localhost/vf_cmdb_backend:latest
     container_name: vf_cmdb_backend
     restart: unless-stopped
     depends_on:
@@ -40,7 +59,10 @@ services:
       - cmdb
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      dockerfile: Containerfile
+    image: localhost/vf_cmdb_frontend:latest
     container_name: vf_cmdb_frontend
     restart: unless-stopped
     depends_on:
@@ -51,19 +73,19 @@ services:
       - cmdb
 
   pgadmin:
-    image: dpage/pgadmin4:latest
+    image: docker.io/dpage/pgadmin4:latest
     container_name: vf_cmdb_pgadmin
     restart: unless-stopped
     depends_on:
       - db
     environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@virtualfactor.local}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@virtualfactor.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
       PGADMIN_CONFIG_SERVER_MODE: "False"
     ports:
       - "${PGADMIN_PORT:-5050}:80"
     volumes:
-      - pgadmin:/var/lib/pgadmin
+      - pgadmin:/var/lib/pgadmin:Z
     networks:
       - cmdb
 

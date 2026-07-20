@@ -52,7 +52,7 @@ Centralize IT configuration information and facilitate the addition, update, and
 | **ORM** | SQLAlchemy (async) | 2.x | Database abstraction |
 | **Migrations** | Alembic | Latest | Database schema versioning |
 | **Database** | PostgreSQL | 16 | Relational database with `inet`/`cidr` types |
-| **Deployment** | Docker + Docker Compose | Latest | Container orchestration |
+| **Deployment** | Podman (rootless) + podman-compose / Quadlet | 4.x+ | Container orchestration |
 | **Web Server** | Nginx | 1.27-alpine | Serves frontend, proxies API |
 | **Version Control** | Git + GitHub | - | Source control |
 
@@ -73,7 +73,7 @@ Centralize IT configuration information and facilitate the addition, update, and
 ┌─────────────────────────────────────────────────────────────┐
 │              Proxmox Ubuntu VM (192.168.x.x)                │
 │  ┌──────────────────────────────────────────────────────┐   │
-│  │              Docker Compose Network                  │   │
+│  │              Podman Network (rootless)               │   │
 │  │                                                      │   │
 │  │  ┌──────────┐    ┌──────────┐    ┌──────────────┐  │   │
 │  │  │ Frontend │───▶│ Backend  │───▶│  PostgreSQL  │  │   │
@@ -110,7 +110,7 @@ Centralize IT configuration information and facilitate the addition, update, and
 |---------|------|--------|
 | Frontend (Nginx) | 8080 | Web UI - `http://vm-ip:8080` |
 | Backend (FastAPI) | 8000 | API + Docs - `http://vm-ip:8000/docs` |
-| PostgreSQL | 5432 | Internal only (Docker network) |
+| PostgreSQL | 5432 | Internal only (Podman network) |
 | pgAdmin | 5050 | DB Admin - `http://vm-ip:5050` |
 
 ---
@@ -330,7 +330,16 @@ vf_cmdb/                                    ← Git repository root
 ├── .git/                                   ← Git metadata
 ├── .gitignore                              ← Ignore node_modules, venv, pgdata, etc.
 ├── .env.example                            ← Environment variables template
-├── docker-compose.yml                      ← Full stack orchestration
+├── podman-compose.yml                      ← Full stack orchestration (Podman)
+├── deploy-podman.sh                        ← Deploy helper (up/down/logs/quadlet)
+├── deploy/quadlet/                         ← systemd Quadlet units (production)
+│   ├── vf-cmdb.network                     ← Podman network unit
+│   ├── vf-cmdb-pgdata.volume               ← Postgres data volume unit
+│   ├── vf-cmdb-pgadmin.volume              ← pgAdmin data volume unit
+│   ├── vf-cmdb-db.container                ← PostgreSQL container unit
+│   ├── vf-cmdb-backend.container           ← FastAPI container unit
+│   ├── vf-cmdb-frontend.container          ← Nginx/React container unit
+│   └── vf-cmdb-pgadmin.container           ← pgAdmin container unit
 │
 ├── README.md                               ← Main documentation
 ├── QUICK_START.md                          ← Quick deployment guide
@@ -339,7 +348,7 @@ vf_cmdb/                                    ← Git repository root
 ├── PROJECT_CONTEXT.md                      ← THIS FILE (project context for AI)
 │
 ├── backend/                                ← Python/FastAPI backend
-│   ├── Dockerfile                          ← Backend container build
+│   ├── Containerfile                       ← Backend container build
 │   ├── requirements.txt                    ← Python dependencies
 │   ├── alembic.ini                         ← Alembic config
 │   ├── seed.py                             ← Initial data seeder (idempotent)
@@ -375,7 +384,7 @@ vf_cmdb/                                    ← Git repository root
 │           └── dashboard.py                ← Dashboard summary stats
 │
 ├── frontend/                               ← React/TypeScript frontend
-│   ├── Dockerfile                          ← Frontend container build (multi-stage)
+│   ├── Containerfile                       ← Frontend container build (multi-stage)
 │   ├── nginx.conf                          ← Nginx config (serves static + proxy /api)
 │   ├── package.json                        ← NPM dependencies
 │   ├── package-lock.json                   ← Locked versions
@@ -437,7 +446,7 @@ vf_cmdb/                                    ← Git repository root
 - [x] Initial data seeder written (idempotent, can re-run safely)
 - [x] All 6 Excel files data imported and normalized
 - [x] Data corrections applied (WLAN addresses, duplicates, missing VLANs)
-- [x] Docker Compose setup with health checks
+- [x] Podman setup with health checks (podman-compose + Quadlet systemd units)
 - [x] Ansible dynamic inventory script
 - [x] Auto-generated naming engine
 - [x] IPAM with utilization and next-IP
@@ -472,21 +481,21 @@ vf_cmdb/                                    ← Git repository root
 
 3. **Deploy on VM** (User to do):
    ```bash
-   # Install Docker
-   curl -fsSL https://get.docker.com | sh
-   sudo usermod -aG docker $USER && newgrp docker
-   
+   # Install Podman (rootless, daemonless)
+   sudo apt-get update && sudo apt-get install -y podman podman-compose
+   # (Fedora/Rocky/RHEL: sudo dnf install -y podman podman-compose)
+
    # Clone and deploy
    git clone https://github.com/jallamasc/vf-cmdb.git
    cd vf-cmdb
    cp .env.example .env
    nano .env  # Set passwords
-   docker compose up -d
-   
-   # Initialize database
-   sleep 10
-   docker compose exec backend alembic upgrade head
-   docker compose exec backend python seed.py
+
+   # Start the stack (backend auto-runs migrations + seeding on first boot)
+   ./deploy-podman.sh up
+
+   # ...or run it as always-on systemd services via Quadlet:
+   # ./deploy-podman.sh quadlet && loginctl enable-linger $USER
    ```
 
 4. **Access and verify**:
@@ -531,13 +540,15 @@ vf_cmdb/                                    ← Git repository root
 - ✅ Changelog page filters correctly
 - ✅ Ansible page displays inventory JSON
 
-### Docker
-- ✅ All Dockerfiles build successfully
-- ✅ docker-compose.yml validated
+### Podman
+- ✅ Both Containerfiles present (backend + frontend)
+- ✅ podman-compose.yml validated (SELinux `:Z` volume flags, rootless-friendly)
+- ✅ Quadlet systemd units authored for always-on production
 - ✅ Health checks defined for all services
 - ✅ Volumes configured for persistence
+- ✅ deploy-podman.sh helper (up/down/restart/build/logs/ps/quadlet)
 
-**Note**: Full integration testing (docker compose up) not performed in this environment due to Docker daemon unavailability. Will be verified on target Proxmox VM.
+**Note**: Full integration testing (`podman compose up`) not performed in this environment due to Podman not being available here. Will be verified on the target Proxmox VM.
 
 ---
 
@@ -557,7 +568,7 @@ vf_cmdb/                                    ← Git repository root
 - ✅ **Tech stack** - User specifically requested Python backend + React frontend + PostgreSQL
 - ✅ **Naming convention logic** - This is core to the user's existing system
 - ✅ **Data model structure** - Already reviewed and approved
-- ✅ **Docker Compose setup** - Already configured for user's environment
+- ✅ **Podman setup** - Rootless podman-compose + Quadlet, already configured for user's environment (user chose Podman over Docker)
 - ✅ **No authentication** - User is the only user, runs on private network
 
 ### Common User Questions to Expect
@@ -565,7 +576,7 @@ vf_cmdb/                                    ← Git repository root
 - "How do I add a new device?" → Point to relevant page (Physical Servers, VMs, etc.)
 - "How do I see IP usage?" → Subnets page, utilization bar
 - "How do I use this with Ansible?" → `ansible/README.md`, use `cmdb_inventory.py`
-- "How do I back up?" → `docker compose exec db pg_dump` (see README)
+- "How do I back up?" → `podman exec -t vf_cmdb_db pg_dump` (see README)
 - "Can I export to Excel?" → Not yet implemented (future enhancement)
 
 ### Important Context from Source Data

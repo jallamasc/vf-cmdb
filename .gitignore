@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+
+# Node / frontend
+node_modules/
+frontend/dist/
+frontend/.vite/
+npm-debug.log*
+
+# Local Postgres data (dev)
+pgdata/
+*.log
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store

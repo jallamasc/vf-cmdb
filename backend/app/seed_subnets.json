@@ -1,0 +1,4130 @@
+{
+ "subnets_ipv4": [
+  {
+   "description": "Public Block / 1",
+   "vlan_id": 100,
+   "zone": "public",
+   "network": null,
+   "range_from": null,
+   "range_to": null,
+   "expansion_ceiling": null,
+   "prefix": null,
+   "gateway": null,
+   "roles": []
+  },
+  {
+   "description": "Public Block / 2",
+   "vlan_id": 101,
+   "zone": "public",
+   "network": null,
+   "range_from": null,
+   "range_to": null,
+   "expansion_ceiling": null,
+   "prefix": null,
+   "gateway": null,
+   "roles": []
+  },
+  {
+   "description": "Private Block",
+   "vlan_id": 107,
+   "zone": "private",
+   "network": "10.100.107.0",
+   "range_from": "10.100.107.1",
+   "range_to": "10.100.107.254",
+   "expansion_ceiling": null,
+   "prefix": 24,
+   "gateway": "10.100.107.1",
+   "roles": [
+    {
+     "role": "gateway",
+     "slot": 1,
+     "ipv4": "10.100.107.1"
+    },
+    {
+     "role": "gateway",
+     "slot": 2,
+     "ipv4": "10.100.107.10"
+    }
+   ]
+  },
+  {
+   "description": "Management / Networking",
+   "vlan_id": 66,
+   "zone": "management",
+   "network": "10.0.0.0",
+   "range_from": "10.0.0.1",
+   "range_to": "10.0.0.126",
+   "expansion_ceiling": "10.0.3.254",
+   "prefix": 25,
+   "gateway": "10.0.0.126",
+   "roles": [
+    {
+     "role": "gateway",
+     "slot": 1,
+     "ipv4": "10.0.0.126"
+    },
+    {
+     "role": "gateway",
+     "slot": 2,
+     "ipv4": "10.0.0.125"
+    },
+    {
+     "role": "gateway",
+     "slot": 3,
+     "ipv4": "10.0.0.124"
+    },
+    {
+     "role": "gateway",
+     "slot": 4,
+     "ipv4": "10.0.0.123"
+    },
+    {
+     "role": "switch",
+     "slot": 1,
+     "ipv4": "10.0.0.122"
+    },
+    {
+     "role": "switch",
+     "slot": 2,
+     "ipv4": "10.0.0.121"
+    },
+    {
+     "role": "switch",
+     "slot": 3,
+     "ipv4": "10.0.0.120"
+    },
+    {
+     "role": "switch",
+     "slot": 4,
+     "ipv4": "10.0.0.119"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 1,
+     "ipv4": "10.0.0.118"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 2,
+     "ipv4": "10.0.0.117"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 3,
+     "ipv4": "10.0.0.116"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 4,
+     "ipv4": "10.0.0.115"
+    },
+    {
+     "role": "dns",
+     "slot": 1,
+     "ipv4": "10.0.0.114"
+    },
+    {
+     "role": "dns",
+     "slot": 2,
+     "ipv4": "10.0.0.113"
+    },
+    {
+     "role": "dns",
+     "slot": 3,
+     "ipv4": "10.0.0.112"
+    },
+    {
+     "role": "host_bridge",
+     "slot": 1,
+     "ipv4": "10.0.0.111"
+    },
+    {
+     "role": "access_point",
+     "slot": 1,
+     "ipv4": "10.0.0.110"
+    },
+    {
+     "role": "access_point",
+     "slot": 2,
+     "ipv4": "10.0.0.109"
+    },
+    {
+     "role": "deployment_server",
+     "slot": 1,
+     "ipv4": "10.0.0.108"
+    },
+    {
+     "role": "test_ip",
+     "slot": 1,
+     "ipv4": "10.0.0.107"
+    }
+   ]
+  },
+  {
+   "description": "Management / Devices",
+   "vlan_id": 67,
+   "zone": "management",
+   "network": "10.0.4.0",
+   "range_from": "10.0.4.1",
+   "range_to": "10.0.4.126",
+   "expansion_ceiling": "10.0.7.254",
+   "prefix": 25,
+   "gateway": "10.0.4.126",
+   "roles": [
+    {
+     "role": "gateway",
+     "slot": 1,
+     "ipv4": "10.0.4.126"
+    },
+    {
+     "role": "gateway",
+     "slot": 2,
+     "ipv4": "10.0.4.125"
+    },
+    {
+     "role": "gateway",
+     "slot": 3,
+     "ipv4": "10.0.4.124"
+    },
+    {
+     "role": "gateway",
+     "slot": 4,
+     "ipv4": "10.0.4.123"
+    },
+    {
+     "role": "switch",
+     "slot": 1,
+     "ipv4": "10.0.4.122"
+    },
+    {
+     "role": "switch",
+     "slot": 2,
+     "ipv4": "10.0.4.121"
+    },
+    {
+     "role": "switch",
+     "slot": 3,
+     "ipv4": "10.0.4.120"
+    },
+    {
+     "role": "switch",
+     "slot": 4,
+     "ipv4": "10.0.4.119"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 1,
+     "ipv4": "10.0.4.118"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 2,
+     "ipv4": "10.0.4.117"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 3,
+     "ipv4": "10.0.4.116"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 4,
+     "ipv4": "10.0.4.115"
+    },
+    {
+     "role": "dns",
+     "slot": 1,
+     "ipv4": "10.0.4.114"
+    },
+    {
+     "role": "dns",
+     "slot": 2,
+     "ipv4": "10.0.4.113"
+    },
+    {
+     "role": "dns",
+     "slot": 3,
+     "ipv4": "10.0.4.112"
+    },
+    {
+     "role": "host_bridge",
+     "slot": 1,
+     "ipv4": "10.0.4.111"
+    },
+    {
+     "role": "access_point",
+     "slot": 1,
+     "ipv4": "10.0.4.110"
+    },
+    {
+     "role": "access_point",
+     "slot": 2,
+     "ipv4": "10.0.4.109"
+    },
+    {
+     "role": "deployment_server",
+     "slot": 1,
+     "ipv4": "10.0.4.108"
+    },
+    {
+     "role": "test_ip",
+     "slot": 1,
+     "ipv4": "10.0.4.107"
+    }
+   ]
+  },
+  {
+   "description": "Management / Storage",
+   "vlan_id": null,
+   "zone": "management",
+   "network": "10.0.8.0",
+   "range_from": "10.0.8.1",
+   "range_to": "10.0.8.126",
+   "expansion_ceiling": "10.0.11.254",
+   "prefix": 25,
+   "gateway": "10.0.8.126",
+   "roles": [
+    {
+     "role": "gateway",
+     "slot": 1,
+     "ipv4": "10.0.8.126"
+    },
+    {
+     "role": "gateway",
+     "slot": 2,
+     "ipv4": "10.0.8.125"
+    },
+    {
+     "role": "gateway",
+     "slot": 3,
+     "ipv4": "10.0.11.124"
+    },
+    {
+     "role": "gateway",
+     "slot": 4,
+     "ipv4": "10.0.11.123"
+    },
+    {
+     "role": "switch",
+     "slot": 1,
+     "ipv4": "10.0.11.122"
+    },
+    {
+     "role": "switch",
+     "slot": 2,
+     "ipv4": "10.0.11.121"
+    },
+    {
+     "role": "switch",
+     "slot": 3,
+     "ipv4": "10.0.11.120"
+    },
+    {
+     "role": "switch",
+     "slot": 4,
+     "ipv4": "10.0.11.119"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 1,
+     "ipv4": "10.0.11.118"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 2,
+     "ipv4": "10.0.11.117"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 3,
+     "ipv4": "10.0.11.116"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 4,
+     "ipv4": "10.0.11.115"
+    },
+    {
+     "role": "dns",
+     "slot": 1,
+     "ipv4": "10.0.11.114"
+    },
+    {
+     "role": "dns",
+     "slot": 2,
+     "ipv4": "10.0.11.113"
+    },
+    {
+     "role": "dns",
+     "slot": 3,
+     "ipv4": "10.0.11.112"
+    },
+    {
+     "role": "host_bridge",
+     "slot": 1,
+     "ipv4": "10.0.11.111"
+    },
+    {
+     "role": "access_point",
+     "slot": 1,
+     "ipv4": "10.0.11.110"
+    },
+    {
+     "role": "access_point",
+     "slot": 2,
+     "ipv4": "10.0.11.109"
+    },
+    {
+     "role": "deployment_server",
+     "slot": 1,
+     "ipv4": "10.0.11.108"
+    },
+    {
+     "role": "test_ip",
+     "slot": 1,
+     "ipv4": "10.0.11.107"
+    }
+   ]
+  },
+  {
+   "description": "Management / Facilities",
+   "vlan_id": null,
+   "zone": "management",
+   "network": "10.0.12.0",
+   "range_from": "10.0.12.1",
+   "range_to": "10.0.12.126",
+   "expansion_ceiling": "10.0.15.254",
+   "prefix": 25,
+   "gateway": "10.0.12.126",
+   "roles": [
+    {
+     "role": "gateway",
+     "slot": 1,
+     "ipv4": "10.0.12.126"
+    },
+    {
+     "role": "gateway",
+     "slot": 2,
+     "ipv4": "10.0.12.125"
+    },
+    {
+     "role": "gateway",
+     "slot": 3,
+     "ipv4": "10.0.12.124"
+    },
+    {
+     "role": "gateway",
+     "slot": 4,
+     "ipv4": "10.0.12.123"
+    },
+    {
+     "role": "switch",
+     "slot": 1,
+     "ipv4": "10.0.12.122"
+    },
+    {
+     "role": "switch",
+     "slot": 2,
+     "ipv4": "10.0.12.121"
+    },
+    {
+     "role": "switch",
+     "slot": 3,
+     "ipv4": "10.0.12.120"
+    },
+    {
+     "role": "switch",
+     "slot": 4,
+     "ipv4": "10.0.12.119"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 1,
+     "ipv4": "10.0.12.118"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 2,
+     "ipv4": "10.0.12.117"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 3,
+     "ipv4": "10.0.12.116"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 4,
+     "ipv4": "10.0.12.115"
+    },
+    {
+     "role": "dns",
+     "slot": 1,
+     "ipv4": "10.0.12.114"
+    },
+    {
+     "role": "dns",
+     "slot": 2,
+     "ipv4": "10.0.12.113"
+    },
+    {
+     "role": "dns",
+     "slot": 3,
+     "ipv4": "10.0.12.112"
+    },
+    {
+     "role": "host_bridge",
+     "slot": 1,
+     "ipv4": "10.0.12.111"
+    },
+    {
+     "role": "access_point",
+     "slot": 1,
+     "ipv4": "10.0.12.110"
+    },
+    {
+     "role": "access_point",
+     "slot": 2,
+     "ipv4": "10.0.12.109"
+    },
+    {
+     "role": "deployment_server",
+     "slot": 1,
+     "ipv4": "10.0.12.108"
+    },
+    {
+     "role": "test_ip",
+     "slot": 1,
+     "ipv4": "10.0.12.107"
+    }
+   ]
+  },
+  {
+   "description": "Servers / Hypervisors",
+   "vlan_id": 176,
+   "zone": "servers",
+   "network": "10.0.16.0",
+   "range_from": "10.0.16.1",
+   "range_to": "10.0.16.126",
+   "expansion_ceiling": "10.0.19.254",
+   "prefix": 25,
+   "gateway": "10.0.16.126",
+   "roles": [
+    {
+     "role": "gateway",
+     "slot": 1,
+     "ipv4": "10.0.16.126"
+    },
+    {
+     "role": "gateway",
+     "slot": 2,
+     "ipv4": "10.0.16.125"
+    },
+    {
+     "role": "gateway",
+     "slot": 3,
+     "ipv4": "10.0.16.124"
+    },
+    {
+     "role": "gateway",
+     "slot": 4,
+     "ipv4": "10.0.16.123"
+    },
+    {
+     "role": "switch",
+     "slot": 1,
+     "ipv4": "10.0.16.122"
+    },
+    {
+     "role": "switch",
+     "slot": 2,
+     "ipv4": "10.0.16.121"
+    },
+    {
+     "role": "switch",
+     "slot": 3,
+     "ipv4": "10.0.16.120"
+    },
+    {
+     "role": "switch",
+     "slot": 4,
+     "ipv4": "10.0.16.119"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 1,
+     "ipv4": "10.0.16.118"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 2,
+     "ipv4": "10.0.16.117"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 3,
+     "ipv4": "10.0.16.116"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 4,
+     "ipv4": "10.0.16.115"
+    },
+    {
+     "role": "dns",
+     "slot": 1,
+     "ipv4": "10.0.16.114"
+    },
+    {
+     "role": "dns",
+     "slot": 2,
+     "ipv4": "10.0.16.113"
+    },
+    {
+     "role": "dns",
+     "slot": 3,
+     "ipv4": "10.0.16.112"
+    },
+    {
+     "role": "host_bridge",
+     "slot": 1,
+     "ipv4": "10.0.16.111"
+    },
+    {
+     "role": "access_point",
+     "slot": 1,
+     "ipv4": "10.0.16.110"
+    },
+    {
+     "role": "access_point",
+     "slot": 2,
+     "ipv4": "10.0.16.109"
+    },
+    {
+     "role": "deployment_server",
+     "slot": 1,
+     "ipv4": "10.0.16.108"
+    },
+    {
+     "role": "test_ip",
+     "slot": 1,
+     "ipv4": "10.0.16.107"
+    }
+   ]
+  },
+  {
+   "description": "Servers / 1",
+   "vlan_id": 177,
+   "zone": "servers",
+   "network": "10.0.20.0",
+   "range_from": "10.0.20.1",
+   "range_to": "10.0.20.126",
+   "expansion_ceiling": "10.0.23.254",
+   "prefix": 25,
+   "gateway": "10.0.20.126",
+   "roles": [
+    {
+     "role": "gateway",
+     "slot": 1,
+     "ipv4": "10.0.20.126"
+    },
+    {
+     "role": "gateway",
+     "slot": 2,
+     "ipv4": "10.0.20.125"
+    },
+    {
+     "role": "gateway",
+     "slot": 3,
+     "ipv4": "10.0.20.124"
+    },
+    {
+     "role": "gateway",
+     "slot": 4,
+     "ipv4": "10.0.20.123"
+    },
+    {
+     "role": "switch",
+     "slot": 1,
+     "ipv4": "10.0.20.122"
+    },
+    {
+     "role": "switch",
+     "slot": 2,
+     "ipv4": "10.0.20.121"
+    },
+    {
+     "role": "switch",
+     "slot": 3,
+     "ipv4": "10.0.20.120"
+    },
+    {
+     "role": "switch",
+     "slot": 4,
+     "ipv4": "10.0.20.119"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 1,
+     "ipv4": "10.0.20.118"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 2,
+     "ipv4": "10.0.20.117"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 3,
+     "ipv4": "10.0.20.116"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 4,
+     "ipv4": "10.0.20.115"
+    },
+    {
+     "role": "dns",
+     "slot": 1,
+     "ipv4": "10.0.20.114"
+    },
+    {
+     "role": "dns",
+     "slot": 2,
+     "ipv4": "10.0.20.113"
+    },
+    {
+     "role": "dns",
+     "slot": 3,
+     "ipv4": "10.0.20.112"
+    },
+    {
+     "role": "host_bridge",
+     "slot": 1,
+     "ipv4": "10.0.20.111"
+    },
+    {
+     "role": "access_point",
+     "slot": 1,
+     "ipv4": "10.0.20.110"
+    },
+    {
+     "role": "access_point",
+     "slot": 2,
+     "ipv4": "10.0.20.109"
+    },
+    {
+     "role": "deployment_server",
+     "slot": 1,
+     "ipv4": "10.0.20.108"
+    },
+    {
+     "role": "test_ip",
+     "slot": 1,
+     "ipv4": "10.0.20.107"
+    }
+   ]
+  },
+  {
+   "description": "Servers / 2",
+   "vlan_id": 178,
+   "zone": "servers",
+   "network": "10.0.24.0",
+   "range_from": "10.0.24.1",
+   "range_to": "10.0.24.126",
+   "expansion_ceiling": "10.0.27.254",
+   "prefix": 25,
+   "gateway": "10.0.24.126",
+   "roles": [
+    {
+     "role": "gateway",
+     "slot": 1,
+     "ipv4": "10.0.24.126"
+    },
+    {
+     "role": "gateway",
+     "slot": 2,
+     "ipv4": "10.0.24.125"
+    },
+    {
+     "role": "gateway",
+     "slot": 3,
+     "ipv4": "10.0.24.124"
+    },
+    {
+     "role": "gateway",
+     "slot": 4,
+     "ipv4": "10.0.24.123"
+    },
+    {
+     "role": "switch",
+     "slot": 1,
+     "ipv4": "10.0.24.122"
+    },
+    {
+     "role": "switch",
+     "slot": 2,
+     "ipv4": "10.0.24.121"
+    },
+    {
+     "role": "switch",
+     "slot": 3,
+     "ipv4": "10.0.24.120"
+    },
+    {
+     "role": "switch",
+     "slot": 4,
+     "ipv4": "10.0.24.119"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 1,
+     "ipv4": "10.0.24.118"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 2,
+     "ipv4": "10.0.24.117"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 3,
+     "ipv4": "10.0.24.116"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 4,
+     "ipv4": "10.0.24.115"
+    },
+    {
+     "role": "dns",
+     "slot": 1,
+     "ipv4": "10.0.24.114"
+    },
+    {
+     "role": "dns",
+     "slot": 2,
+     "ipv4": "10.0.24.113"
+    },
+    {
+     "role": "dns",
+     "slot": 3,
+     "ipv4": "10.0.24.112"
+    },
+    {
+     "role": "host_bridge",
+     "slot": 1,
+     "ipv4": "10.0.24.111"
+    },
+    {
+     "role": "access_point",
+     "slot": 1,
+     "ipv4": "10.0.24.110"
+    },
+    {
+     "role": "access_point",
+     "slot": 2,
+     "ipv4": "10.0.24.109"
+    },
+    {
+     "role": "deployment_server",
+     "slot": 1,
+     "ipv4": "10.0.24.108"
+    },
+    {
+     "role": "test_ip",
+     "slot": 1,
+     "ipv4": "10.0.24.107"
+    }
+   ]
+  },
+  {
+   "description": "Servers / Reserved",
+   "vlan_id": null,
+   "zone": "servers",
+   "network": "10.0.28.1",
+   "range_from": "10.0.28.1",
+   "range_to": "10.0.28.126",
+   "expansion_ceiling": "10.0.31.254",
+   "prefix": 25,
+   "gateway": "10.0.28.126",
+   "roles": [
+    {
+     "role": "gateway",
+     "slot": 1,
+     "ipv4": "10.0.28.126"
+    },
+    {
+     "role": "gateway",
+     "slot": 2,
+     "ipv4": "10.0.28.125"
+    },
+    {
+     "role": "gateway",
+     "slot": 3,
+     "ipv4": "10.0.28.124"
+    },
+    {
+     "role": "gateway",
+     "slot": 4,
+     "ipv4": "10.0.28.123"
+    },
+    {
+     "role": "switch",
+     "slot": 1,
+     "ipv4": "10.0.28.122"
+    },
+    {
+     "role": "switch",
+     "slot": 2,
+     "ipv4": "10.0.28.121"
+    },
+    {
+     "role": "switch",
+     "slot": 3,
+     "ipv4": "10.0.28.120"
+    },
+    {
+     "role": "switch",
+     "slot": 4,
+     "ipv4": "10.0.28.119"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 1,
+     "ipv4": "10.0.28.118"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 2,
+     "ipv4": "10.0.28.117"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 3,
+     "ipv4": "10.0.28.116"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 4,
+     "ipv4": "10.0.28.115"
+    },
+    {
+     "role": "dns",
+     "slot": 1,
+     "ipv4": "10.0.28.114"
+    },
+    {
+     "role": "dns",
+     "slot": 2,
+     "ipv4": "10.0.28.113"
+    },
+    {
+     "role": "dns",
+     "slot": 3,
+     "ipv4": "10.0.28.112"
+    },
+    {
+     "role": "host_bridge",
+     "slot": 1,
+     "ipv4": "10.0.28.111"
+    },
+    {
+     "role": "access_point",
+     "slot": 1,
+     "ipv4": "10.0.28.110"
+    },
+    {
+     "role": "access_point",
+     "slot": 2,
+     "ipv4": "10.0.28.109"
+    },
+    {
+     "role": "deployment_server",
+     "slot": 1,
+     "ipv4": "10.0.28.108"
+    },
+    {
+     "role": "test_ip",
+     "slot": 1,
+     "ipv4": "10.0.28.107"
+    }
+   ]
+  },
+  {
+   "description": "Storage / Block",
+   "vlan_id": 186,
+   "zone": "storage",
+   "network": "10.0.32.0",
+   "range_from": "10.0.32.1",
+   "range_to": "10.0.32.254",
+   "expansion_ceiling": "10.0.32.254",
+   "prefix": 25,
+   "gateway": "10.0.32.126",
+   "roles": [
+    {
+     "role": "gateway",
+     "slot": 1,
+     "ipv4": "10.0.32.126"
+    },
+    {
+     "role": "gateway",
+     "slot": 2,
+     "ipv4": "10.0.32.125"
+    },
+    {
+     "role": "gateway",
+     "slot": 3,
+     "ipv4": "10.0.32.124"
+    },
+    {
+     "role": "gateway",
+     "slot": 4,
+     "ipv4": "10.0.32.123"
+    },
+    {
+     "role": "switch",
+     "slot": 1,
+     "ipv4": "10.0.32.122"
+    },
+    {
+     "role": "switch",
+     "slot": 2,
+     "ipv4": "10.0.32.121"
+    },
+    {
+     "role": "switch",
+     "slot": 3,
+     "ipv4": "10.0.32.120"
+    },
+    {
+     "role": "switch",
+     "slot": 4,
+     "ipv4": "10.0.32.119"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 1,
+     "ipv4": "10.0.32.118"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 2,
+     "ipv4": "10.0.32.117"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 3,
+     "ipv4": "10.0.32.116"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 4,
+     "ipv4": "10.0.32.115"
+    },
+    {
+     "role": "dns",
+     "slot": 1,
+     "ipv4": "10.0.32.114"
+    },
+    {
+     "role": "dns",
+     "slot": 2,
+     "ipv4": "10.0.32.113"
+    },
+    {
+     "role": "dns",
+     "slot": 3,
+     "ipv4": "10.0.32.112"
+    },
+    {
+     "role": "host_bridge",
+     "slot": 1,
+     "ipv4": "10.0.32.111"
+    },
+    {
+     "role": "access_point",
+     "slot": 1,
+     "ipv4": "10.0.32.110"
+    },
+    {
+     "role": "access_point",
+     "slot": 2,
+     "ipv4": "10.0.32.109"
+    },
+    {
+     "role": "deployment_server",
+     "slot": 1,
+     "ipv4": "10.0.32.108"
+    },
+    {
+     "role": "test_ip",
+     "slot": 1,
+     "ipv4": "10.0.32.107"
+    }
+   ]
+  },
+  {
+   "description": "Storage / Object",
+   "vlan_id": 187,
+   "zone": "storage",
+   "network": "10.0.33.0",
+   "range_from": "10.0.33.1",
+   "range_to": "10.0.33.254",
+   "expansion_ceiling": "10.0.33.254",
+   "prefix": 25,
+   "gateway": "10.0.33.126",
+   "roles": [
+    {
+     "role": "gateway",
+     "slot": 1,
+     "ipv4": "10.0.33.126"
+    },
+    {
+     "role": "gateway",
+     "slot": 2,
+     "ipv4": "10.0.33.125"
+    },
+    {
+     "role": "gateway",
+     "slot": 3,
+     "ipv4": "10.0.33.124"
+    },
+    {
+     "role": "gateway",
+     "slot": 4,
+     "ipv4": "10.0.33.123"
+    },
+    {
+     "role": "switch",
+     "slot": 1,
+     "ipv4": "10.0.33.122"
+    },
+    {
+     "role": "switch",
+     "slot": 2,
+     "ipv4": "10.0.33.121"
+    },
+    {
+     "role": "switch",
+     "slot": 3,
+     "ipv4": "10.0.33.120"
+    },
+    {
+     "role": "switch",
+     "slot": 4,
+     "ipv4": "10.0.33.119"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 1,
+     "ipv4": "10.0.33.118"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 2,
+     "ipv4": "10.0.33.117"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 3,
+     "ipv4": "10.0.33.116"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 4,
+     "ipv4": "10.0.33.115"
+    },
+    {
+     "role": "dns",
+     "slot": 1,
+     "ipv4": "10.0.33.114"
+    },
+    {
+     "role": "dns",
+     "slot": 2,
+     "ipv4": "10.0.33.113"
+    },
+    {
+     "role": "dns",
+     "slot": 3,
+     "ipv4": "10.0.33.112"
+    },
+    {
+     "role": "host_bridge",
+     "slot": 1,
+     "ipv4": "10.0.33.111"
+    },
+    {
+     "role": "access_point",
+     "slot": 1,
+     "ipv4": "10.0.33.110"
+    },
+    {
+     "role": "access_point",
+     "slot": 2,
+     "ipv4": "10.0.33.109"
+    },
+    {
+     "role": "deployment_server",
+     "slot": 1,
+     "ipv4": "10.0.33.108"
+    },
+    {
+     "role": "test_ip",
+     "slot": 1,
+     "ipv4": "10.0.33.107"
+    }
+   ]
+  },
+  {
+   "description": "Storage / File",
+   "vlan_id": 188,
+   "zone": "storage",
+   "network": "10.0.34.0",
+   "range_from": "10.0.34.1",
+   "range_to": "10.0.34.254",
+   "expansion_ceiling": "10.0.34.254",
+   "prefix": 25,
+   "gateway": "10.0.34.126",
+   "roles": [
+    {
+     "role": "gateway",
+     "slot": 1,
+     "ipv4": "10.0.34.126"
+    },
+    {
+     "role": "gateway",
+     "slot": 2,
+     "ipv4": "10.0.34.125"
+    },
+    {
+     "role": "gateway",
+     "slot": 3,
+     "ipv4": "10.0.34.124"
+    },
+    {
+     "role": "gateway",
+     "slot": 4,
+     "ipv4": "10.0.34.123"
+    },
+    {
+     "role": "switch",
+     "slot": 1,
+     "ipv4": "10.0.34.122"
+    },
+    {
+     "role": "switch",
+     "slot": 2,
+     "ipv4": "10.0.34.121"
+    },
+    {
+     "role": "switch",
+     "slot": 3,
+     "ipv4": "10.0.34.120"
+    },
+    {
+     "role": "switch",
+     "slot": 4,
+     "ipv4": "10.0.34.119"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 1,
+     "ipv4": "10.0.34.118"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 2,
+     "ipv4": "10.0.34.117"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 3,
+     "ipv4": "10.0.34.116"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 4,
+     "ipv4": "10.0.34.115"
+    },
+    {
+     "role": "dns",
+     "slot": 1,
+     "ipv4": "10.0.34.114"
+    },
+    {
+     "role": "dns",
+     "slot": 2,
+     "ipv4": "10.0.34.113"
+    },
+    {
+     "role": "dns",
+     "slot": 3,
+     "ipv4": "10.0.34.112"
+    },
+    {
+     "role": "host_bridge",
+     "slot": 1,
+     "ipv4": "10.0.34.111"
+    },
+    {
+     "role": "access_point",
+     "slot": 1,
+     "ipv4": "10.0.34.110"
+    },
+    {
+     "role": "access_point",
+     "slot": 2,
+     "ipv4": "10.0.34.109"
+    },
+    {
+     "role": "deployment_server",
+     "slot": 1,
+     "ipv4": "10.0.34.108"
+    },
+    {
+     "role": "test_ip",
+     "slot": 1,
+     "ipv4": "10.0.34.107"
+    }
+   ]
+  },
+  {
+   "description": "Storage / Reserved",
+   "vlan_id": 189,
+   "zone": "storage",
+   "network": "10.0.35.0",
+   "range_from": "10.0.35.1",
+   "range_to": "10.0.35.126",
+   "expansion_ceiling": "10.0.35.254",
+   "prefix": 25,
+   "gateway": "10.0.35.126",
+   "roles": [
+    {
+     "role": "gateway",
+     "slot": 1,
+     "ipv4": "10.0.35.126"
+    },
+    {
+     "role": "gateway",
+     "slot": 2,
+     "ipv4": "10.0.35.125"
+    },
+    {
+     "role": "gateway",
+     "slot": 3,
+     "ipv4": "10.0.35.124"
+    },
+    {
+     "role": "gateway",
+     "slot": 4,
+     "ipv4": "10.0.35.123"
+    },
+    {
+     "role": "switch",
+     "slot": 1,
+     "ipv4": "10.0.35.122"
+    },
+    {
+     "role": "switch",
+     "slot": 2,
+     "ipv4": "10.0.35.121"
+    },
+    {
+     "role": "switch",
+     "slot": 3,
+     "ipv4": "10.0.35.120"
+    },
+    {
+     "role": "switch",
+     "slot": 4,
+     "ipv4": "10.0.35.119"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 1,
+     "ipv4": "10.0.35.118"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 2,
+     "ipv4": "10.0.35.117"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 3,
+     "ipv4": "10.0.35.116"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 4,
+     "ipv4": "10.0.35.115"
+    },
+    {
+     "role": "dns",
+     "slot": 1,
+     "ipv4": "10.0.35.114"
+    },
+    {
+     "role": "dns",
+     "slot": 2,
+     "ipv4": "10.0.35.113"
+    },
+    {
+     "role": "dns",
+     "slot": 3,
+     "ipv4": "10.0.35.112"
+    },
+    {
+     "role": "host_bridge",
+     "slot": 1,
+     "ipv4": "10.0.35.111"
+    },
+    {
+     "role": "access_point",
+     "slot": 1,
+     "ipv4": "10.0.35.110"
+    },
+    {
+     "role": "access_point",
+     "slot": 2,
+     "ipv4": "10.0.35.109"
+    },
+    {
+     "role": "deployment_server",
+     "slot": 1,
+     "ipv4": "10.0.35.108"
+    },
+    {
+     "role": "test_ip",
+     "slot": 1,
+     "ipv4": "10.0.35.107"
+    }
+   ]
+  },
+  {
+   "description": "Service / Applications / Containers / 1",
+   "vlan_id": 196,
+   "zone": "services",
+   "network": "10.0.36.0",
+   "range_from": "10.0.36.1",
+   "range_to": "10.0.36.126",
+   "expansion_ceiling": "10.0.39.254",
+   "prefix": 25,
+   "gateway": "10.0.36.126",
+   "roles": [
+    {
+     "role": "gateway",
+     "slot": 1,
+     "ipv4": "10.0.36.126"
+    },
+    {
+     "role": "gateway",
+     "slot": 2,
+     "ipv4": "10.0.36.125"
+    },
+    {
+     "role": "gateway",
+     "slot": 3,
+     "ipv4": "10.0.36.124"
+    },
+    {
+     "role": "gateway",
+     "slot": 4,
+     "ipv4": "10.0.36.123"
+    },
+    {
+     "role": "switch",
+     "slot": 1,
+     "ipv4": "10.0.36.122"
+    },
+    {
+     "role": "switch",
+     "slot": 2,
+     "ipv4": "10.0.36.121"
+    },
+    {
+     "role": "switch",
+     "slot": 3,
+     "ipv4": "10.0.36.120"
+    },
+    {
+     "role": "switch",
+     "slot": 4,
+     "ipv4": "10.0.36.119"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 1,
+     "ipv4": "10.0.36.118"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 2,
+     "ipv4": "10.0.36.117"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 3,
+     "ipv4": "10.0.36.116"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 4,
+     "ipv4": "10.0.36.115"
+    },
+    {
+     "role": "dns",
+     "slot": 1,
+     "ipv4": "10.0.36.114"
+    },
+    {
+     "role": "dns",
+     "slot": 2,
+     "ipv4": "10.0.36.113"
+    },
+    {
+     "role": "dns",
+     "slot": 3,
+     "ipv4": "10.0.36.112"
+    },
+    {
+     "role": "host_bridge",
+     "slot": 1,
+     "ipv4": "10.0.36.111"
+    },
+    {
+     "role": "access_point",
+     "slot": 1,
+     "ipv4": "10.0.36.110"
+    },
+    {
+     "role": "access_point",
+     "slot": 2,
+     "ipv4": "10.0.36.109"
+    },
+    {
+     "role": "deployment_server",
+     "slot": 1,
+     "ipv4": "10.0.36.108"
+    },
+    {
+     "role": "test_ip",
+     "slot": 1,
+     "ipv4": "10.0.36.107"
+    }
+   ]
+  },
+  {
+   "description": "Service / Applications / Containers / 2",
+   "vlan_id": 197,
+   "zone": "services",
+   "network": "10.0.40.0",
+   "range_from": "10.0.40.1",
+   "range_to": "10.0.40.126",
+   "expansion_ceiling": "10.0.43.254",
+   "prefix": 25,
+   "gateway": "10.0.40.126",
+   "roles": [
+    {
+     "role": "gateway",
+     "slot": 1,
+     "ipv4": "10.0.40.126"
+    },
+    {
+     "role": "gateway",
+     "slot": 2,
+     "ipv4": "10.0.40.125"
+    },
+    {
+     "role": "gateway",
+     "slot": 3,
+     "ipv4": "10.0.40.124"
+    },
+    {
+     "role": "gateway",
+     "slot": 4,
+     "ipv4": "10.0.40.123"
+    },
+    {
+     "role": "switch",
+     "slot": 1,
+     "ipv4": "10.0.40.122"
+    },
+    {
+     "role": "switch",
+     "slot": 2,
+     "ipv4": "10.0.40.121"
+    },
+    {
+     "role": "switch",
+     "slot": 3,
+     "ipv4": "10.0.40.120"
+    },
+    {
+     "role": "switch",
+     "slot": 4,
+     "ipv4": "10.0.40.119"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 1,
+     "ipv4": "10.0.40.118"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 2,
+     "ipv4": "10.0.40.117"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 3,
+     "ipv4": "10.0.40.116"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 4,
+     "ipv4": "10.0.40.115"
+    },
+    {
+     "role": "dns",
+     "slot": 1,
+     "ipv4": "10.0.40.114"
+    },
+    {
+     "role": "dns",
+     "slot": 2,
+     "ipv4": "10.0.40.113"
+    },
+    {
+     "role": "dns",
+     "slot": 3,
+     "ipv4": "10.0.40.112"
+    },
+    {
+     "role": "host_bridge",
+     "slot": 1,
+     "ipv4": "10.0.40.111"
+    },
+    {
+     "role": "access_point",
+     "slot": 1,
+     "ipv4": "10.0.40.110"
+    },
+    {
+     "role": "access_point",
+     "slot": 2,
+     "ipv4": "10.0.40.109"
+    },
+    {
+     "role": "deployment_server",
+     "slot": 1,
+     "ipv4": "10.0.40.108"
+    },
+    {
+     "role": "test_ip",
+     "slot": 1,
+     "ipv4": "10.0.40.107"
+    }
+   ]
+  },
+  {
+   "description": "Service / Applications / Containers / 3",
+   "vlan_id": 198,
+   "zone": "services",
+   "network": "10.0.44.0",
+   "range_from": "10.0.44.1",
+   "range_to": "10.0.44.126",
+   "expansion_ceiling": "10.0.44.254",
+   "prefix": 25,
+   "gateway": "10.0.44.126",
+   "roles": [
+    {
+     "role": "gateway",
+     "slot": 1,
+     "ipv4": "10.0.44.126"
+    },
+    {
+     "role": "gateway",
+     "slot": 2,
+     "ipv4": "10.0.44.125"
+    },
+    {
+     "role": "gateway",
+     "slot": 3,
+     "ipv4": "10.0.44.124"
+    },
+    {
+     "role": "gateway",
+     "slot": 4,
+     "ipv4": "10.0.44.123"
+    },
+    {
+     "role": "switch",
+     "slot": 1,
+     "ipv4": "10.0.44.122"
+    },
+    {
+     "role": "switch",
+     "slot": 2,
+     "ipv4": "10.0.44.121"
+    },
+    {
+     "role": "switch",
+     "slot": 3,
+     "ipv4": "10.0.44.120"
+    },
+    {
+     "role": "switch",
+     "slot": 4,
+     "ipv4": "10.0.44.119"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 1,
+     "ipv4": "10.0.44.118"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 2,
+     "ipv4": "10.0.44.117"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 3,
+     "ipv4": "10.0.44.116"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 4,
+     "ipv4": "10.0.44.115"
+    },
+    {
+     "role": "dns",
+     "slot": 1,
+     "ipv4": "10.0.44.114"
+    },
+    {
+     "role": "dns",
+     "slot": 2,
+     "ipv4": "10.0.44.113"
+    },
+    {
+     "role": "dns",
+     "slot": 3,
+     "ipv4": "10.0.44.112"
+    },
+    {
+     "role": "host_bridge",
+     "slot": 1,
+     "ipv4": "10.0.44.111"
+    },
+    {
+     "role": "access_point",
+     "slot": 1,
+     "ipv4": "10.0.44.110"
+    },
+    {
+     "role": "access_point",
+     "slot": 2,
+     "ipv4": "10.0.44.109"
+    },
+    {
+     "role": "deployment_server",
+     "slot": 1,
+     "ipv4": "10.0.44.108"
+    },
+    {
+     "role": "test_ip",
+     "slot": 1,
+     "ipv4": "10.0.44.107"
+    }
+   ]
+  },
+  {
+   "description": "Service / Applications / Reserved",
+   "vlan_id": 199,
+   "zone": "services",
+   "network": "10.0.52.0",
+   "range_from": "10.0.52.1",
+   "range_to": "10.0.52.126",
+   "expansion_ceiling": "10.0.55.254",
+   "prefix": 25,
+   "gateway": "10.0.52.126",
+   "roles": [
+    {
+     "role": "gateway",
+     "slot": 1,
+     "ipv4": "10.0.52.126"
+    },
+    {
+     "role": "gateway",
+     "slot": 2,
+     "ipv4": "10.0.52.125"
+    },
+    {
+     "role": "gateway",
+     "slot": 3,
+     "ipv4": "10.0.52.124"
+    },
+    {
+     "role": "gateway",
+     "slot": 4,
+     "ipv4": "10.0.52.123"
+    },
+    {
+     "role": "switch",
+     "slot": 1,
+     "ipv4": "10.0.52.122"
+    },
+    {
+     "role": "switch",
+     "slot": 2,
+     "ipv4": "10.0.52.121"
+    },
+    {
+     "role": "switch",
+     "slot": 3,
+     "ipv4": "10.0.52.120"
+    },
+    {
+     "role": "switch",
+     "slot": 4,
+     "ipv4": "10.0.52.119"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 1,
+     "ipv4": "10.0.52.118"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 2,
+     "ipv4": "10.0.52.117"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 3,
+     "ipv4": "10.0.52.116"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 4,
+     "ipv4": "10.0.52.115"
+    },
+    {
+     "role": "dns",
+     "slot": 1,
+     "ipv4": "10.0.52.114"
+    },
+    {
+     "role": "dns",
+     "slot": 2,
+     "ipv4": "10.0.52.113"
+    },
+    {
+     "role": "dns",
+     "slot": 3,
+     "ipv4": "10.0.52.112"
+    },
+    {
+     "role": "host_bridge",
+     "slot": 1,
+     "ipv4": "10.0.52.111"
+    },
+    {
+     "role": "access_point",
+     "slot": 1,
+     "ipv4": "10.0.52.110"
+    },
+    {
+     "role": "access_point",
+     "slot": 2,
+     "ipv4": "10.0.52.109"
+    },
+    {
+     "role": "deployment_server",
+     "slot": 1,
+     "ipv4": "10.0.52.108"
+    },
+    {
+     "role": "test_ip",
+     "slot": 1,
+     "ipv4": "10.0.52.107"
+    }
+   ]
+  },
+  {
+   "description": "Cluster / Hypervisor",
+   "vlan_id": 216,
+   "zone": "cluster",
+   "network": "10.0.56.0",
+   "range_from": "10.0.56.1",
+   "range_to": "10.0.56.126",
+   "expansion_ceiling": "10.0.56.254",
+   "prefix": 25,
+   "gateway": "10.0.56.126",
+   "roles": [
+    {
+     "role": "gateway",
+     "slot": 1,
+     "ipv4": "10.0.56.126"
+    },
+    {
+     "role": "gateway",
+     "slot": 2,
+     "ipv4": "10.0.56.125"
+    },
+    {
+     "role": "gateway",
+     "slot": 3,
+     "ipv4": "10.0.56.124"
+    },
+    {
+     "role": "gateway",
+     "slot": 4,
+     "ipv4": "10.0.56.123"
+    },
+    {
+     "role": "switch",
+     "slot": 1,
+     "ipv4": "10.0.56.122"
+    },
+    {
+     "role": "switch",
+     "slot": 2,
+     "ipv4": "10.0.56.121"
+    },
+    {
+     "role": "switch",
+     "slot": 3,
+     "ipv4": "10.0.56.120"
+    },
+    {
+     "role": "switch",
+     "slot": 4,
+     "ipv4": "10.0.56.119"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 1,
+     "ipv4": "10.0.56.118"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 2,
+     "ipv4": "10.0.56.117"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 3,
+     "ipv4": "10.0.56.116"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 4,
+     "ipv4": "10.0.56.115"
+    },
+    {
+     "role": "dns",
+     "slot": 1,
+     "ipv4": "10.0.56.114"
+    },
+    {
+     "role": "dns",
+     "slot": 2,
+     "ipv4": "10.0.56.113"
+    },
+    {
+     "role": "dns",
+     "slot": 3,
+     "ipv4": "10.0.56.112"
+    },
+    {
+     "role": "host_bridge",
+     "slot": 1,
+     "ipv4": "10.0.56.111"
+    },
+    {
+     "role": "access_point",
+     "slot": 1,
+     "ipv4": "10.0.56.110"
+    },
+    {
+     "role": "access_point",
+     "slot": 2,
+     "ipv4": "10.0.56.109"
+    },
+    {
+     "role": "deployment_server",
+     "slot": 1,
+     "ipv4": "10.0.56.108"
+    },
+    {
+     "role": "test_ip",
+     "slot": 1,
+     "ipv4": "10.0.56.107"
+    }
+   ]
+  },
+  {
+   "description": "Cluster / Application",
+   "vlan_id": 217,
+   "zone": "services",
+   "network": "10.0.57.0",
+   "range_from": "10.0.57.1",
+   "range_to": "10.0.57.126",
+   "expansion_ceiling": "10.0.57.254",
+   "prefix": 25,
+   "gateway": "10.0.57.126",
+   "roles": [
+    {
+     "role": "gateway",
+     "slot": 1,
+     "ipv4": "10.0.57.126"
+    },
+    {
+     "role": "gateway",
+     "slot": 2,
+     "ipv4": "10.0.57.125"
+    },
+    {
+     "role": "gateway",
+     "slot": 3,
+     "ipv4": "10.0.57.124"
+    },
+    {
+     "role": "gateway",
+     "slot": 4,
+     "ipv4": "10.0.57.123"
+    },
+    {
+     "role": "switch",
+     "slot": 1,
+     "ipv4": "10.0.57.122"
+    },
+    {
+     "role": "switch",
+     "slot": 2,
+     "ipv4": "10.0.57.121"
+    },
+    {
+     "role": "switch",
+     "slot": 3,
+     "ipv4": "10.0.57.120"
+    },
+    {
+     "role": "switch",
+     "slot": 4,
+     "ipv4": "10.0.57.119"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 1,
+     "ipv4": "10.0.57.118"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 2,
+     "ipv4": "10.0.57.117"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 3,
+     "ipv4": "10.0.57.116"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 4,
+     "ipv4": "10.0.57.115"
+    },
+    {
+     "role": "dns",
+     "slot": 1,
+     "ipv4": "10.0.57.114"
+    },
+    {
+     "role": "dns",
+     "slot": 2,
+     "ipv4": "10.0.57.113"
+    },
+    {
+     "role": "dns",
+     "slot": 3,
+     "ipv4": "10.0.57.112"
+    },
+    {
+     "role": "host_bridge",
+     "slot": 1,
+     "ipv4": "10.0.57.111"
+    },
+    {
+     "role": "access_point",
+     "slot": 1,
+     "ipv4": "10.0.57.110"
+    },
+    {
+     "role": "access_point",
+     "slot": 2,
+     "ipv4": "10.0.57.109"
+    },
+    {
+     "role": "deployment_server",
+     "slot": 1,
+     "ipv4": "10.0.57.108"
+    },
+    {
+     "role": "test_ip",
+     "slot": 1,
+     "ipv4": "10.0.57.107"
+    }
+   ]
+  },
+  {
+   "description": "Cluster / Database",
+   "vlan_id": 218,
+   "zone": "cluster",
+   "network": "10.0.58.0",
+   "range_from": "10.0.58.1",
+   "range_to": "10.0.58.126",
+   "expansion_ceiling": "10.0.58.254",
+   "prefix": 25,
+   "gateway": "10.0.58.126",
+   "roles": [
+    {
+     "role": "gateway",
+     "slot": 1,
+     "ipv4": "10.0.58.126"
+    },
+    {
+     "role": "gateway",
+     "slot": 2,
+     "ipv4": "10.0.58.125"
+    },
+    {
+     "role": "gateway",
+     "slot": 3,
+     "ipv4": "10.0.58.124"
+    },
+    {
+     "role": "gateway",
+     "slot": 4,
+     "ipv4": "10.0.58.123"
+    },
+    {
+     "role": "switch",
+     "slot": 1,
+     "ipv4": "10.0.58.122"
+    },
+    {
+     "role": "switch",
+     "slot": 2,
+     "ipv4": "10.0.58.121"
+    },
+    {
+     "role": "switch",
+     "slot": 3,
+     "ipv4": "10.0.58.120"
+    },
+    {
+     "role": "switch",
+     "slot": 4,
+     "ipv4": "10.0.58.119"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 1,
+     "ipv4": "10.0.58.118"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 2,
+     "ipv4": "10.0.58.117"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 3,
+     "ipv4": "10.0.58.116"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 4,
+     "ipv4": "10.0.58.115"
+    },
+    {
+     "role": "dns",
+     "slot": 1,
+     "ipv4": "10.0.58.114"
+    },
+    {
+     "role": "dns",
+     "slot": 2,
+     "ipv4": "10.0.58.113"
+    },
+    {
+     "role": "dns",
+     "slot": 3,
+     "ipv4": "10.0.58.112"
+    },
+    {
+     "role": "host_bridge",
+     "slot": 1,
+     "ipv4": "10.0.58.111"
+    },
+    {
+     "role": "access_point",
+     "slot": 1,
+     "ipv4": "10.0.58.110"
+    },
+    {
+     "role": "access_point",
+     "slot": 2,
+     "ipv4": "10.0.58.109"
+    },
+    {
+     "role": "deployment_server",
+     "slot": 1,
+     "ipv4": "10.0.58.108"
+    },
+    {
+     "role": "test_ip",
+     "slot": 1,
+     "ipv4": "10.0.58.107"
+    }
+   ]
+  },
+  {
+   "description": "Cluster / Reserved",
+   "vlan_id": 219,
+   "zone": "cluster",
+   "network": "10.0.59.0",
+   "range_from": "10.0.59.1",
+   "range_to": "10.0.59.126",
+   "expansion_ceiling": "10.0.59.254",
+   "prefix": 25,
+   "gateway": "10.0.59.126",
+   "roles": [
+    {
+     "role": "gateway",
+     "slot": 1,
+     "ipv4": "10.0.59.126"
+    },
+    {
+     "role": "gateway",
+     "slot": 2,
+     "ipv4": "10.0.59.125"
+    },
+    {
+     "role": "gateway",
+     "slot": 3,
+     "ipv4": "10.0.59.124"
+    },
+    {
+     "role": "gateway",
+     "slot": 4,
+     "ipv4": "10.0.59.123"
+    },
+    {
+     "role": "switch",
+     "slot": 1,
+     "ipv4": "10.0.59.122"
+    },
+    {
+     "role": "switch",
+     "slot": 2,
+     "ipv4": "10.0.59.121"
+    },
+    {
+     "role": "switch",
+     "slot": 3,
+     "ipv4": "10.0.59.120"
+    },
+    {
+     "role": "switch",
+     "slot": 4,
+     "ipv4": "10.0.59.119"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 1,
+     "ipv4": "10.0.59.118"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 2,
+     "ipv4": "10.0.59.117"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 3,
+     "ipv4": "10.0.59.116"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 4,
+     "ipv4": "10.0.59.115"
+    },
+    {
+     "role": "dns",
+     "slot": 1,
+     "ipv4": "10.0.59.114"
+    },
+    {
+     "role": "dns",
+     "slot": 2,
+     "ipv4": "10.0.59.113"
+    },
+    {
+     "role": "dns",
+     "slot": 3,
+     "ipv4": "10.0.59.112"
+    },
+    {
+     "role": "host_bridge",
+     "slot": 1,
+     "ipv4": "10.0.59.111"
+    },
+    {
+     "role": "access_point",
+     "slot": 1,
+     "ipv4": "10.0.59.110"
+    },
+    {
+     "role": "access_point",
+     "slot": 2,
+     "ipv4": "10.0.59.109"
+    },
+    {
+     "role": "deployment_server",
+     "slot": 1,
+     "ipv4": "10.0.59.108"
+    },
+    {
+     "role": "test_ip",
+     "slot": 1,
+     "ipv4": "10.0.59.107"
+    }
+   ]
+  },
+  {
+   "description": "DMZ / 1",
+   "vlan_id": 386,
+   "zone": "dmz",
+   "network": "10.0.60.0",
+   "range_from": "10.0.60.1",
+   "range_to": "10.0.60.126",
+   "expansion_ceiling": "10.0.60.254",
+   "prefix": 25,
+   "gateway": "10.0.60.126",
+   "roles": [
+    {
+     "role": "gateway",
+     "slot": 1,
+     "ipv4": "10.0.60.126"
+    },
+    {
+     "role": "gateway",
+     "slot": 2,
+     "ipv4": "10.0.60.125"
+    },
+    {
+     "role": "gateway",
+     "slot": 3,
+     "ipv4": "10.0.60.124"
+    },
+    {
+     "role": "gateway",
+     "slot": 4,
+     "ipv4": "10.0.60.123"
+    },
+    {
+     "role": "switch",
+     "slot": 1,
+     "ipv4": "10.0.60.122"
+    },
+    {
+     "role": "switch",
+     "slot": 2,
+     "ipv4": "10.0.60.121"
+    },
+    {
+     "role": "switch",
+     "slot": 3,
+     "ipv4": "10.0.60.120"
+    },
+    {
+     "role": "switch",
+     "slot": 4,
+     "ipv4": "10.0.60.119"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 1,
+     "ipv4": "10.0.60.118"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 2,
+     "ipv4": "10.0.60.117"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 3,
+     "ipv4": "10.0.60.116"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 4,
+     "ipv4": "10.0.60.115"
+    },
+    {
+     "role": "dns",
+     "slot": 1,
+     "ipv4": "10.0.60.114"
+    },
+    {
+     "role": "dns",
+     "slot": 2,
+     "ipv4": "10.0.60.113"
+    },
+    {
+     "role": "dns",
+     "slot": 3,
+     "ipv4": "10.0.60.112"
+    },
+    {
+     "role": "host_bridge",
+     "slot": 1,
+     "ipv4": "10.0.60.111"
+    },
+    {
+     "role": "access_point",
+     "slot": 1,
+     "ipv4": "10.0.60.110"
+    },
+    {
+     "role": "access_point",
+     "slot": 2,
+     "ipv4": "10.0.60.109"
+    },
+    {
+     "role": "deployment_server",
+     "slot": 1,
+     "ipv4": "10.0.60.108"
+    },
+    {
+     "role": "test_ip",
+     "slot": 1,
+     "ipv4": "10.0.60.107"
+    }
+   ]
+  },
+  {
+   "description": "DMZ / 2",
+   "vlan_id": 387,
+   "zone": "dmz",
+   "network": "10.0.61.0",
+   "range_from": "10.0.61.1",
+   "range_to": "10.0.61.126",
+   "expansion_ceiling": "10.0.61.254",
+   "prefix": 25,
+   "gateway": "10.0.61.126",
+   "roles": [
+    {
+     "role": "gateway",
+     "slot": 1,
+     "ipv4": "10.0.61.126"
+    },
+    {
+     "role": "gateway",
+     "slot": 2,
+     "ipv4": "10.0.61.125"
+    },
+    {
+     "role": "gateway",
+     "slot": 3,
+     "ipv4": "10.0.61.124"
+    },
+    {
+     "role": "gateway",
+     "slot": 4,
+     "ipv4": "10.0.61.123"
+    },
+    {
+     "role": "switch",
+     "slot": 1,
+     "ipv4": "10.0.61.122"
+    },
+    {
+     "role": "switch",
+     "slot": 2,
+     "ipv4": "10.0.61.121"
+    },
+    {
+     "role": "switch",
+     "slot": 3,
+     "ipv4": "10.0.61.120"
+    },
+    {
+     "role": "switch",
+     "slot": 4,
+     "ipv4": "10.0.61.119"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 1,
+     "ipv4": "10.0.61.118"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 2,
+     "ipv4": "10.0.61.117"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 3,
+     "ipv4": "10.0.61.116"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 4,
+     "ipv4": "10.0.61.115"
+    },
+    {
+     "role": "dns",
+     "slot": 1,
+     "ipv4": "10.0.61.114"
+    },
+    {
+     "role": "dns",
+     "slot": 2,
+     "ipv4": "10.0.61.113"
+    },
+    {
+     "role": "dns",
+     "slot": 3,
+     "ipv4": "10.0.61.112"
+    },
+    {
+     "role": "host_bridge",
+     "slot": 1,
+     "ipv4": "10.0.61.111"
+    },
+    {
+     "role": "access_point",
+     "slot": 1,
+     "ipv4": "10.0.61.110"
+    },
+    {
+     "role": "access_point",
+     "slot": 2,
+     "ipv4": "10.0.61.109"
+    },
+    {
+     "role": "deployment_server",
+     "slot": 1,
+     "ipv4": "10.0.61.108"
+    },
+    {
+     "role": "test_ip",
+     "slot": 1,
+     "ipv4": "10.0.61.107"
+    }
+   ]
+  },
+  {
+   "description": "DMZ / 3",
+   "vlan_id": 388,
+   "zone": "dmz",
+   "network": "10.0.62.0",
+   "range_from": "10.0.62.1",
+   "range_to": "10.0.62.126",
+   "expansion_ceiling": "10.0.62.254",
+   "prefix": 25,
+   "gateway": "10.0.62.126",
+   "roles": [
+    {
+     "role": "gateway",
+     "slot": 1,
+     "ipv4": "10.0.62.126"
+    },
+    {
+     "role": "gateway",
+     "slot": 2,
+     "ipv4": "10.0.62.125"
+    },
+    {
+     "role": "gateway",
+     "slot": 3,
+     "ipv4": "10.0.62.124"
+    },
+    {
+     "role": "gateway",
+     "slot": 4,
+     "ipv4": "10.0.62.123"
+    },
+    {
+     "role": "switch",
+     "slot": 1,
+     "ipv4": "10.0.62.122"
+    },
+    {
+     "role": "switch",
+     "slot": 2,
+     "ipv4": "10.0.62.121"
+    },
+    {
+     "role": "switch",
+     "slot": 3,
+     "ipv4": "10.0.62.120"
+    },
+    {
+     "role": "switch",
+     "slot": 4,
+     "ipv4": "10.0.62.119"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 1,
+     "ipv4": "10.0.62.118"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 2,
+     "ipv4": "10.0.62.117"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 3,
+     "ipv4": "10.0.62.116"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 4,
+     "ipv4": "10.0.62.115"
+    },
+    {
+     "role": "dns",
+     "slot": 1,
+     "ipv4": "10.0.62.114"
+    },
+    {
+     "role": "dns",
+     "slot": 2,
+     "ipv4": "10.0.62.113"
+    },
+    {
+     "role": "dns",
+     "slot": 3,
+     "ipv4": "10.0.62.112"
+    },
+    {
+     "role": "host_bridge",
+     "slot": 1,
+     "ipv4": "10.0.62.111"
+    },
+    {
+     "role": "access_point",
+     "slot": 1,
+     "ipv4": "10.0.62.110"
+    },
+    {
+     "role": "access_point",
+     "slot": 2,
+     "ipv4": "10.0.62.109"
+    },
+    {
+     "role": "deployment_server",
+     "slot": 1,
+     "ipv4": "10.0.62.108"
+    },
+    {
+     "role": "test_ip",
+     "slot": 1,
+     "ipv4": "10.0.62.107"
+    }
+   ]
+  },
+  {
+   "description": "DMZ / Reserved",
+   "vlan_id": 389,
+   "zone": "dmz",
+   "network": "10.0.63.0",
+   "range_from": "10.0.63.1",
+   "range_to": "10.0.63.126",
+   "expansion_ceiling": "10.0.63.254",
+   "prefix": 25,
+   "gateway": "10.0.63.126",
+   "roles": [
+    {
+     "role": "gateway",
+     "slot": 1,
+     "ipv4": "10.0.63.126"
+    },
+    {
+     "role": "gateway",
+     "slot": 2,
+     "ipv4": "10.0.63.125"
+    },
+    {
+     "role": "gateway",
+     "slot": 3,
+     "ipv4": "10.0.63.124"
+    },
+    {
+     "role": "gateway",
+     "slot": 4,
+     "ipv4": "10.0.63.123"
+    },
+    {
+     "role": "switch",
+     "slot": 1,
+     "ipv4": "10.0.63.122"
+    },
+    {
+     "role": "switch",
+     "slot": 2,
+     "ipv4": "10.0.63.121"
+    },
+    {
+     "role": "switch",
+     "slot": 3,
+     "ipv4": "10.0.63.120"
+    },
+    {
+     "role": "switch",
+     "slot": 4,
+     "ipv4": "10.0.63.119"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 1,
+     "ipv4": "10.0.63.118"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 2,
+     "ipv4": "10.0.63.117"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 3,
+     "ipv4": "10.0.63.116"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 4,
+     "ipv4": "10.0.63.115"
+    },
+    {
+     "role": "dns",
+     "slot": 1,
+     "ipv4": "10.0.63.114"
+    },
+    {
+     "role": "dns",
+     "slot": 2,
+     "ipv4": "10.0.63.113"
+    },
+    {
+     "role": "dns",
+     "slot": 3,
+     "ipv4": "10.0.63.112"
+    },
+    {
+     "role": "host_bridge",
+     "slot": 1,
+     "ipv4": "10.0.63.111"
+    },
+    {
+     "role": "access_point",
+     "slot": 1,
+     "ipv4": "10.0.63.110"
+    },
+    {
+     "role": "access_point",
+     "slot": 2,
+     "ipv4": "10.0.63.109"
+    },
+    {
+     "role": "deployment_server",
+     "slot": 1,
+     "ipv4": "10.0.63.108"
+    },
+    {
+     "role": "test_ip",
+     "slot": 1,
+     "ipv4": "10.0.63.107"
+    }
+   ]
+  },
+  {
+   "description": "LAN / 1",
+   "vlan_id": 476,
+   "zone": "lan",
+   "network": "192.168.0.0",
+   "range_from": "192.168.0.1",
+   "range_to": "192.168.0.254",
+   "expansion_ceiling": "192.168.3.254",
+   "prefix": 24,
+   "gateway": "192.168.0.126",
+   "roles": [
+    {
+     "role": "gateway",
+     "slot": 1,
+     "ipv4": "192.168.0.126"
+    },
+    {
+     "role": "gateway",
+     "slot": 2,
+     "ipv4": "192.168.0.125"
+    },
+    {
+     "role": "gateway",
+     "slot": 3,
+     "ipv4": "192.168.0.124"
+    },
+    {
+     "role": "gateway",
+     "slot": 4,
+     "ipv4": "192.168.0.123"
+    },
+    {
+     "role": "switch",
+     "slot": 1,
+     "ipv4": "192.168.0.122"
+    },
+    {
+     "role": "switch",
+     "slot": 2,
+     "ipv4": "192.168.0.121"
+    },
+    {
+     "role": "switch",
+     "slot": 3,
+     "ipv4": "192.168.0.120"
+    },
+    {
+     "role": "switch",
+     "slot": 4,
+     "ipv4": "192.168.0.119"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 1,
+     "ipv4": "192.168.0.118"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 2,
+     "ipv4": "192.168.0.117"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 3,
+     "ipv4": "192.168.0.116"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 4,
+     "ipv4": "192.168.0.115"
+    },
+    {
+     "role": "dns",
+     "slot": 1,
+     "ipv4": "192.168.0.114"
+    },
+    {
+     "role": "dns",
+     "slot": 2,
+     "ipv4": "192.168.0.113"
+    },
+    {
+     "role": "dns",
+     "slot": 3,
+     "ipv4": "192.168.0.112"
+    },
+    {
+     "role": "host_bridge",
+     "slot": 1,
+     "ipv4": "192.168.0.111"
+    },
+    {
+     "role": "access_point",
+     "slot": 1,
+     "ipv4": "192.168.0.110"
+    },
+    {
+     "role": "access_point",
+     "slot": 2,
+     "ipv4": "192.168.0.109"
+    },
+    {
+     "role": "deployment_server",
+     "slot": 1,
+     "ipv4": "192.168.0.108"
+    },
+    {
+     "role": "test_ip",
+     "slot": 1,
+     "ipv4": "192.168.0.107"
+    }
+   ]
+  },
+  {
+   "description": "LAN / 2",
+   "vlan_id": 477,
+   "zone": "lan",
+   "network": "192.168.4.0",
+   "range_from": "192.168.4.1",
+   "range_to": "192.168.4.254",
+   "expansion_ceiling": "192.168.7.254",
+   "prefix": 24,
+   "gateway": "192.168.4.126",
+   "roles": [
+    {
+     "role": "gateway",
+     "slot": 1,
+     "ipv4": "192.168.4.126"
+    },
+    {
+     "role": "gateway",
+     "slot": 2,
+     "ipv4": "192.168.4.125"
+    },
+    {
+     "role": "gateway",
+     "slot": 3,
+     "ipv4": "192.168.4.124"
+    },
+    {
+     "role": "gateway",
+     "slot": 4,
+     "ipv4": "192.168.4.123"
+    },
+    {
+     "role": "switch",
+     "slot": 1,
+     "ipv4": "192.168.4.122"
+    },
+    {
+     "role": "switch",
+     "slot": 2,
+     "ipv4": "192.168.4.121"
+    },
+    {
+     "role": "switch",
+     "slot": 3,
+     "ipv4": "192.168.4.120"
+    },
+    {
+     "role": "switch",
+     "slot": 4,
+     "ipv4": "192.168.4.119"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 1,
+     "ipv4": "192.168.4.118"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 2,
+     "ipv4": "192.168.4.117"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 3,
+     "ipv4": "192.168.4.116"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 4,
+     "ipv4": "192.168.4.115"
+    },
+    {
+     "role": "dns",
+     "slot": 1,
+     "ipv4": "192.168.4.114"
+    },
+    {
+     "role": "dns",
+     "slot": 2,
+     "ipv4": "192.168.4.113"
+    },
+    {
+     "role": "dns",
+     "slot": 3,
+     "ipv4": "192.168.4.112"
+    },
+    {
+     "role": "host_bridge",
+     "slot": 1,
+     "ipv4": "192.168.4.111"
+    },
+    {
+     "role": "access_point",
+     "slot": 1,
+     "ipv4": "192.168.4.110"
+    },
+    {
+     "role": "access_point",
+     "slot": 2,
+     "ipv4": "192.168.4.109"
+    },
+    {
+     "role": "deployment_server",
+     "slot": 1,
+     "ipv4": "192.168.4.108"
+    },
+    {
+     "role": "test_ip",
+     "slot": 1,
+     "ipv4": "192.168.4.107"
+    }
+   ]
+  },
+  {
+   "description": "LAN / 3",
+   "vlan_id": 478,
+   "zone": "lan",
+   "network": "192.168.8.0",
+   "range_from": "192.168.8.1",
+   "range_to": "192.168.8.254",
+   "expansion_ceiling": "192.168.11.254",
+   "prefix": 24,
+   "gateway": "192.168.8.126",
+   "roles": [
+    {
+     "role": "gateway",
+     "slot": 1,
+     "ipv4": "192.168.8.126"
+    },
+    {
+     "role": "gateway",
+     "slot": 2,
+     "ipv4": "192.168.8.125"
+    },
+    {
+     "role": "gateway",
+     "slot": 3,
+     "ipv4": "192.168.8.124"
+    },
+    {
+     "role": "gateway",
+     "slot": 4,
+     "ipv4": "192.168.8.123"
+    },
+    {
+     "role": "switch",
+     "slot": 1,
+     "ipv4": "192.168.8.122"
+    },
+    {
+     "role": "switch",
+     "slot": 2,
+     "ipv4": "192.168.8.121"
+    },
+    {
+     "role": "switch",
+     "slot": 3,
+     "ipv4": "192.168.8.120"
+    },
+    {
+     "role": "switch",
+     "slot": 4,
+     "ipv4": "192.168.8.119"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 1,
+     "ipv4": "192.168.8.118"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 2,
+     "ipv4": "192.168.8.117"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 3,
+     "ipv4": "192.168.8.116"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 4,
+     "ipv4": "192.168.8.115"
+    },
+    {
+     "role": "dns",
+     "slot": 1,
+     "ipv4": "192.168.8.114"
+    },
+    {
+     "role": "dns",
+     "slot": 2,
+     "ipv4": "192.168.8.113"
+    },
+    {
+     "role": "dns",
+     "slot": 3,
+     "ipv4": "192.168.8.112"
+    },
+    {
+     "role": "host_bridge",
+     "slot": 1,
+     "ipv4": "192.168.8.111"
+    },
+    {
+     "role": "access_point",
+     "slot": 1,
+     "ipv4": "192.168.8.110"
+    },
+    {
+     "role": "access_point",
+     "slot": 2,
+     "ipv4": "192.168.8.109"
+    },
+    {
+     "role": "deployment_server",
+     "slot": 1,
+     "ipv4": "192.168.8.108"
+    },
+    {
+     "role": "test_ip",
+     "slot": 1,
+     "ipv4": "192.168.8.107"
+    }
+   ]
+  },
+  {
+   "description": "LAN / Reserved",
+   "vlan_id": 479,
+   "zone": "lan",
+   "network": "192.168.12.0",
+   "range_from": "192.168.12.1",
+   "range_to": "192.168.12.254",
+   "expansion_ceiling": "192.168.15.254",
+   "prefix": 24,
+   "gateway": "192.168.12.126",
+   "roles": [
+    {
+     "role": "gateway",
+     "slot": 1,
+     "ipv4": "192.168.12.126"
+    },
+    {
+     "role": "gateway",
+     "slot": 2,
+     "ipv4": "192.168.12.125"
+    },
+    {
+     "role": "gateway",
+     "slot": 3,
+     "ipv4": "192.168.12.124"
+    },
+    {
+     "role": "gateway",
+     "slot": 4,
+     "ipv4": "192.168.12.123"
+    },
+    {
+     "role": "switch",
+     "slot": 1,
+     "ipv4": "192.168.12.122"
+    },
+    {
+     "role": "switch",
+     "slot": 2,
+     "ipv4": "192.168.12.121"
+    },
+    {
+     "role": "switch",
+     "slot": 3,
+     "ipv4": "192.168.12.120"
+    },
+    {
+     "role": "switch",
+     "slot": 4,
+     "ipv4": "192.168.12.119"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 1,
+     "ipv4": "192.168.12.118"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 2,
+     "ipv4": "192.168.12.117"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 3,
+     "ipv4": "192.168.12.116"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 4,
+     "ipv4": "192.168.12.115"
+    },
+    {
+     "role": "dns",
+     "slot": 1,
+     "ipv4": "192.168.12.114"
+    },
+    {
+     "role": "dns",
+     "slot": 2,
+     "ipv4": "192.168.12.113"
+    },
+    {
+     "role": "dns",
+     "slot": 3,
+     "ipv4": "192.168.12.112"
+    },
+    {
+     "role": "host_bridge",
+     "slot": 1,
+     "ipv4": "192.168.12.111"
+    },
+    {
+     "role": "access_point",
+     "slot": 1,
+     "ipv4": "192.168.12.110"
+    },
+    {
+     "role": "access_point",
+     "slot": 2,
+     "ipv4": "192.168.12.109"
+    },
+    {
+     "role": "deployment_server",
+     "slot": 1,
+     "ipv4": "192.168.12.108"
+    },
+    {
+     "role": "test_ip",
+     "slot": 1,
+     "ipv4": "192.168.12.107"
+    }
+   ]
+  },
+  {
+   "description": "WLAN / 1",
+   "vlan_id": 576,
+   "zone": "wlan",
+   "network": "192.168.40.0",
+   "range_from": "192.168.40.1",
+   "range_to": "192.168.40.254",
+   "expansion_ceiling": "192.168.43.254",
+   "prefix": 24,
+   "gateway": "192.168.40.126",
+   "roles": [
+    {
+     "role": "gateway",
+     "slot": 1,
+     "ipv4": "192.168.40.126"
+    },
+    {
+     "role": "gateway",
+     "slot": 2,
+     "ipv4": "192.168.40.125"
+    },
+    {
+     "role": "gateway",
+     "slot": 3,
+     "ipv4": "192.168.40.124"
+    },
+    {
+     "role": "gateway",
+     "slot": 4,
+     "ipv4": "192.168.40.123"
+    },
+    {
+     "role": "switch",
+     "slot": 1,
+     "ipv4": "192.168.40.122"
+    },
+    {
+     "role": "switch",
+     "slot": 2,
+     "ipv4": "192.168.40.121"
+    },
+    {
+     "role": "switch",
+     "slot": 3,
+     "ipv4": "192.168.40.120"
+    },
+    {
+     "role": "switch",
+     "slot": 4,
+     "ipv4": "192.168.40.119"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 1,
+     "ipv4": "192.168.40.118"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 2,
+     "ipv4": "192.168.40.117"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 3,
+     "ipv4": "192.168.40.116"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 4,
+     "ipv4": "192.168.40.115"
+    },
+    {
+     "role": "dns",
+     "slot": 1,
+     "ipv4": "192.168.40.114"
+    },
+    {
+     "role": "dns",
+     "slot": 2,
+     "ipv4": "192.168.40.113"
+    },
+    {
+     "role": "dns",
+     "slot": 3,
+     "ipv4": "192.168.40.112"
+    },
+    {
+     "role": "host_bridge",
+     "slot": 1,
+     "ipv4": "192.168.40.111"
+    },
+    {
+     "role": "access_point",
+     "slot": 1,
+     "ipv4": "192.168.40.110"
+    },
+    {
+     "role": "access_point",
+     "slot": 2,
+     "ipv4": "192.168.40.109"
+    },
+    {
+     "role": "deployment_server",
+     "slot": 1,
+     "ipv4": "192.168.40.108"
+    },
+    {
+     "role": "test_ip",
+     "slot": 1,
+     "ipv4": "192.168.40.107"
+    }
+   ]
+  },
+  {
+   "description": "WLAN / 2",
+   "vlan_id": 577,
+   "zone": "wlan",
+   "network": "192.168.44.0",
+   "range_from": "192.168.44.1",
+   "range_to": "192.168.44.254",
+   "expansion_ceiling": "192.168.47.254",
+   "prefix": 24,
+   "gateway": "192.168.44.126",
+   "roles": [
+    {
+     "role": "gateway",
+     "slot": 1,
+     "ipv4": "192.168.44.126"
+    },
+    {
+     "role": "gateway",
+     "slot": 2,
+     "ipv4": "192.168.44.125"
+    },
+    {
+     "role": "gateway",
+     "slot": 3,
+     "ipv4": "192.168.44.124"
+    },
+    {
+     "role": "gateway",
+     "slot": 4,
+     "ipv4": "192.168.44.123"
+    },
+    {
+     "role": "switch",
+     "slot": 1,
+     "ipv4": "192.168.44.122"
+    },
+    {
+     "role": "switch",
+     "slot": 2,
+     "ipv4": "192.168.44.121"
+    },
+    {
+     "role": "switch",
+     "slot": 3,
+     "ipv4": "192.168.44.120"
+    },
+    {
+     "role": "switch",
+     "slot": 4,
+     "ipv4": "192.168.44.119"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 1,
+     "ipv4": "192.168.44.118"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 2,
+     "ipv4": "192.168.44.117"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 3,
+     "ipv4": "192.168.44.116"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 4,
+     "ipv4": "192.168.44.115"
+    },
+    {
+     "role": "dns",
+     "slot": 1,
+     "ipv4": "192.168.44.114"
+    },
+    {
+     "role": "dns",
+     "slot": 2,
+     "ipv4": "192.168.44.113"
+    },
+    {
+     "role": "dns",
+     "slot": 3,
+     "ipv4": "192.168.44.112"
+    },
+    {
+     "role": "host_bridge",
+     "slot": 1,
+     "ipv4": "192.168.44.111"
+    },
+    {
+     "role": "access_point",
+     "slot": 1,
+     "ipv4": "192.168.44.110"
+    },
+    {
+     "role": "access_point",
+     "slot": 2,
+     "ipv4": "192.168.44.109"
+    },
+    {
+     "role": "deployment_server",
+     "slot": 1,
+     "ipv4": "192.168.44.108"
+    },
+    {
+     "role": "test_ip",
+     "slot": 1,
+     "ipv4": "192.168.44.107"
+    }
+   ]
+  },
+  {
+   "description": "WLAN / 3",
+   "vlan_id": 578,
+   "zone": "wlan",
+   "network": "192.168.48.0",
+   "range_from": "192.168.48.1",
+   "range_to": "192.168.48.254",
+   "expansion_ceiling": "192.168.51.254",
+   "prefix": 24,
+   "gateway": "192.168.48.126",
+   "roles": [
+    {
+     "role": "gateway",
+     "slot": 1,
+     "ipv4": "192.168.48.126"
+    },
+    {
+     "role": "gateway",
+     "slot": 2,
+     "ipv4": "192.168.48.125"
+    },
+    {
+     "role": "gateway",
+     "slot": 3,
+     "ipv4": "192.168.48.124"
+    },
+    {
+     "role": "gateway",
+     "slot": 4,
+     "ipv4": "192.168.48.123"
+    },
+    {
+     "role": "switch",
+     "slot": 1,
+     "ipv4": "192.168.48.122"
+    },
+    {
+     "role": "switch",
+     "slot": 2,
+     "ipv4": "192.168.48.121"
+    },
+    {
+     "role": "switch",
+     "slot": 3,
+     "ipv4": "192.168.48.120"
+    },
+    {
+     "role": "switch",
+     "slot": 4,
+     "ipv4": "192.168.48.119"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 1,
+     "ipv4": "192.168.48.118"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 2,
+     "ipv4": "192.168.48.117"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 3,
+     "ipv4": "192.168.48.116"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 4,
+     "ipv4": "192.168.48.115"
+    },
+    {
+     "role": "dns",
+     "slot": 1,
+     "ipv4": "192.168.48.114"
+    },
+    {
+     "role": "dns",
+     "slot": 2,
+     "ipv4": "192.168.48.113"
+    },
+    {
+     "role": "dns",
+     "slot": 3,
+     "ipv4": "192.168.48.112"
+    },
+    {
+     "role": "host_bridge",
+     "slot": 1,
+     "ipv4": "192.168.48.111"
+    },
+    {
+     "role": "access_point",
+     "slot": 1,
+     "ipv4": "192.168.48.110"
+    },
+    {
+     "role": "access_point",
+     "slot": 2,
+     "ipv4": "192.168.48.109"
+    },
+    {
+     "role": "deployment_server",
+     "slot": 1,
+     "ipv4": "192.168.48.108"
+    },
+    {
+     "role": "test_ip",
+     "slot": 1,
+     "ipv4": "192.168.48.107"
+    }
+   ]
+  },
+  {
+   "description": "WLAN / Reserved",
+   "vlan_id": 579,
+   "zone": "wlan",
+   "network": "192.168.52.0",
+   "range_from": "192.168.52.1",
+   "range_to": "192.168.52.254",
+   "expansion_ceiling": "192.168.55.254",
+   "prefix": 24,
+   "gateway": "192.168.52.126",
+   "roles": [
+    {
+     "role": "gateway",
+     "slot": 1,
+     "ipv4": "192.168.52.126"
+    },
+    {
+     "role": "gateway",
+     "slot": 2,
+     "ipv4": "192.168.52.125"
+    },
+    {
+     "role": "gateway",
+     "slot": 3,
+     "ipv4": "192.168.52.124"
+    },
+    {
+     "role": "gateway",
+     "slot": 4,
+     "ipv4": "192.168.52.123"
+    },
+    {
+     "role": "switch",
+     "slot": 1,
+     "ipv4": "192.168.52.122"
+    },
+    {
+     "role": "switch",
+     "slot": 2,
+     "ipv4": "192.168.52.121"
+    },
+    {
+     "role": "switch",
+     "slot": 3,
+     "ipv4": "192.168.52.120"
+    },
+    {
+     "role": "switch",
+     "slot": 4,
+     "ipv4": "192.168.52.119"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 1,
+     "ipv4": "192.168.52.118"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 2,
+     "ipv4": "192.168.52.117"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 3,
+     "ipv4": "192.168.52.116"
+    },
+    {
+     "role": "load_balancer",
+     "slot": 4,
+     "ipv4": "192.168.52.115"
+    },
+    {
+     "role": "dns",
+     "slot": 1,
+     "ipv4": "192.168.52.114"
+    },
+    {
+     "role": "dns",
+     "slot": 2,
+     "ipv4": "192.168.52.113"
+    },
+    {
+     "role": "dns",
+     "slot": 3,
+     "ipv4": "192.168.52.112"
+    },
+    {
+     "role": "host_bridge",
+     "slot": 1,
+     "ipv4": "192.168.52.111"
+    },
+    {
+     "role": "access_point",
+     "slot": 1,
+     "ipv4": "192.168.52.110"
+    },
+    {
+     "role": "access_point",
+     "slot": 2,
+     "ipv4": "192.168.52.109"
+    },
+    {
+     "role": "deployment_server",
+     "slot": 1,
+     "ipv4": "192.168.52.108"
+    },
+    {
+     "role": "test_ip",
+     "slot": 1,
+     "ipv4": "192.168.52.107"
+    }
+   ]
+  },
+  {
+   "description": "VPN Users / 2",
+   "vlan_id": 677,
+   "zone": "vpn",
+   "network": "172.16.0.0",
+   "range_from": null,
+   "range_to": null,
+   "expansion_ceiling": null,
+   "prefix": null,
+   "gateway": null,
+   "roles": []
+  },
+  {
+   "description": "VPN Users / 3",
+   "vlan_id": 678,
+   "zone": "vpn",
+   "network": "172.16.4.0",
+   "range_from": null,
+   "range_to": null,
+   "expansion_ceiling": null,
+   "prefix": null,
+   "gateway": null,
+   "roles": []
+  },
+  {
+   "description": "VPN Users / 4",
+   "vlan_id": 679,
+   "zone": "vpn",
+   "network": "172.16.8.0",
+   "range_from": null,
+   "range_to": null,
+   "expansion_ceiling": null,
+   "prefix": null,
+   "gateway": null,
+   "roles": []
+  },
+  {
+   "description": "VPN Azure / 1",
+   "vlan_id": 776,
+   "zone": "vpn",
+   "network": "172.16.12.0",
+   "range_from": null,
+   "range_to": null,
+   "expansion_ceiling": null,
+   "prefix": null,
+   "gateway": null,
+   "roles": []
+  },
+  {
+   "description": "VPN Azure / 2",
+   "vlan_id": 777,
+   "zone": "vpn",
+   "network": "172.16.16.0",
+   "range_from": null,
+   "range_to": null,
+   "expansion_ceiling": null,
+   "prefix": null,
+   "gateway": null,
+   "roles": []
+  },
+  {
+   "description": "VPN Azure / 3",
+   "vlan_id": 778,
+   "zone": "vpn",
+   "network": "172.16.20.0",
+   "range_from": null,
+   "range_to": null,
+   "expansion_ceiling": null,
+   "prefix": null,
+   "gateway": null,
+   "roles": []
+  },
+  {
+   "description": "VPN Azure / 4",
+   "vlan_id": 779,
+   "zone": "vpn",
+   "network": "172.16.24.0",
+   "range_from": null,
+   "range_to": null,
+   "expansion_ceiling": null,
+   "prefix": null,
+   "gateway": null,
+   "roles": []
+  },
+  {
+   "description": "VPN AWS / 1",
+   "vlan_id": 876,
+   "zone": "vpn",
+   "network": "172.16.28.0",
+   "range_from": null,
+   "range_to": null,
+   "expansion_ceiling": null,
+   "prefix": null,
+   "gateway": null,
+   "roles": []
+  },
+  {
+   "description": "VPN AWS / 2",
+   "vlan_id": 877,
+   "zone": "vpn",
+   "network": "172.16.32.0",
+   "range_from": null,
+   "range_to": null,
+   "expansion_ceiling": null,
+   "prefix": null,
+   "gateway": null,
+   "roles": []
+  },
+  {
+   "description": "VPN AWS / 3",
+   "vlan_id": 878,
+   "zone": "vpn",
+   "network": "172.16.36.0",
+   "range_from": null,
+   "range_to": null,
+   "expansion_ceiling": null,
+   "prefix": null,
+   "gateway": null,
+   "roles": []
+  },
+  {
+   "description": "VPN AWS / 4",
+   "vlan_id": 879,
+   "zone": "vpn",
+   "network": "172.16.40.0",
+   "range_from": null,
+   "range_to": null,
+   "expansion_ceiling": null,
+   "prefix": null,
+   "gateway": null,
+   "roles": []
+  }
+ ],
+ "subnets_ipv6": [
+  {
+   "description": "Organization Prefix",
+   "vlan_id": null,
+   "network": "fd52:bcef:51a7::/48",
+   "range_from": "fd52:bcef:51a7::1",
+   "range_to": "fd52:bcef:51a7:ffff:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "Public Block",
+   "vlan_id": 100,
+   "network": "fd52:bcef:51a7:100::/64",
+   "range_from": "fd52:bcef:51a7:100::1",
+   "range_to": "fd52:bcef:51a7:100:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "Public Block",
+   "vlan_id": 101,
+   "network": "fd52:bcef:51a7:101::/64",
+   "range_from": "fd52:bcef:51a7:101::1",
+   "range_to": "fd52:bcef:51a7:101:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "Private Block",
+   "vlan_id": 107,
+   "network": "fd52:bcef:51a7:107::/64",
+   "range_from": "fd52:bcef:51a7:107::1",
+   "range_to": "fd52:bcef:51a7:107:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "Management / Networking",
+   "vlan_id": 66,
+   "network": "fd52:bcef:51a7:66::/64",
+   "range_from": "fd52:bcef:51a7:66::1",
+   "range_to": "fd52:bcef:51a7:66:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "Management / Devices",
+   "vlan_id": 67,
+   "network": "fd52:bcef:51a7:67::/64",
+   "range_from": "fd52:bcef:51a7:67::1",
+   "range_to": "fd52:bcef:51a7:67:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "Management / Storage",
+   "vlan_id": 68,
+   "network": "fd52:bcef:51a7:68::/64",
+   "range_from": "fd52:bcef:51a7:68::1",
+   "range_to": "fd52:bcef:51a7:68:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "Management / Facilities",
+   "vlan_id": 69,
+   "network": "fd52:bcef:51a7:69::/64",
+   "range_from": "fd52:bcef:51a7:69::1",
+   "range_to": "fd52:bcef:51a7:69:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "Servers / Hypervisors",
+   "vlan_id": 176,
+   "network": "fd52:bcef:51a7:176::/64",
+   "range_from": "fd52:bcef:51a7:176::1",
+   "range_to": "fd52:bcef:51a7:176:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "Servers / 1",
+   "vlan_id": 177,
+   "network": "fd52:bcef:51a7:177::/64",
+   "range_from": "fd52:bcef:51a7:177::1",
+   "range_to": "fd52:bcef:51a7:177:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "Servers / 2",
+   "vlan_id": 178,
+   "network": "fd52:bcef:51a7:178::/64",
+   "range_from": "fd52:bcef:51a7:178::1",
+   "range_to": "fd52:bcef:51a7:178:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "Servers / Reserved",
+   "vlan_id": 179,
+   "network": "fd52:bcef:51a7:179::/64",
+   "range_from": "fd52:bcef:51a7:179::1",
+   "range_to": "fd52:bcef:51a7:179:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "Storage / Block",
+   "vlan_id": 186,
+   "network": "fd52:bcef:51a7:186::/64",
+   "range_from": "fd52:bcef:51a7:186::1",
+   "range_to": "fd52:bcef:51a7:186:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "Storage / Object",
+   "vlan_id": 187,
+   "network": "fd52:bcef:51a7:187::/64",
+   "range_from": "fd52:bcef:51a7:187::1",
+   "range_to": "fd52:bcef:51a7:187:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "Storage / File",
+   "vlan_id": 188,
+   "network": "fd52:bcef:51a7:188::/64",
+   "range_from": "fd52:bcef:51a7:188::1",
+   "range_to": "fd52:bcef:51a7:188:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "Storage / Reserved",
+   "vlan_id": 189,
+   "network": "fd52:bcef:51a7:189::/64",
+   "range_from": "fd52:bcef:51a7:189::1",
+   "range_to": "fd52:bcef:51a7:189:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "Service / Applications / Containers / 1",
+   "vlan_id": 196,
+   "network": "fd52:bcef:51a7:196::/64",
+   "range_from": "fd52:bcef:51a7:196::1",
+   "range_to": "fd52:bcef:51a7:196:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "Service / Applications / Containers / 2",
+   "vlan_id": 197,
+   "network": "fd52:bcef:51a7:197::/64",
+   "range_from": "fd52:bcef:51a7:197::1",
+   "range_to": "fd52:bcef:51a7:197:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "Service / Applications / Containers / 3",
+   "vlan_id": 198,
+   "network": "fd52:bcef:51a7:198::/64",
+   "range_from": "fd52:bcef:51a7:198::1",
+   "range_to": "fd52:bcef:51a7:198:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "Service / Applications / Reserved",
+   "vlan_id": 199,
+   "network": "fd52:bcef:51a7:199::/64",
+   "range_from": "fd52:bcef:51a7:199::1",
+   "range_to": "fd52:bcef:51a7:199:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "Cluster / Hypervisor",
+   "vlan_id": 216,
+   "network": "fd52:bcef:51a7:216::/64",
+   "range_from": "fd52:bcef:51a7:216::1",
+   "range_to": "fd52:bcef:51a7:216:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "Cluster / Application",
+   "vlan_id": 217,
+   "network": "fd52:bcef:51a7:217::/64",
+   "range_from": "fd52:bcef:51a7:217::1",
+   "range_to": "fd52:bcef:51a7:217:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "Cluster / Database",
+   "vlan_id": 218,
+   "network": "fd52:bcef:51a7:218::/64",
+   "range_from": "fd52:bcef:51a7:218::1",
+   "range_to": "fd52:bcef:51a7:218:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "Cluster / Reserved",
+   "vlan_id": 219,
+   "network": "fd52:bcef:51a7:219::/64",
+   "range_from": "fd52:bcef:51a7:219::1",
+   "range_to": "fd52:bcef:51a7:219:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "DMZ / 1",
+   "vlan_id": 386,
+   "network": "fd52:bcef:51a7:386::/64",
+   "range_from": "fd52:bcef:51a7:386::1",
+   "range_to": "fd52:bcef:51a7:386:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "DMZ / 2",
+   "vlan_id": 387,
+   "network": "fd52:bcef:51a7:387::/64",
+   "range_from": "fd52:bcef:51a7:387::1",
+   "range_to": "fd52:bcef:51a7:387:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "DMZ / 3",
+   "vlan_id": 388,
+   "network": "fd52:bcef:51a7:388::/64",
+   "range_from": "fd52:bcef:51a7:388::1",
+   "range_to": "fd52:bcef:51a7:388:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "DMZ / Reserved",
+   "vlan_id": 389,
+   "network": "fd52:bcef:51a7:389::/64",
+   "range_from": "fd52:bcef:51a7:389::1",
+   "range_to": "fd52:bcef:51a7:389:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "LAN / 1",
+   "vlan_id": 476,
+   "network": "fd52:bcef:51a7:476::/64",
+   "range_from": "fd52:bcef:51a7:476::1",
+   "range_to": "fd52:bcef:51a7:476:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "LAN / 2",
+   "vlan_id": 477,
+   "network": "fd52:bcef:51a7:477::/64",
+   "range_from": "fd52:bcef:51a7:477::1",
+   "range_to": "fd52:bcef:51a7:477:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "LAN / 3",
+   "vlan_id": 478,
+   "network": "fd52:bcef:51a7:478::/64",
+   "range_from": "fd52:bcef:51a7:478::1",
+   "range_to": "fd52:bcef:51a7:478:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "LAN / Reserved",
+   "vlan_id": 479,
+   "network": "fd52:bcef:51a7:479::/64",
+   "range_from": "fd52:bcef:51a7:479::1",
+   "range_to": "fd52:bcef:51a7:479:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "WLAN / 1",
+   "vlan_id": 576,
+   "network": "fd52:bcef:51a7:576::/64",
+   "range_from": "fd52:bcef:51a7:576::1",
+   "range_to": "fd52:bcef:51a7:576:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "WLAN / 2",
+   "vlan_id": 577,
+   "network": "fd52:bcef:51a7:577::/64",
+   "range_from": "fd52:bcef:51a7:577::1",
+   "range_to": "fd52:bcef:51a7:577:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "WLAN / 3",
+   "vlan_id": 578,
+   "network": "fd52:bcef:51a7:578::/64",
+   "range_from": "fd52:bcef:51a7:578::1",
+   "range_to": "fd52:bcef:51a7:578:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "WLAN / Reserved",
+   "vlan_id": 579,
+   "network": "fd52:bcef:51a7:579::/64",
+   "range_from": "fd52:bcef:51a7:579::1",
+   "range_to": "fd52:bcef:51a7:579:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "VPN Users / 2",
+   "vlan_id": 677,
+   "network": "fd52:bcef:51a7:677::/64",
+   "range_from": "fd52:bcef:51a7:677::1",
+   "range_to": "fd52:bcef:51a7:677:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "VPN Users / 3",
+   "vlan_id": 678,
+   "network": "fd52:bcef:51a7:678::/64",
+   "range_from": "fd52:bcef:51a7:678::1",
+   "range_to": "fd52:bcef:51a7:678:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "VPN Users / 4",
+   "vlan_id": 679,
+   "network": "fd52:bcef:51a7:679::/64",
+   "range_from": "fd52:bcef:51a7:679::1",
+   "range_to": "fd52:bcef:51a7:679:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "VPN Azure / 1",
+   "vlan_id": 776,
+   "network": "fd52:bcef:51a7:776::/64",
+   "range_from": "fd52:bcef:51a7:776::1",
+   "range_to": "fd52:bcef:51a7:776:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "VPN Azure / 2",
+   "vlan_id": 777,
+   "network": "fd52:bcef:51a7:777::/64",
+   "range_from": "fd52:bcef:51a7:777::1",
+   "range_to": "fd52:bcef:51a7:777:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "VPN Azure / 3",
+   "vlan_id": 778,
+   "network": "fd52:bcef:51a7:778::/64",
+   "range_from": "fd52:bcef:51a7:778::1",
+   "range_to": "fd52:bcef:51a7:778:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "VPN Azure / 4",
+   "vlan_id": 779,
+   "network": "fd52:bcef:51a7:779::/64",
+   "range_from": "fd52:bcef:51a7:779::1",
+   "range_to": "fd52:bcef:51a7:779:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "VPN AWS / 1",
+   "vlan_id": 876,
+   "network": "fd52:bcef:51a7:876::/64",
+   "range_from": "fd52:bcef:51a7:876::1",
+   "range_to": "fd52:bcef:51a7:876:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "VPN AWS / 2",
+   "vlan_id": 877,
+   "network": "fd52:bcef:51a7:877::/64",
+   "range_from": "fd52:bcef:51a7:877::1",
+   "range_to": "fd52:bcef:51a7:877:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "VPN AWS / 3",
+   "vlan_id": 878,
+   "network": "fd52:bcef:51a7:878::/64",
+   "range_from": "fd52:bcef:51a7:878::1",
+   "range_to": "fd52:bcef:51a7:878:ffff:ffff:ffff:ffff"
+  },
+  {
+   "description": "VPN AWS / 4",
+   "vlan_id": 879,
+   "network": "fd52:bcef:51a7:879::/64",
+   "range_from": "fd52:bcef:51a7:879::1",
+   "range_to": "fd52:bcef:51a7:879:ffff:ffff:ffff:ffff"
+  }
+ ]
+}

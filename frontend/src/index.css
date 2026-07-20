@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root { height: 100%; margin: 0; }
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.zone-management { background:#dbeafe; color:#1e40af; }
+.zone-servers    { background:#dcfce7; color:#166534; }
+.zone-storage    { background:#fef9c3; color:#854d0e; }
+.zone-services   { background:#f3e8ff; color:#6b21a8; }
+.zone-cluster    { background:#cffafe; color:#155e75; }
+.zone-dmz        { background:#ffedd5; color:#9a3412; }
+.zone-lan        { background:#e0e7ff; color:#3730a3; }
+.zone-wlan       { background:#fce7f3; color:#9d174d; }
+.zone-vpn        { background:#e2e8f0; color:#334155; }
+.zone-public     { background:#fee2e2; color:#991b1b; }
+.zone-private    { background:#d1fae5; color:#065f46; }

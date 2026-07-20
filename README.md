@@ -40,6 +40,29 @@ devices, interfaces) and IP address management — with **auto-generated naming*
 
 ---
 
+## Deployment, operations & disaster recovery
+
+Full guides for standing up and running the test environment on Proxmox live in
+[`docs/`](docs/) and [`deploy/`](deploy/):
+
+| Guide | Purpose |
+|-------|---------|
+| [`docs/DEPLOYMENT_MANUAL.md`](docs/DEPLOYMENT_MANUAL.md) | First-time **manual** deploy on Proxmox + Ubuntu 22.04, incl. VS Code Remote-SSH |
+| [`docs/OPERATIONS.md`](docs/OPERATIONS.md) | **Auto-update** loop + **continuous code review** (CI/CD) + day-2 ops |
+| [`docs/DISASTER_RECOVERY.md`](docs/DISASTER_RECOVERY.md) | **Backups** and rebuild-from-nothing **recovery** runbook |
+| [`deploy/scripts/bootstrap.sh`](deploy/scripts/bootstrap.sh) | One-shot: fresh VM → running stack + timers + firewall |
+| [`deploy/ansible/`](deploy/ansible/) | **Repeatable** remote deploy from your workstation (idempotent) |
+| [`deploy/cloud-init/`](deploy/cloud-init/) | **Zero-touch** VM provisioning via Proxmox cloud-init |
+
+**TL;DR — first time (manual):** follow `docs/DEPLOYMENT_MANUAL.md`, or on a fresh
+VM just run:
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/jallamasc/vf-cmdb/master/deploy/scripts/bootstrap.sh)
+```
+This installs Podman, deploys the stack (systemd/Quadlet), and enables the daily
+auto-update and twice-daily backup timers. After that, merges to `master` roll out
+automatically and the server can be rebuilt in minutes from a backup archive.
+
 ## Quick start (Podman)
 
 Requires **Podman 4.x+**. For the compose workflow you also need either the

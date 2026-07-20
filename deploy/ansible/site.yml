@@ -1,0 +1,192 @@
+---
+# ===========================================================================
+# Virtualfactor IT CMDB — Repeatable deployment playbook
+#
+# Provisions and deploys the entire CMDB stack onto a fresh Ubuntu VM from
+# your workstation. Idempotent — re-running converges to the same state and
+# is the fast path to rebuild a lost server.
+#
+# Usage:
+#   cd deploy/ansible
+#   cp inventory.example.ini inventory.ini   # edit host IP + user
+#   ansible-playbook -i inventory.ini site.yml
+#
+# What it does (mirrors deploy/scripts/bootstrap.sh, but agentless/remote):
+#   * installs podman + tooling
+#   * enables rootless lingering
+#   * clones/updates the repo at ~/vf-cmdb on the master branch
+#   * templates .env (generates a strong DB password on first run)
+#   * deploys via Quadlet/systemd
+#   * installs & enables auto-update + backup timers
+#   * configures the ufw firewall
+#   * optionally restores a backup archive (‑e restore_archive=/path.tar.gz)
+# ===========================================================================
+- name: Deploy Virtualfactor IT CMDB
+  hosts: cmdb
+  become: false
+  gather_facts: true
+
+  vars:
+    repo_url: "https://github.com/jallamasc/vf-cmdb.git"
+    repo_branch: "master"
+    repo_dir: "{{ ansible_env.HOME }}/vf-cmdb"
+    user_unit_dir: "{{ ansible_env.HOME }}/.config/systemd/user"
+    quadlet_dir: "{{ ansible_env.HOME }}/.config/containers/systemd"
+    open_ports: [8080, 8000, 5050]
+    # Override on the CLI: -e "cors_origins=http://cmdb.home.lan:8080"
+    cors_origins: "*"
+    pgadmin_email: "admin@virtualfactor.local"
+
+  tasks:
+    # ---- Prerequisites ---------------------------------------------------
+    - name: Install base packages
+      become: true
+      ansible.builtin.apt:
+        name:
+          - podman
+          - git
+          - curl
+          - ufw
+          - uidmap
+          - slirp4netns
+          - fuse-overlayfs
+          - python3-pip
+          - acl
+        state: present
+        update_cache: true
+
+    - name: Detect podman version
+      ansible.builtin.command: podman version --format '{{ '{{' }}.Client.Version{{ '}}' }}'
+      register: podman_version
+      changed_when: false
+
+    - name: Enable user lingering (services survive logout/reboot)
+      become: true
+      ansible.builtin.command: "loginctl enable-linger {{ ansible_user_id }}"
+      args:
+        creates: "/var/lib/systemd/linger/{{ ansible_user_id }}"
+
+    - name: Ensure quadlet & systemd user dirs exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ quadlet_dir }}"
+        - "{{ user_unit_dir }}"
+
+    # ---- Repository ------------------------------------------------------
+    - name: Clone / update the repository
+      ansible.builtin.git:
+        repo: "{{ repo_url }}"
+        dest: "{{ repo_dir }}"
+        version: "{{ repo_branch }}"
+        update: true
+        force: false
+
+    - name: Ensure scripts are executable (remote)
+      ansible.builtin.command: "chmod +x {{ repo_dir }}/deploy-podman.sh {{ repo_dir }}/deploy/scripts/vf-cmdb-backup.sh {{ repo_dir }}/deploy/scripts/vf-cmdb-restore.sh {{ repo_dir }}/deploy/scripts/vf-cmdb-update.sh {{ repo_dir }}/deploy/scripts/bootstrap.sh"
+      changed_when: false
+
+    # ---- Environment file ------------------------------------------------
+    - name: Check for existing .env
+      ansible.builtin.stat:
+        path: "{{ repo_dir }}/.env"
+      register: env_file
+
+    - name: Generate a strong DB password (first run only)
+      ansible.builtin.set_fact:
+        generated_db_password: "{{ lookup('password', '/dev/null length=24 chars=ascii_letters,digits') }}"
+      when: not env_file.stat.exists
+
+    - name: Create .env from template (first run only)
+      ansible.builtin.shell: |
+        cp "{{ repo_dir }}/.env.example" "{{ repo_dir }}/.env"
+        sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD={{ generated_db_password }}|" "{{ repo_dir }}/.env"
+        sed -i "s|^CORS_ORIGINS=.*|CORS_ORIGINS={{ cors_origins }}|" "{{ repo_dir }}/.env"
+      when: not env_file.stat.exists
+      args:
+        executable: /bin/bash
+
+    # ---- Optional: restore a backup before starting ----------------------
+    - name: Restore .env from a backup archive (if requested)
+      ansible.builtin.command: "{{ repo_dir }}/deploy/scripts/vf-cmdb-restore.sh --env-only {{ restore_archive }}"
+      when: restore_archive is defined
+      changed_when: true
+
+    # ---- Deploy ----------------------------------------------------------
+    - name: Deploy the stack via Quadlet (Podman >= 4)
+      ansible.builtin.command: "./deploy-podman.sh quadlet"
+      args:
+        chdir: "{{ repo_dir }}"
+      environment:
+        DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/user/{{ ansible_facts['user_uid'] | default(1000) }}/bus"
+      when: podman_version.stdout is version('4.0.0', '>=')
+      register: deploy_quadlet
+      changed_when: true
+
+    - name: Deploy the stack via compose (Podman < 4 fallback)
+      ansible.builtin.command: "./deploy-podman.sh up"
+      args:
+        chdir: "{{ repo_dir }}"
+      when: podman_version.stdout is version('4.0.0', '<')
+      changed_when: true
+
+    # ---- Auto-update & backup timers ------------------------------------
+    - name: Install systemd user units (update + backup)
+      ansible.builtin.copy:
+        src: "{{ repo_dir }}/deploy/systemd/{{ item }}"
+        dest: "{{ user_unit_dir }}/{{ item }}"
+        remote_src: true
+        mode: "0644"
+      loop:
+        - vf-cmdb-update.service
+        - vf-cmdb-update.timer
+        - vf-cmdb-backup.service
+        - vf-cmdb-backup.timer
+
+    - name: Reload user systemd & enable timers
+      ansible.builtin.shell: |
+        export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+        systemctl --user daemon-reload
+        systemctl --user enable --now vf-cmdb-update.timer vf-cmdb-backup.timer
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    # ---- Restore full DB (if requested, after stack is up) ---------------
+    - name: Restore database from backup archive (if requested)
+      ansible.builtin.command: "{{ repo_dir }}/deploy/scripts/vf-cmdb-restore.sh {{ restore_archive }}"
+      when: restore_archive is defined
+      changed_when: true
+
+    # ---- Firewall --------------------------------------------------------
+    - name: Allow SSH through ufw
+      become: true
+      community.general.ufw:
+        rule: allow
+        name: OpenSSH
+      ignore_errors: true
+
+    - name: Allow CMDB ports through ufw
+      become: true
+      community.general.ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+      loop: "{{ open_ports }}"
+
+    - name: Enable ufw
+      become: true
+      community.general.ufw:
+        state: enabled
+        policy: deny
+        direction: incoming
+
+    - name: Show access URLs
+      ansible.builtin.debug:
+        msg:
+          - "CMDB deployed on {{ ansible_host | default(inventory_hostname) }}"
+          - "Web UI   : http://{{ ansible_host | default(inventory_hostname) }}:8080"
+          - "API docs : http://{{ ansible_host | default(inventory_hostname) }}:8000/docs"
+          - "pgAdmin  : http://{{ ansible_host | default(inventory_hostname) }}:5050"

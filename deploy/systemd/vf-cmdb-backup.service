@@ -1,0 +1,9 @@
+[Unit]
+Description=Virtualfactor CMDB — database & config backup
+Documentation=file:%h/vf-cmdb/docs/DISASTER_RECOVERY.md
+
+[Service]
+Type=oneshot
+ExecStart=%h/vf-cmdb/deploy/scripts/vf-cmdb-backup.sh
+TimeoutStartSec=900
+Nice=15

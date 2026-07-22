@@ -94,6 +94,21 @@ seed).
 .\Manage-CmdbVM.ps1 -Action ssh     # ssh vfadmin@<ip>
 ```
 
+> **Finding the IP if `-Action ip` is slow or empty:** open the console
+> (`.\Manage-CmdbVM.ps1 -Action connect`) — the VM prints its **IP address and
+> all URLs right on the login screen**, so you can read it without logging in.
+> (If the banner still shows `\4`, press Enter once to refresh, or wait a few
+> seconds for the network to come up.) The VM also runs the Hyper-V KVP daemon,
+> so the IP shows in Hyper-V Manager's *Networking* tab too.
+
+### Credentials
+| Where | Username | Password |
+|---|---|---|
+| **SSH** (preferred) | `vfadmin` | *(none — uses your SSH key)* |
+| **Console login** | `vfadmin` | `changeme-on-first-login` (change it: `passwd`) |
+| **pgAdmin** (`:5050`) | `admin@virtualfactor.local` | `admin` (set in `~/vf-cmdb/.env`) |
+| **Web UI** (`:8080`) | *(no login — single-user app)* | — |
+
 - **Web UI**: `http://<vm-ip>:8080`
 - **API docs**: `http://<vm-ip>:8000/docs`
 - **Health**: `http://<vm-ip>:8000/health`

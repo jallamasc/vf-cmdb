@@ -49,6 +49,26 @@ if (-not (Get-VM -Name $VMName -ErrorAction SilentlyContinue)) {
     Die "VM '$VMName' not found. Create it with New-CmdbVM.ps1 (or pass -VMName)."
 }
 
+# Read the IP from the Hyper-V KVP exchange (works even when the integration
+# 'IPAddresses' property is empty on some builds, as long as hv-kvp-daemon runs).
+function Get-VMIPFromKvp {
+    try {
+        $vmWmi = Get-CimInstance -Namespace root\virtualization\v2 -ClassName Msvm_ComputerSystem `
+                 -Filter "ElementName='$VMName'" -ErrorAction Stop
+        $kvp = Get-CimAssociatedInstance -InputObject $vmWmi `
+               -ResultClassName Msvm_KvpExchangeComponent -ErrorAction Stop
+        foreach ($item in $kvp.GuestIntrinsicExchangeItems) {
+            if ($item -match 'Name>NetworkAddressIPv4<' -or $item -match 'RtrNetworkAddressIPv4') {
+                if ($item -match '<Data>([0-9\.;]+)</Data>') {
+                    $addr = ($matches[1] -split ';' | Where-Object { $_ -match '^\d+\.\d+\.\d+\.\d+$' -and $_ -ne '127.0.0.1' } | Select-Object -First 1)
+                    if ($addr) { return $addr }
+                }
+            }
+        }
+    } catch { Write-Verbose "KVP lookup failed: $($_.Exception.Message)" }
+    return $null
+}
+
 function Get-VMIPv4 {
     param([int]$TimeoutSec = 180)
     $deadline = (Get-Date).AddSeconds($TimeoutSec)
@@ -56,6 +76,8 @@ function Get-VMIPv4 {
         $ips = (Get-VMNetworkAdapter -VMName $VMName).IPAddresses |
                Where-Object { $_ -match '^\d+\.\d+\.\d+\.\d+$' -and $_ -ne '127.0.0.1' }
         if ($ips) { return $ips | Select-Object -First 1 }
+        $kvpIp = Get-VMIPFromKvp
+        if ($kvpIp) { return $kvpIp }
         Start-Sleep -Seconds 5
     } while ((Get-Date) -lt $deadline)
     return $null

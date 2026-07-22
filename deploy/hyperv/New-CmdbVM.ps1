@@ -301,9 +301,17 @@ Write-Host @"
   First boot installs Podman, clones the repo and deploys the
   stack. Allow ~5-8 minutes on first run.
 
-  Find the VM's IP address:
-     .\Manage-CmdbVM.ps1 -VMName $VMName -Action ip
-     (or open Hyper-V Manager -> $VMName -> Networking tab)
+  Find the VM's IP address (three easy ways):
+     1) .\Manage-CmdbVM.ps1 -VMName $VMName -Action ip
+     2) Open the console (.\Manage-CmdbVM.ps1 -Action connect) - the IP and
+        all URLs are printed right on the LOGIN SCREEN, no login needed.
+        (If it still says '\4', press Enter once to refresh, or wait for the
+        network to come up.)
+     3) Hyper-V Manager -> $VMName -> Networking tab
+
+  Console / SSH credentials:
+     SSH (preferred) : vfadmin@<VM-IP>   using key $SshPublicKeyPath
+     Console login   : vfadmin / changeme-on-first-login
 
   Then browse from your laptop:
      Web UI   : http://<VM-IP>:8080

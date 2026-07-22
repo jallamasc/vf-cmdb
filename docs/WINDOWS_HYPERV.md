@@ -219,6 +219,7 @@ archive instead of a multi-GB disk.
 | No IP from `-Action ip` | Wait for first boot to finish; ensure the VM is *Running* and (for LAN) that you used an External switch. NAT/Default Switch IPs are only reachable from the host. |
 | Web UI not up yet | First boot installs everything — allow ~5–8 min. Watch progress: `.\Manage-CmdbVM.ps1 -Action ssh` then `cloud-init status --wait` and `cmdb-logs`. |
 | Secure Boot / won't boot | The script sets the **MicrosoftUEFICertificateAuthority** template required by Ubuntu cloud images; don't switch it to the default Windows template. |
+| `must not be sparse` / `0xC03A001A` on resize or start | qemu-img on Windows marks its VHDX output as *sparse*, which Hyper-V rejects. The script clears it automatically (`fsutil sparse setflag <vhdx> 0`, with a copy-based fallback). If you hit it on an older copy of the script, update to the latest, or run manually: `fsutil sparse setflag "C:\HyperV\vf-cmdb\vf-cmdb-os.vhdx" 0`. |
 | After Proxmox import, no network | Confirm `--bridge` matches your Proxmox bridge (usually `vmbr0`); for static, re-check `--ip/--gw`. Reboot once so cloud-init re-applies. |
 
 ---

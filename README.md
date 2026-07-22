@@ -48,11 +48,14 @@ Full guides for standing up and running the test environment on Proxmox live in
 | Guide | Purpose |
 |-------|---------|
 | [`docs/DEPLOYMENT_MANUAL.md`](docs/DEPLOYMENT_MANUAL.md) | First-time **manual** deploy on Proxmox + Ubuntu 22.04, incl. VS Code Remote-SSH |
+| [`docs/WINDOWS_HYPERV.md`](docs/WINDOWS_HYPERV.md) | **Laptop test VM on Hyper-V** (one command) + **migrate to Proxmox** (one command) |
 | [`docs/OPERATIONS.md`](docs/OPERATIONS.md) | **Auto-update** loop + **continuous code review** (CI/CD) + day-2 ops |
 | [`docs/DISASTER_RECOVERY.md`](docs/DISASTER_RECOVERY.md) | **Backups** and rebuild-from-nothing **recovery** runbook |
-| [`deploy/scripts/bootstrap.sh`](deploy/scripts/bootstrap.sh) | One-shot: fresh VM → running stack + timers + firewall |
+| [`deploy/scripts/bootstrap.sh`](deploy/scripts/bootstrap.sh) | One-shot: fresh VM -> running stack + timers + firewall |
+| [`deploy/hyperv/`](deploy/hyperv/) | **Windows/Hyper-V** zero-touch VM + migration-to-Proxmox scripts |
 | [`deploy/ansible/`](deploy/ansible/) | **Repeatable** remote deploy from your workstation (idempotent) |
 | [`deploy/cloud-init/`](deploy/cloud-init/) | **Zero-touch** VM provisioning via Proxmox cloud-init |
+| [`deploy/proxmox/import-from-hyperv.sh`](deploy/proxmox/import-from-hyperv.sh) | Import a Hyper-V-exported disk into Proxmox in **one command** |
 
 **TL;DR — first time (manual):** follow `docs/DEPLOYMENT_MANUAL.md`, or on a fresh
 VM just run:

@@ -194,14 +194,23 @@ if (-not (Test-Path $imgFile)) {
 }
 
 $osVhdx = Join-Path $VMPath "$VMName-os.vhdx"
-Write-Ok "Converting cloud image -> $osVhdx"
-& $qemu convert -f qcow2 -O vhdx -o subformat=dynamic $imgFile $osVhdx
-if ($LASTEXITCODE -ne 0) { Die "qemu-img convert failed." }
-Write-Ok "Resizing OS disk to ${DiskGB}GB"
-# Use qemu-img resize (not Resize-VHD) because the converted VHDX is sparse and
-# Hyper-V's Resize-VHD refuses to resize sparse disks (0xC03A001A error).
-& $qemu resize -f vhdx $osVhdx "${DiskGB}G"
+# Resize at the qcow2 level FIRST, then convert to VHDX. Two reasons:
+#   * Hyper-V's Resize-VHD refuses to resize the sparse VHDX (0xC03A001A).
+#   * Many qemu builds' VHDX driver does not support 'qemu-img resize' at all
+#     ("Image format driver does not support resize").
+# qcow2 resize is always supported, so we grow a working qcow2 copy, then convert.
+$workQcow = Join-Path $WorkDir "$VMName-os-work.qcow2"
+if (Test-Path $workQcow) { Remove-Item $workQcow -Force }
+Write-Ok "Preparing working qcow2 copy"
+& $qemu convert -f qcow2 -O qcow2 $imgFile $workQcow
+if ($LASTEXITCODE -ne 0) { Die "qemu-img convert (qcow2 working copy) failed." }
+Write-Ok "Resizing (qcow2) to ${DiskGB}GB"
+& $qemu resize $workQcow "${DiskGB}G"
 if ($LASTEXITCODE -ne 0) { Die "qemu-img resize failed." }
+Write-Ok "Converting resized image -> $osVhdx"
+& $qemu convert -f qcow2 -O vhdx -o subformat=dynamic $workQcow $osVhdx
+if ($LASTEXITCODE -ne 0) { Die "qemu-img convert (vhdx) failed." }
+Remove-Item $workQcow -Force -ErrorAction SilentlyContinue
 
 # --------------------------------------------------------------------------
 # 5. Build cloud-init NoCloud seed disk (pure PowerShell, no ADK)

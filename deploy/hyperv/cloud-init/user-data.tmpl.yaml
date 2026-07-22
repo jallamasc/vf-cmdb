@@ -44,6 +44,10 @@ packages:
   - slirp4netns
   - fuse-overlayfs
   - python3-pip
+  # Hyper-V integration daemons — lets the Hyper-V host (and Manage-CmdbVM.ps1
+  # -Action ip / Hyper-V Manager) read the VM's IP address via KVP.
+  - linux-cloud-tools-virtual
+  - linux-tools-virtual
 
 write_files:
   - path: /etc/profile.d/vf-cmdb.sh
@@ -55,7 +59,30 @@ write_files:
       alias cmdb-update='~/vf-cmdb/deploy/scripts/vf-cmdb-update.sh'
       alias cmdb-backup='~/vf-cmdb/deploy/scripts/vf-cmdb-backup.sh'
 
+  # Console login banner: agetty replaces \4 with the live IPv4 address, so the
+  # VM's IP is visible ON THE LOGIN SCREEN — no need to log in to find it.
+  - path: /etc/issue
+    permissions: "0644"
+    content: |
+      Ubuntu \r (\l)
+
+      ======================================================
+       Virtualfactor IT CMDB  (host: \n)
+      ------------------------------------------------------
+       IPv4 address .: \4
+       Web UI .......: http://\4:8080
+       API docs .....: http://\4:8000/docs
+       pgAdmin ......: http://\4:5050
+      ------------------------------------------------------
+       SSH login ....: vfadmin@\4   (key-based)
+       Console login : vfadmin / changeme-on-first-login
+      ======================================================
+
 runcmd:
+  # Make sure the Hyper-V KVP daemon is running so the host can read our IP.
+  - ["systemctl", "enable", "--now", "hv-kvp-daemon.service"]
+  # Refresh the console banner so the IP shows on the current login prompt.
+  - ["systemctl", "restart", "getty@tty1.service"]
   # Deploy as the app user (rootless Podman requires a real login session).
   - ["sudo", "-iu", "vfadmin", "bash", "-lc",
      "REPO_BRANCH=__REPO_BRANCH__ CORS_ORIGINS='*' bash <(curl -fsSL https://raw.githubusercontent.com/jallamasc/vf-cmdb/__REPO_BRANCH__/deploy/scripts/bootstrap.sh)"]

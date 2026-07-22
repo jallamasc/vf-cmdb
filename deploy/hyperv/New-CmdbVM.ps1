@@ -212,6 +212,22 @@ Write-Ok "Converting resized image -> $osVhdx"
 if ($LASTEXITCODE -ne 0) { Die "qemu-img convert (vhdx) failed." }
 Remove-Item $workQcow -Force -ErrorAction SilentlyContinue
 
+# qemu-img on Windows marks its output with the NTFS "sparse" attribute, which
+# Hyper-V refuses to attach (error 0xC03A001A "must not be sparse"). Clear it.
+Write-Ok "Clearing sparse attribute on VHDX (Hyper-V requirement)"
+& fsutil sparse setflag "$osVhdx" 0 | Out-Null
+$sparseState = (& fsutil sparse queryflag "$osVhdx") 2>$null
+if ($sparseState -match "is set") {
+    # fsutil couldn't clear it (rare) -> rewrite via a plain copy, which drops
+    # the sparse flag, then swap the files.
+    Write-Warn2 "Sparse flag still set - rewriting file via copy to remove it."
+    $tmpCopy = "$osVhdx.nonsparse"
+    Copy-Item -LiteralPath $osVhdx -Destination $tmpCopy -Force
+    Remove-Item -LiteralPath $osVhdx -Force
+    Move-Item  -LiteralPath $tmpCopy -Destination $osVhdx -Force
+    & fsutil sparse setflag "$osVhdx" 0 | Out-Null
+}
+
 # --------------------------------------------------------------------------
 # 5. Build cloud-init NoCloud seed disk (pure PowerShell, no ADK)
 # --------------------------------------------------------------------------

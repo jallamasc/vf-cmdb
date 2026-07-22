@@ -1,0 +1,63 @@
+#cloud-config
+# ===========================================================================
+# Virtualfactor IT CMDB — cloud-init user-data (Hyper-V NoCloud seed)
+#
+# This is a TEMPLATE. New-CmdbVM.ps1 substitutes the __PLACEHOLDERS__ and
+# writes the result onto a FAT32 disk labelled CIDATA that cloud-init reads on
+# first boot. It provisions the app user, installs your SSH key + Podman, then
+# runs bootstrap.sh — the same flow used for Proxmox, so the two stay identical.
+#
+# Placeholders (filled in automatically by the PowerShell script):
+#   __SSH_PUBLIC_KEY__   your ~/.ssh/id_ed25519.pub
+#   __HOSTNAME__         the VM name
+#   __REPO_BRANCH__      branch to deploy (default master)
+# ===========================================================================
+
+hostname: __HOSTNAME__
+manage_etc_hosts: true
+
+users:
+  - name: vfadmin
+    groups: [sudo]
+    shell: /bin/bash
+    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+    lock_passwd: false
+    ssh_authorized_keys:
+      - __SSH_PUBLIC_KEY__
+
+# Fallback console password (SSH keys are strongly preferred — change this!)
+chpasswd:
+  expire: false
+  users:
+    - name: vfadmin
+      password: "changeme-on-first-login"
+      type: text
+
+package_update: true
+package_upgrade: false
+packages:
+  - git
+  - curl
+  - podman
+  - ufw
+  - uidmap
+  - slirp4netns
+  - fuse-overlayfs
+  - python3-pip
+
+write_files:
+  - path: /etc/profile.d/vf-cmdb.sh
+    permissions: "0644"
+    content: |
+      # Convenience aliases for CMDB operators
+      alias cmdb-status='systemctl --user status vf-cmdb-backend.service'
+      alias cmdb-logs='journalctl --user -u vf-cmdb-backend.service -f'
+      alias cmdb-update='~/vf-cmdb/deploy/scripts/vf-cmdb-update.sh'
+      alias cmdb-backup='~/vf-cmdb/deploy/scripts/vf-cmdb-backup.sh'
+
+runcmd:
+  # Deploy as the app user (rootless Podman requires a real login session).
+  - ["sudo", "-iu", "vfadmin", "bash", "-lc",
+     "REPO_BRANCH=__REPO_BRANCH__ CORS_ORIGINS='*' bash <(curl -fsSL https://raw.githubusercontent.com/jallamasc/vf-cmdb/__REPO_BRANCH__/deploy/scripts/bootstrap.sh)"]
+
+final_message: "Virtualfactor IT CMDB provisioned on __HOSTNAME__. UI :8080, API :8000/docs, pgAdmin :5050 once boot completes."

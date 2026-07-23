@@ -56,15 +56,20 @@ PODMAN_VER="$(podman version --format '{{.Client.Version}}' 2>/dev/null || echo 
 log "Podman version: $PODMAN_VER"
 
 # --- 1b. Ensure Docker Hub is a default search registry --------------------
-# Ubuntu 24.04's /etc/containers/registries.conf ships with NO unqualified-search
-# registries, so short image names like "nginx:1.27-alpine" fail to resolve.
-# This fixes the current build and any future short-name images.
-REGISTRIES_CONF="/etc/containers/registries.conf"
-if ! sudo grep -q "unqualified-search-registries" "$REGISTRIES_CONF" 2>/dev/null; then
-    log "Adding docker.io as default search registry in $REGISTRIES_CONF ..."
-    echo 'unqualified-search-registries = ["docker.io"]' | sudo tee -a "$REGISTRIES_CONF" >/dev/null
+# Ubuntu 24.04's /etc/containers/registries.conf only has a COMMENTED example
+# of unqualified-search-registries, so short image names like
+# "nginx:1.27-alpine" fail to resolve. Write a drop-in conf file (loaded from
+# registries.conf.d) so short names resolve to docker.io. Using a drop-in avoids
+# matching the commented line in the main file and covers all future images.
+REGISTRIES_DROPIN="/etc/containers/registries.conf.d/01-vf-cmdb-docker.conf"
+log "Setting docker.io as default search registry ($REGISTRIES_DROPIN) ..."
+sudo mkdir -p /etc/containers/registries.conf.d
+echo 'unqualified-search-registries = ["docker.io"]' | sudo tee "$REGISTRIES_DROPIN" >/dev/null
+# Verify Podman now sees docker.io as a search registry.
+if podman info --format '{{.Registries.Search}}' 2>/dev/null | grep -q docker.io; then
+    log "Confirmed: docker.io is now a search registry."
 else
-    log "unqualified-search-registries already set in $REGISTRIES_CONF — skipping."
+    log "WARN: docker.io not yet visible to podman info — continuing anyway."
 fi
 
 # --- 2. Rootless lingering -------------------------------------------------

@@ -55,6 +55,18 @@ fi
 PODMAN_VER="$(podman version --format '{{.Client.Version}}' 2>/dev/null || echo '0')"
 log "Podman version: $PODMAN_VER"
 
+# --- 1b. Ensure Docker Hub is a default search registry --------------------
+# Ubuntu 24.04's /etc/containers/registries.conf ships with NO unqualified-search
+# registries, so short image names like "nginx:1.27-alpine" fail to resolve.
+# This fixes the current build and any future short-name images.
+REGISTRIES_CONF="/etc/containers/registries.conf"
+if ! sudo grep -q "unqualified-search-registries" "$REGISTRIES_CONF" 2>/dev/null; then
+    log "Adding docker.io as default search registry in $REGISTRIES_CONF ..."
+    echo 'unqualified-search-registries = ["docker.io"]' | sudo tee -a "$REGISTRIES_CONF" >/dev/null
+else
+    log "unqualified-search-registries already set in $REGISTRIES_CONF — skipping."
+fi
+
 # --- 2. Rootless lingering -------------------------------------------------
 log "Enabling user lingering (services survive logout/reboot)..."
 sudo loginctl enable-linger "$USER"

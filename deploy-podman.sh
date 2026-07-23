@@ -11,6 +11,9 @@
 #   ./deploy-podman.sh ps        Show running containers
 #   ./deploy-podman.sh reset     Clear stale containers + pgadmin volume, then up
 #                                (NEVER deletes the pgdata / database volume)
+#   ./deploy-podman.sh recover   Repair a corrupted podman volume store
+#                                ("more than one result for volume name ...");
+#                                backs up on-disk DB data first
 #   ./deploy-podman.sh quadlet   Install Quadlet units for rootless systemd
 #
 # Requires: podman 4.x+ and (for the compose sub-commands) either
@@ -138,6 +141,12 @@ case "${1:-}" in
         ;;
     ps)
         podman ps --filter "name=vf_cmdb_"
+        ;;
+    recover)
+        # Repair a corrupted podman volume store ("more than one result for
+        # volume name ..."). Backs up on-disk PostgreSQL data first, then
+        # repairs. Pass CONFIRM_RESET=1 to allow the full-reset last resort.
+        exec ./deploy/scripts/recover-podman-volumes.sh
         ;;
     quadlet)
         ensure_env

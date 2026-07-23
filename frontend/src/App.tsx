@@ -2,6 +2,7 @@ import { Routes, Route } from "react-router-dom";
 import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
 import Sites from "./pages/Sites";
+import Hierarchy from "./pages/Hierarchy";
 import RackView from "./pages/RackView";
 import PhysicalServers from "./pages/PhysicalServers";
 import VirtualMachines from "./pages/VirtualMachines";
@@ -24,6 +25,7 @@ export default function App() {
       <Route element={<Layout />}>
         <Route index element={<Dashboard />} />
         <Route path="sites" element={<Sites />} />
+        <Route path="hierarchy" element={<Hierarchy />} />
         <Route path="racks" element={<RackView />} />
         <Route path="patch-panels" element={<SimpleGridPage kind="patch-panels" />} />
         <Route path="power" element={<SimpleGridPage kind="power" />} />

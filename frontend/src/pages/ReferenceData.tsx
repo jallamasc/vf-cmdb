@@ -7,6 +7,7 @@ interface RefTable {
   label: string;
   description: string;
   columns: ReturnType<typeof textCol>[];
+  newRowDefaults?: Record<string, unknown>;
 }
 
 // Reference data = lookup lists that are NOT naming conventions. They hold
@@ -28,6 +29,22 @@ const TABLES: RefTable[] = [
       textCol("country", "Country", 140),
       textCol("notes", "Notes", 240),
     ],
+    newRowDefaults: { label: "New address" },
+  },
+  {
+    slug: "rack-types",
+    label: "Rack Types",
+    description:
+      "Reusable rack models (height in U, code) picked when creating racks on the Physical Hierarchy page.",
+    columns: [
+      roCol("id", "ID", 70),
+      textCol("name", "Name", 200),
+      textCol("code", "Code", 120),
+      textCol("total_units", "Height (U)", 120),
+      textCol("case_enforcement", "Case Enforcement", 160),
+      textCol("description", "Description", 260),
+    ],
+    newRowDefaults: { name: "New rack type", total_units: 42 },
   },
 ];
 
@@ -69,7 +86,7 @@ export default function ReferenceData() {
           title={table.label}
           description={table.description}
           columns={table.columns}
-          newRowDefaults={{ label: "New address" }}
+          newRowDefaults={table.newRowDefaults ?? {}}
         />
       </div>
     </div>

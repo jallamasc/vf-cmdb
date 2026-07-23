@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, CellValueChangedEvent } from "ag-grid-community";
@@ -12,6 +13,7 @@ interface Props {
   columns: ColDef[];
   newRowDefaults?: Row;
   description?: string;
+  toolbarExtra?: ReactNode;
 }
 
 export default function EntityGrid({
@@ -20,6 +22,7 @@ export default function EntityGrid({
   columns,
   newRowDefaults = {},
   description,
+  toolbarExtra,
 }: Props) {
   const qc = useQueryClient();
   const gridRef = useRef<AgGridReact>(null);
@@ -61,8 +64,20 @@ export default function EntityGrid({
 
   const onCellValueChanged = (e: CellValueChangedEvent) => {
     setError(null);
-    const field = e.colDef.field!;
-    const payload: Row = { [field]: e.newValue === "" ? null : e.newValue };
+    const field = e.colDef.field;
+    let payload: Row;
+    if (!field) {
+      // User-defined column backed by the custom_fields JSON object. The
+      // column's valueSetter has already mutated e.data.custom_fields, so we
+      // persist the whole object.
+      payload = { custom_fields: e.data.custom_fields ?? {} };
+    } else if (field.includes(".")) {
+      // Nested field path (e.g. "custom_fields.foo"): persist the root object.
+      const root = field.split(".")[0];
+      payload = { [root]: e.data[root] };
+    } else {
+      payload = { [field]: e.newValue === "" ? null : e.newValue };
+    }
     updateMut.mutate({ id: e.data.id, payload });
   };
 
@@ -90,6 +105,7 @@ export default function EntityGrid({
           {description && <p className="text-sm text-slate-500">{description}</p>}
         </div>
         <div className="flex gap-2">
+          {toolbarExtra}
           <button
             onClick={handleAdd}
             className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"

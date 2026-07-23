@@ -38,6 +38,7 @@ const NAV: { section: string; items: { to: string; label: string }[] }[] = [
     section: "Reference",
     items: [
       { to: "/naming", label: "Naming Conventions" },
+      { to: "/reference-data", label: "Reference Data" },
       { to: "/ansible", label: "Ansible Inventory" },
       { to: "/changelog", label: "Changelog" },
     ],

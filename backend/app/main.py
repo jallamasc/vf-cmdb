@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
-from .registry import ENTITY_REGISTRY, LOOKUP_SLUGS
+from .registry import ENTITY_REGISTRY, LOOKUP_SLUGS, REFERENCE_SLUGS
 from .routers import ansible, generic, special
 
 app = FastAPI(title=settings.app_name, version="1.0.0")
@@ -36,4 +36,5 @@ async def list_entities() -> dict:
     return {
         "entities": sorted(ENTITY_REGISTRY.keys()),
         "lookups": LOOKUP_SLUGS,
+        "reference_tables": REFERENCE_SLUGS,
     }

@@ -96,9 +96,9 @@ volumes:
   # produces duplicate/orphan volumes and the "more than one result for volume
   # name" crash.
   pgdata:
-    name: vf-cmdb_pgdata
+    name: ${PGDATA_VOLUME:-vf-cmdb_pgdata}
   pgadmin:
-    name: vf-cmdb_pgadmin
+    name: ${PGADMIN_VOLUME:-vf-cmdb_pgadmin}
 
 networks:
   cmdb:

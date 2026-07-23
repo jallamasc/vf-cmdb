@@ -28,6 +28,7 @@ const NAV: { section: string; items: { to: string; label: string }[] }[] = [
   {
     section: "Networking & IPAM",
     items: [
+      { to: "/ipam", label: "IPAM by Site" },
       { to: "/vlans", label: "VLANs" },
       { to: "/subnets", label: "Subnets (IPAM)" },
       { to: "/ip-assignments", label: "IP Assignments" },

@@ -2,6 +2,7 @@
 const BASE = "/api/v1";
 
 export type Row = Record<string, any>;
+export type Family = "ipv4" | "ipv6";
 
 async function handle(res: Response) {
   if (!res.ok) {
@@ -41,10 +42,62 @@ export const api = {
   changelog: (params = "") =>
     fetch(`${BASE}/changelog${params}`).then(handle),
   ansibleInventory: () => fetch(`${BASE}/ansible/inventory`).then(handle),
-  nextIp: (subnetId: number) =>
-    fetch(`${BASE}/ipam/subnets/${subnetId}/next-ip`).then(handle),
-  utilization: (subnetId: number) =>
-    fetch(`${BASE}/ipam/subnets/${subnetId}/utilization`).then(handle),
+  nextIp: (subnetId: number, family: Family = "ipv4", anchor?: string) => {
+    let qs = `family=${family}`;
+    if (anchor) qs += `&anchor=${encodeURIComponent(anchor)}`;
+    return fetch(`${BASE}/ipam/subnets/${subnetId}/next-ip?${qs}`).then(handle);
+  },
+  utilization: (subnetId: number, family: Family = "ipv4") =>
+    fetch(`${BASE}/ipam/subnets/${subnetId}/utilization?family=${family}`).then(
+      handle,
+    ),
+
+  // ---- Site-scoped IPAM listings (Phase 2) ----
+  ipamVlans: (siteId?: number | null): Promise<Row[]> => {
+    const qs = siteId != null ? `?site_id=${siteId}` : "";
+    return fetch(`${BASE}/ipam/vlans${qs}`).then(handle);
+  },
+  ipamSubnets: (
+    siteId?: number | null,
+    family: Family = "ipv4",
+    vlanId?: number | null,
+  ): Promise<Row[]> => {
+    let qs = `?family=${family}`;
+    if (siteId != null) qs += `&site_id=${siteId}`;
+    if (vlanId != null) qs += `&vlan_id=${vlanId}`;
+    return fetch(`${BASE}/ipam/subnets${qs}`).then(handle);
+  },
+
+  // ---- Reserved-IP pools (Phase 2) ----
+  reservations: (subnetId: number, family: Family = "ipv4") =>
+    fetch(
+      `${BASE}/ipam/subnets/${subnetId}/reservations?family=${family}`,
+    ).then(handle),
+  nextReserved: (subnetId: number, family: Family = "ipv4") =>
+    fetch(
+      `${BASE}/ipam/subnets/${subnetId}/next-reserved?family=${family}`,
+    ).then(handle),
+  addReservation: (
+    subnetId: number,
+    payload: Row,
+    family: Family = "ipv4",
+  ): Promise<Row> =>
+    fetch(`${BASE}/ipam/subnets/${subnetId}/reservations?family=${family}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }).then(handle),
+  removeReservation: (
+    subnetId: number,
+    resId: number,
+    family: Family = "ipv4",
+    force = false,
+  ): Promise<null> =>
+    fetch(
+      `${BASE}/ipam/subnets/${subnetId}/reservations/${resId}` +
+        `?family=${family}${force ? "&force=true" : ""}`,
+      { method: "DELETE" },
+    ).then(handle),
   naming: (qs: string) => fetch(`${BASE}/naming/generate?${qs}`).then(handle),
   // Abbreviation preview: derive a short code from a full name by trim mode.
   previewAbbrev: (

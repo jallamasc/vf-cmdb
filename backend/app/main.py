@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
 from .registry import ENTITY_REGISTRY, LOOKUP_SLUGS, REFERENCE_SLUGS
-from .routers import ansible, generic, special
+from .routers import ansible, generic, ipam, special
 
 app = FastAPI(title=settings.app_name, version="1.0.0")
 
@@ -21,6 +21,7 @@ app.add_middleware(
 # Special routers first so their concrete paths win over the generic
 # "/{resource}" catch-all.
 app.include_router(special.router, prefix=settings.api_prefix)
+app.include_router(ipam.router, prefix=settings.api_prefix)
 app.include_router(ansible.router, prefix=settings.api_prefix)
 app.include_router(generic.router, prefix=settings.api_prefix)
 

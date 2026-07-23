@@ -303,9 +303,12 @@ async def seed() -> None:
                 except ValueError:
                     cidr = None
             sub = models.SubnetIpv4(
-                vlan_id=vlan_pk, network_cidr=cidr, gateway=s.get("gateway"),
+                vlan_id=vlan_pk, site_id=site.id, network_cidr=cidr,
+                gateway=s.get("gateway"),
                 range_from=s.get("range_from"), range_to=s.get("range_to"),
                 expansion_ceiling=s.get("expansion_ceiling"), description=s["description"],
+                reserved_count=s.get("reserved_count", 0),
+                reservation_anchor=s.get("reservation_anchor", "from_end"),
             )
             session.add(sub)
             await session.flush()
@@ -321,9 +324,11 @@ async def seed() -> None:
             vid = s["vlan_id"]
             vlan_pk = vlan_by_id.get(vid) if vid is not None else None
             session.add(models.SubnetIpv6(
-                vlan_id=vlan_pk, network_cidr=s["network"],
+                vlan_id=vlan_pk, site_id=site.id, network_cidr=s["network"],
                 range_from=s.get("range_from"), range_to=s.get("range_to"),
                 description=s["description"],
+                reserved_count=s.get("reserved_count", 0),
+                reservation_anchor=s.get("reservation_anchor", "from_end"),
             ))
 
         # ---- Network devices ----

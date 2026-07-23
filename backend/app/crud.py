@@ -94,6 +94,103 @@ async def _sync_abbrev(session: AsyncSession, obj) -> None:
     )
 
 
+async def _validate_ipam(session: AsyncSession, obj, entity_id) -> None:
+    """Enforce Phase 2 site-scoped IPAM rules before a VLAN/subnet is flushed.
+
+    * VLANs must belong to a site and a VLAN number may not be reused on any
+      other site (cross-site duplication guard).
+    * Subnets must belong to a site (derived from their parent VLAN when
+      omitted) and their CIDR may not overlap another segment on the same site
+      or be reused on a different site.
+
+    Raises a clean 409/422 ``HTTPException`` instead of surfacing a raw DB
+    constraint violation.
+    """
+    import ipaddress as _ip
+
+    from fastapi import HTTPException
+
+    if isinstance(obj, models.Vlan):
+        if obj.site_id is None:
+            raise HTTPException(
+                status_code=422,
+                detail="site_id is required for a VLAN (IPAM is site-scoped).",
+            )
+        if obj.vlan_id is not None:
+            stmt = select(models.Vlan).where(models.Vlan.vlan_id == obj.vlan_id)
+            if entity_id is not None:
+                stmt = stmt.where(models.Vlan.id != entity_id)
+            existing = (await session.execute(stmt)).scalars().first()
+            if existing is not None:
+                if existing.site_id != obj.site_id:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            f"VLAN {obj.vlan_id} is already used on another site "
+                            f"(site #{existing.site_id}); VLAN numbers cannot be "
+                            "reused across sites."
+                        ),
+                    )
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"VLAN {obj.vlan_id} already exists on this site.",
+                )
+        return
+
+    if isinstance(obj, (models.SubnetIpv4, models.SubnetIpv6)):
+        # Derive / validate the segment's site from its parent VLAN.
+        if obj.vlan_id is not None:
+            vlan = await session.get(models.Vlan, obj.vlan_id)
+            if vlan is not None:
+                if obj.site_id is None:
+                    obj.site_id = vlan.site_id
+                elif vlan.site_id is not None and obj.site_id != vlan.site_id:
+                    raise HTTPException(
+                        status_code=422,
+                        detail=(
+                            f"Subnet site (#{obj.site_id}) does not match its "
+                            f"VLAN's site (#{vlan.site_id})."
+                        ),
+                    )
+        if obj.site_id is None:
+            raise HTTPException(
+                status_code=422,
+                detail="site_id is required for a subnet (IPAM is site-scoped).",
+            )
+        # CIDR overlap / cross-site reuse guard (same address family only).
+        if obj.network_cidr:
+            try:
+                net = _ip.ip_network(str(obj.network_cidr), strict=False)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid subnet CIDR")
+            model = type(obj)
+            stmt = select(model).where(model.network_cidr.isnot(None))
+            if entity_id is not None:
+                stmt = stmt.where(model.id != entity_id)
+            for other in (await session.execute(stmt)).scalars().all():
+                try:
+                    other_net = _ip.ip_network(str(other.network_cidr), strict=False)
+                except ValueError:
+                    continue
+                if net.overlaps(other_net):
+                    if other.site_id != obj.site_id:
+                        raise HTTPException(
+                            status_code=409,
+                            detail=(
+                                f"CIDR {net} overlaps segment {other_net} on "
+                                f"another site (site #{other.site_id}); segments "
+                                "cannot be reused across sites."
+                            ),
+                        )
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            f"CIDR {net} overlaps existing segment {other_net} "
+                            "on this site."
+                        ),
+                    )
+
+
 async def _log(
     session: AsyncSession,
     table: str,
@@ -135,6 +232,7 @@ async def create_item(
     data = sanitize_payload(model, payload)
     obj = model(**data)
     await _validate_abbrev(session, obj, entity_id=None)
+    await _validate_ipam(session, obj, entity_id=None)
     session.add(obj)
     await session.flush()  # obtain PK
     await naming.apply_naming(session, obj)
@@ -162,6 +260,7 @@ async def update_item(
             setattr(obj, field, new_value)
     if changes:
         await _validate_abbrev(session, obj, entity_id=obj.id)
+        await _validate_ipam(session, obj, entity_id=obj.id)
         await session.flush()
         await naming.apply_naming(session, obj)
         await _sync_abbrev(session, obj)

@@ -1,7 +1,6 @@
 """Special endpoints: dashboard, IPAM, naming, changelog, Ansible, facts."""
 from __future__ import annotations
 
-import ipaddress
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -78,88 +77,9 @@ async def changelog(
 
 
 # ---------------------------------------------------------------------------
-# IPAM: next available IP
+# IPAM: next available IP, utilisation, and reserved-IP pools live in the
+# dedicated, site-scoped ``routers/ipam.py`` module (Phase 2).
 # ---------------------------------------------------------------------------
-async def _used_ipv4(session: AsyncSession) -> set[str]:
-    used: set[str] = set()
-    for model, field in [
-        (models.IpAssignment, "ipv4_address"),
-        (models.SubnetRoleAssignment, "ipv4_address"),
-        (models.NetworkDevice, "management_ipv4"),
-        (models.PhysicalServer, "management_ipv4"),
-        (models.PhysicalServer, "ilo_ipmi_ipv4"),
-        (models.VirtualMachine, "management_ipv4"),
-        (models.ContainerApp, "ipv4_address"),
-        (models.Workstation, "management_ipv4"),
-    ]:
-        col = getattr(model, field)
-        result = await session.execute(select(col).where(col.isnot(None)))
-        for value in result.scalars().all():
-            if value:
-                used.add(str(value).split("/")[0])
-    return used
-
-
-@router.get("/ipam/subnets/{subnet_id}/next-ip")
-async def next_ip(
-    subnet_id: int,
-    session: AsyncSession = Depends(get_session),
-) -> dict[str, Any]:
-    subnet = await session.get(models.SubnetIpv4, subnet_id)
-    if subnet is None or not subnet.network_cidr:
-        raise HTTPException(status_code=404, detail="Subnet not found or has no CIDR")
-    try:
-        net = ipaddress.ip_network(str(subnet.network_cidr), strict=False)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid subnet CIDR")
-
-    used = await _used_ipv4(session)
-    range_from = (
-        ipaddress.ip_address(str(subnet.range_from).split("/")[0])
-        if subnet.range_from
-        else next(net.hosts(), None)
-    )
-    range_to = (
-        ipaddress.ip_address(str(subnet.range_to).split("/")[0])
-        if subnet.range_to
-        else None
-    )
-    for host in net.hosts():
-        if range_from and host < range_from:
-            continue
-        if range_to and host > range_to:
-            break
-        if str(host) not in used:
-            return {
-                "subnet_id": subnet_id,
-                "network": str(net),
-                "next_ip": str(host),
-                "used_count": len(
-                    [u for u in used if ipaddress.ip_address(u) in net]
-                ),
-            }
-    raise HTTPException(status_code=409, detail="No free IP available in subnet")
-
-
-@router.get("/ipam/subnets/{subnet_id}/utilization")
-async def subnet_utilization(
-    subnet_id: int,
-    session: AsyncSession = Depends(get_session),
-) -> dict[str, Any]:
-    subnet = await session.get(models.SubnetIpv4, subnet_id)
-    if subnet is None or not subnet.network_cidr:
-        raise HTTPException(status_code=404, detail="Subnet not found")
-    net = ipaddress.ip_network(str(subnet.network_cidr), strict=False)
-    used = await _used_ipv4(session)
-    in_net = [u for u in used if ipaddress.ip_address(u) in net]
-    total = net.num_addresses - 2 if net.num_addresses > 2 else net.num_addresses
-    return {
-        "subnet_id": subnet_id,
-        "network": str(net),
-        "total_usable": total,
-        "used": len(in_net),
-        "utilization_pct": round(len(in_net) / total * 100, 1) if total else 0,
-    }
 
 
 # ---------------------------------------------------------------------------

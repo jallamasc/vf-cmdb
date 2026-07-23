@@ -1,5 +1,8 @@
 import { useMemo } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import EntityGrid from "../components/EntityGrid";
+import SequenceGapHelper from "../components/SequenceGapHelper";
+import { api } from "../api";
 import { useLookups, textCol, roCol, numCol, fkCol, ipCol } from "../lib/columns";
 
 const LK = [
@@ -12,6 +15,12 @@ const LK = [
 
 export default function NetworkDevices() {
   const { map, isLoading } = useLookups(LK);
+  const qc = useQueryClient();
+  const createMut = useMutation({
+    mutationFn: (payload: Record<string, unknown>) =>
+      api.create("network-devices", payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["network-devices"] }),
+  });
   const columns = useMemo(
     () => [
       roCol("id", "ID", 70),
@@ -40,11 +49,20 @@ export default function NetworkDevices() {
   );
   if (isLoading) return <div className="text-slate-500">Loading…</div>;
   return (
-    <EntityGrid
-      resource="network-devices"
-      title="Network Devices"
-      description="Switches, routers, firewalls and access points. Long name auto-generates from type, brand and sequence."
-      columns={columns}
-    />
+    <div className="flex flex-col h-full">
+      <SequenceGapHelper
+        onPick={(prefix, sequence) =>
+          createMut.mutate({ name_prefix: prefix, sequence_number: sequence })
+        }
+      />
+      <div className="flex-1">
+        <EntityGrid
+          resource="network-devices"
+          title="Network Devices"
+          description="Switches, routers, firewalls and access points. Long name auto-generates from type, brand and sequence."
+          columns={columns}
+        />
+      </div>
+    </div>
   );
 }

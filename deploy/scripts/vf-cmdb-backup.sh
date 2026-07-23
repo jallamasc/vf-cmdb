@@ -25,7 +25,7 @@ REPO_DIR="${REPO_DIR:-$HOME/vf-cmdb}"
 BACKUP_DIR="${BACKUP_DIR:-$HOME/vf-cmdb-backups}"
 RETENTION_DAYS="${RETENTION_DAYS:-14}"
 DB_CONTAINER="${DB_CONTAINER:-vf_cmdb_db}"
-PGADMIN_VOLUME="${PGADMIN_VOLUME:-vf-cmdb-pgadmin}"
+PGADMIN_VOLUME="${PGADMIN_VOLUME:-vf-cmdb_pgadmin}"
 
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 WORK="$(mktemp -d)"

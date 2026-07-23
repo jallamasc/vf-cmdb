@@ -10,7 +10,7 @@ from typing import Any, Optional
 from sqlalchemy import inspect, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from . import models, naming
+from . import abbrev, models, naming
 
 # Auto-generated columns must never be set directly by clients.
 COMPUTED_FIELDS = {
@@ -45,6 +45,53 @@ def sanitize_payload(model, payload: dict) -> dict:
                 value = None
             clean[key] = value
     return clean
+
+
+async def _validate_abbrev(session: AsyncSession, obj, entity_id) -> None:
+    """Normalise the abbreviation/code and validate charset + global uniqueness.
+
+    Runs BEFORE the row is flushed so clients receive a clean 422/409 error
+    instead of a raw database CHECK / unique-index violation. The value is
+    normalised in place according to the record's ``case_enforcement``.
+    """
+    field = abbrev.ABBR_FIELDS.get(type(obj))
+    if field is None:
+        return
+    value = getattr(obj, field, None)
+    if not value:
+        return
+    value = abbrev.apply_case(value, getattr(obj, "case_enforcement", None))
+    setattr(obj, field, value)
+    abbrev.validate_charset(value, field)
+    conflict = await abbrev._conflict(
+        session, value, obj.__tablename__, entity_id
+    )
+    if conflict is not None:
+        from fastapi import HTTPException
+
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Abbreviation '{value}' is already used by "
+                f"{conflict.entity_type} #{conflict.entity_id}. "
+                "Abbreviations must be globally unique (case-insensitive)."
+            ),
+        )
+
+
+async def _sync_abbrev(session: AsyncSession, obj) -> None:
+    """Write / update / remove the global registry row for a saved record.
+
+    The value was already normalised + validated by ``_validate_abbrev`` before
+    flush; this only persists the registry ownership row.
+    """
+    field = abbrev.ABBR_FIELDS.get(type(obj))
+    if field is None:
+        return
+    value = getattr(obj, field, None)
+    await abbrev.sync_registry(
+        session, obj.__tablename__, obj.id, field, value or None
+    )
 
 
 async def _log(
@@ -87,9 +134,11 @@ async def create_item(
 ):
     data = sanitize_payload(model, payload)
     obj = model(**data)
+    await _validate_abbrev(session, obj, entity_id=None)
     session.add(obj)
     await session.flush()  # obtain PK
     await naming.apply_naming(session, obj)
+    await _sync_abbrev(session, obj)
     await session.flush()
     for field, value in data.items():
         await _log(session, model.__tablename__, obj.id, field, None, value, source)
@@ -112,8 +161,10 @@ async def update_item(
             changes.append((field, old_value, new_value))
             setattr(obj, field, new_value)
     if changes:
+        await _validate_abbrev(session, obj, entity_id=obj.id)
         await session.flush()
         await naming.apply_naming(session, obj)
+        await _sync_abbrev(session, obj)
         await session.flush()
         for field, old, new in changes:
             await _log(session, model.__tablename__, obj.id, field, old, new, source)
@@ -129,6 +180,8 @@ async def delete_item(
     if obj is None:
         return False
     await _log(session, model.__tablename__, item_id, "__deleted__", "exists", None, source)
+    if type(obj) in abbrev.ABBR_FIELDS:
+        await abbrev.remove_registry(session, obj.__tablename__, obj.id)
     await session.delete(obj)
     await session.commit()
     return True

@@ -2,7 +2,7 @@
 Description=Virtualfactor CMDB pgAdmin data volume
 
 [Volume]
-VolumeName=vf-cmdb-pgadmin
+VolumeName=vf-cmdb_pgadmin
 
 [Install]
 WantedBy=default.target

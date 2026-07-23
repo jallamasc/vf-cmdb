@@ -90,8 +90,15 @@ services:
       - cmdb
 
 volumes:
+  # Explicit, fixed volume names so podman-compose does NOT auto-prefix with the
+  # project name. This keeps the compose path and the Quadlet path (deploy/quadlet/)
+  # on the SAME physical volumes, preventing the dash/underscore divergence that
+  # produces duplicate/orphan volumes and the "more than one result for volume
+  # name" crash.
   pgdata:
+    name: ${PGDATA_VOLUME:-vf-cmdb_pgdata}
   pgadmin:
+    name: ${PGADMIN_VOLUME:-vf-cmdb_pgadmin}
 
 networks:
   cmdb:

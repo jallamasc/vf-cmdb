@@ -46,4 +46,38 @@ export const api = {
   utilization: (subnetId: number) =>
     fetch(`${BASE}/ipam/subnets/${subnetId}/utilization`).then(handle),
   naming: (qs: string) => fetch(`${BASE}/naming/generate?${qs}`).then(handle),
+  // Abbreviation preview: derive a short code from a full name by trim mode.
+  previewAbbrev: (
+    fullName: string,
+    trimMode: string,
+    caseEnforcement: string,
+  ): Promise<{ abbreviation: string }> =>
+    fetch(
+      `${BASE}/naming/preview?full_name=${encodeURIComponent(fullName)}` +
+        `&trim_mode=${encodeURIComponent(trimMode)}` +
+        `&case_enforcement=${encodeURIComponent(caseEnforcement)}`,
+    ).then(handle),
+  // Global uniqueness check for an abbreviation/code value.
+  checkAbbrev: (
+    value: string,
+    entityType = "",
+    entityId?: number,
+  ): Promise<{ value: string; available: boolean; owner: Row | null }> => {
+    let qs = `value=${encodeURIComponent(value)}`;
+    if (entityType) qs += `&entity_type=${encodeURIComponent(entityType)}`;
+    if (entityId != null) qs += `&entity_id=${entityId}`;
+    return fetch(`${BASE}/naming/check-abbreviation?${qs}`).then(handle);
+  },
+  // Sequence-number gap detection for a device naming prefix.
+  gaps: (
+    prefix: string,
+  ): Promise<{
+    prefix: string;
+    used: number[];
+    gaps: number[];
+    next_gap: number | null;
+    next_sequential: number;
+    recommended: number;
+    message: string;
+  }> => fetch(`${BASE}/naming/gaps?prefix=${encodeURIComponent(prefix)}`).then(handle),
 };

@@ -148,11 +148,24 @@ async def seed() -> None:
         NDT = m[models.NetworkDeviceType]; NST = m[models.NetworkSubtype]
         OSF = m[models.OsFamily]; OSV = m[models.OsVersion]; APP = m[models.AppType]
 
+        # ---- Reference data: site addresses (NOT naming conventions) ----
+        home_address = models.SiteAddress(
+            label="Home Datacenter — Bogota",
+            street="1st Floor",
+            city="Bogota",
+            state_region="Cundinamarca",
+            country="Colombia",
+            notes="Primary home lab location",
+        )
+        session.add(home_address)
+        await session.flush()
+
         # ---- Site: Home Datacenter (Korriban) ----
         site = models.Site(
             description="Bogota, Home, 1st Floor Datacenter",
             organization_id=ORG["vf"], cloud_id=CLOUD["vs"], region_id=REGION["cc"],
             campus_id=CAMPUS["hm"], building_id=BUILDING["M1"], floor_section_id=FS["+F1S1"],
+            site_address_id=home_address.id,
             simple_name="Korriban",
         )
         session.add(site)

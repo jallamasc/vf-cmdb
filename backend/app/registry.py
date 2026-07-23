@@ -20,6 +20,8 @@ ENTITY_REGISTRY = {
     "cluster-types": models.ClusterType,
     "storage-device-types": models.StorageDeviceType,
     "network-id-types": models.NetworkIdType,
+    # reference data (NON-naming lookup lists)
+    "site-addresses": models.SiteAddress,
     # physical
     "sites": models.Site,
     "racks": models.Rack,
@@ -46,9 +48,19 @@ ENTITY_REGISTRY = {
     "ip-assignments": models.IpAssignment,
 }
 
+# True naming-convention dictionaries (full_name -> abbreviation) that feed
+# the auto-naming engine. These are the ONLY tables surfaced on the
+# "Naming Conventions" page.
 LOOKUP_SLUGS = [
     "organizations", "clouds", "regions", "campuses", "buildings",
     "floor-sections", "compute-device-types", "brands", "device-roles",
     "network-device-types", "network-subtypes", "os-families", "os-versions",
     "app-types", "cluster-types", "storage-device-types", "network-id-types",
+]
+
+# Reference / lookup data that is NOT a naming convention. These are plain
+# reference lists (e.g. physical addresses) that other records point to but
+# that never participate in name generation. Surfaced under "Reference Data".
+REFERENCE_SLUGS = [
+    "site-addresses",
 ]

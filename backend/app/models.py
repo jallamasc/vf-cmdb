@@ -100,6 +100,27 @@ class NetworkIdType(LookupMixin, Base):
 
 
 # ---------------------------------------------------------------------------
+# Reference data (NON-naming lookup lists: addresses, etc.)
+#
+# These tables are deliberately kept separate from the naming-convention
+# dictionaries above. They hold real-world reference values (e.g. postal
+# addresses) that are looked up / referenced by other records but play no
+# part in the auto-generated naming engine.
+# ---------------------------------------------------------------------------
+class SiteAddress(Base):
+    __tablename__ = "site_addresses"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    label: Mapped[str] = mapped_column(String(120), nullable=False)
+    street: Mapped[Optional[str]] = mapped_column(String(200))
+    city: Mapped[Optional[str]] = mapped_column(String(120))
+    state_region: Mapped[Optional[str]] = mapped_column(String(120))
+    postal_code: Mapped[Optional[str]] = mapped_column(String(40))
+    country: Mapped[Optional[str]] = mapped_column(String(120))
+    notes: Mapped[Optional[str]] = mapped_column(Text)
+
+
+# ---------------------------------------------------------------------------
 # Physical layer
 # ---------------------------------------------------------------------------
 class Site(Base):
@@ -113,10 +134,14 @@ class Site(Base):
     campus_id: Mapped[Optional[int]] = mapped_column(ForeignKey("campuses.id"))
     building_id: Mapped[Optional[int]] = mapped_column(ForeignKey("buildings.id"))
     floor_section_id: Mapped[Optional[int]] = mapped_column(ForeignKey("floor_sections.id"))
+    # Physical address — reference data, NOT a naming convention.
+    site_address_id: Mapped[Optional[int]] = mapped_column(ForeignKey("site_addresses.id"))
     simple_name: Mapped[Optional[str]] = mapped_column(String(120))
     vf_long_name: Mapped[Optional[str]] = mapped_column(String(200))
     vf_short_name: Mapped[Optional[str]] = mapped_column(String(120))
     tia606b_name: Mapped[Optional[str]] = mapped_column(String(200))
+    # Arbitrary user-defined columns (dynamic column feature). Stored as JSON.
+    custom_fields: Mapped[Optional[dict]] = mapped_column(JSONB)
     notes: Mapped[Optional[str]] = mapped_column(Text)
 
 

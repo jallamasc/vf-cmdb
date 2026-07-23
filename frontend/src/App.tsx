@@ -13,6 +13,7 @@ import IpAssignments from "./pages/IpAssignments";
 import NetworkDevices from "./pages/NetworkDevices";
 import PortConfig from "./pages/PortConfig";
 import Naming from "./pages/Naming";
+import ReferenceData from "./pages/ReferenceData";
 import Ansible from "./pages/Ansible";
 import Changelog from "./pages/Changelog";
 import SimpleGridPage from "./pages/SimpleGridPage";
@@ -37,6 +38,7 @@ export default function App() {
         <Route path="network-devices" element={<NetworkDevices />} />
         <Route path="port-config" element={<PortConfig />} />
         <Route path="naming" element={<Naming />} />
+        <Route path="reference-data" element={<ReferenceData />} />
         <Route path="ansible" element={<Ansible />} />
         <Route path="changelog" element={<Changelog />} />
       </Route>

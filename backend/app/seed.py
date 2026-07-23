@@ -11,7 +11,7 @@ import os
 
 from sqlalchemy import func, select
 
-from . import models, naming
+from . import abbrev, models, naming
 from .database import AsyncSessionLocal
 
 HERE = os.path.dirname(__file__)
@@ -38,15 +38,15 @@ LOOKUPS: dict = {
         ("Main Building 1", "M1", 4), ("Secondary Building 1", "S1", 4),
     ],
     models.FloorSection: [
-        ("Floor 1 Section 1", "+F1S1", 5),
+        ("Floor 1 Section 1", "F1S1", 5),
     ],
     models.ComputeDeviceType: [
         ("Desktop / Workstation", "ws", 2), ("Laptop", "lp", 2),
         ("Physical Server", "ps", 2), ("Virtual Desktop / Workstation", "vw", 2),
-        ("Virtual Server", "vs", 2),
+        ("Virtual Server", "vse", 3),
     ],
     models.Brand: [
-        ("Apple", "ap", 3), ("MSI", "msi", 3), ("Hewlett Packard", "hp", 3),
+        ("Apple", "apl", 3), ("MSI", "msi", 3), ("Hewlett Packard", "hp", 3),
         ("Hewlett Packard Enterprise", "hpe", 3), ("Lenovo", "ln", 3),
         ("Seagate", "sgt", 3), ("Western Digital", "wd", 3), ("Linksys", "ls", 3),
         ("Combodo", "cm", 3), ("Oracle", "or", 3), ("Generic", "ge", 3),
@@ -62,11 +62,11 @@ LOOKUPS: dict = {
         ("Instance", "in", 3), ("All-in-one", "all", 3), ("Management", "mg", 3),
     ],
     models.NetworkDeviceType: [
-        ("Firewall", "fw", 3), ("Load Balancer", "lb", 3), ("Router", "ro", 3),
+        ("Firewall", "fwl", 3), ("Load Balancer", "lb", 3), ("Router", "ro", 3),
         ("Switch", "sw", 3), ("Security Appliance / Firewall", "sa", 3),
-        ("Virtual Switch", "vs", 3), ("Virtual Distributed Switch", "vds", 3),
+        ("Virtual Switch", "vsw", 3), ("Virtual Distributed Switch", "vds", 3),
         ("Standard Portgroup", "sp", 3), ("Distributed Portgroup", "dp", 3),
-        ("Wireless Device", "wd", 3), ("Modem", "mo", 3),
+        ("Wireless Device", "wl", 3), ("Modem", "mo", 3),
         ("Satellital Antenna Kit", "sk", 3),
     ],
     models.NetworkSubtype: [
@@ -74,9 +74,9 @@ LOOKUPS: dict = {
         ("Antenna", "a", 1), ("Spine", "s", 1),
     ],
     models.OsFamily: [
-        ("ESXi", "es", 2), ("Hyper-V", "hv", 2), ("Linux", "ln", 2),
+        ("ESXi", "es", 2), ("Hyper-V", "hy", 2), ("Linux", "lx", 2),
         ("Windows", "wn", 2), ("BSD", "bs", 2), ("OpnSense", "op", 2),
-        ("Proxmox", "pr", 2),
+        ("Proxmox", "px", 2),
     ],
     models.OsVersion: [
         ("Windows 10 Pro", "10p", 4), ("Windows 10 Enterprise", "10e", 4),
@@ -86,7 +86,7 @@ LOOKUPS: dict = {
         ("Ubuntu 18.04", "v04", 5),
     ],
     models.AppType: [
-        ("iTop", "it", 5), ("OCS Inventory", "oi", 5), ("OpenProject", "op", 5),
+        ("iTop", "it", 5), ("OCS Inventory", "oi", 5), ("OpenProject", "opj", 5),
         ("Azure DNS Updater", "adu", 5), ("Traefik", "tr", 5), ("Mailu", "ml", 5),
         ("Certbot", "crt", 5),
     ],
@@ -94,18 +94,18 @@ LOOKUPS: dict = {
         ("Management", "mng", 3), ("Processing", "prc", 3),
     ],
     models.StorageDeviceType: [
-        ("Storage Array", "sa", 2), ("Volume", "vl", 2), ("Disk", "dk", 2),
+        ("Storage Array", "sar", 3), ("Volume", "vl", 2), ("Disk", "dk", 2),
         ("Disk Group / RAID", "dg", 2), ("Volume Group", "vg", 2),
         ("Mobile Drive", "md", 2),
     ],
     models.NetworkIdType: [
-        ("Wireless Network", "wn", 3), ("Cable Network", "cn", 3),
+        ("Wireless Network", "wnw", 3), ("Cable Network", "cn", 3),
     ],
 }
 
 
 async def _seed_lookups(session) -> dict:
-    """Insert lookups and return {model: {abbreviation: id}}."""
+    """Insert lookups, register their abbreviations and return {model: {abbr: id}}."""
     maps: dict = {}
     for model, rows in LOOKUPS.items():
         maps[model] = {}
@@ -113,6 +113,11 @@ async def _seed_lookups(session) -> dict:
             obj = model(full_name=full_name, abbreviation=abbr, max_length=max_len)
             session.add(obj)
             await session.flush()
+            # Register in the global abbreviation namespace (case-insensitive
+            # uniqueness + charset validation).
+            await abbrev.sync_registry(
+                session, obj.__tablename__, obj.id, "abbreviation", abbr
+            )
             maps[model][abbr] = obj.id
     return maps
 
@@ -164,7 +169,7 @@ async def seed() -> None:
         site = models.Site(
             description="Bogota, Home, 1st Floor Datacenter",
             organization_id=ORG["vf"], cloud_id=CLOUD["vs"], region_id=REGION["cc"],
-            campus_id=CAMPUS["hm"], building_id=BUILDING["M1"], floor_section_id=FS["+F1S1"],
+            campus_id=CAMPUS["hm"], building_id=BUILDING["M1"], floor_section_id=FS["F1S1"],
             site_address_id=home_address.id,
             simple_name="Korriban",
         )
@@ -173,13 +178,57 @@ async def seed() -> None:
         await naming.generate_site(session, site)
         await session.flush()
 
-        # ---- Rack AA01 ----
+        # ---- Rack types (reference list of standard heights) ----
+        rack_type_ids: dict[str, int] = {}
+        for rt_name, rt_code, rt_units in [
+            ("16U Rack", "16U", 16), ("32U Rack", "32U", 32),
+            ("42U Rack", "42U", 42), ("48U Rack", "48U", 48),
+        ]:
+            rt = models.RackType(name=rt_name, code=rt_code, total_units=rt_units)
+            session.add(rt)
+            await session.flush()
+            await abbrev.sync_registry(session, rt.__tablename__, rt.id, "code", rt_code)
+            rack_type_ids[rt_code] = rt.id
+
+        # ---- Physical hierarchy: Datacenter > Floor > Room ----
+        datacenter = models.Datacenter(
+            name="NA", code="na", site_id=site.id,
+            description="Primary datacenter for the home site",
+        )
+        session.add(datacenter)
+        await session.flush()
+        await abbrev.sync_registry(
+            session, datacenter.__tablename__, datacenter.id, "code", "na"
+        )
+
+        floor = models.DatacenterFloor(
+            name="1st Floor", code="f1", floor_number=1,
+            datacenter_id=datacenter.id, description="Ground floor",
+        )
+        session.add(floor)
+        await session.flush()
+        await abbrev.sync_registry(
+            session, floor.__tablename__, floor.id, "code", "f1"
+        )
+
+        room = models.Room(
+            name="Alejandro's Office", code="ao",
+            datacenter_floor_id=floor.id, description="Home office / lab room",
+        )
+        session.add(room)
+        await session.flush()
+        await abbrev.sync_registry(session, room.__tablename__, room.id, "code", "ao")
+
+        # ---- Rack AA01 (linked into the hierarchy) ----
         rack = models.Rack(
-            site_id=site.id, grid_coordinates="AA01", total_units=36,
+            site_id=site.id, datacenter_floor_id=floor.id, room_id=room.id,
+            rack_type_id=rack_type_ids.get("42U"), code="AA01",
+            grid_coordinates="AA01", total_units=36,
             description="Home datacenter primary rack", simple_name="AA01",
         )
         session.add(rack)
         await session.flush()
+        await abbrev.sync_registry(session, rack.__tablename__, rack.id, "code", "AA01")
         await naming.generate_rack(session, rack)
         await session.flush()
 
@@ -373,7 +422,7 @@ async def seed() -> None:
         psrv = models.PhysicalServer(
             site_id=site.id, rack_id=rack.id, rack_unit=29,
             device_type_id=CDT["ps"], brand_id=BRAND["ge"], role_id=ROLE["hv"],
-            os_family_id=OSF["pr"], os_version_id=OSV["p7"], consecutive=1,
+            os_family_id=OSF["px"], os_version_id=OSV["p7"], consecutive=1,
             model="HPE ProLiant Gen10 Plus V2", serial_number="MXQ3240CGQ",
             part_number="P54654-001", management_ipv4="10.0.16.106",
             ilo_ipmi_user="Administrator", ilo_ipmi_fqdn="MXQ3240CGQ",
@@ -404,7 +453,7 @@ async def seed() -> None:
             ("oi", "2", "ap", 1, "OCS Inventory Container App"),
             ("oi", "2", "db", 1, "OCS Inventory Container Database"),
             ("oi", "2", "pr", 1, "OCS Inventory Container Proxy"),
-            ("op", "12", "all", 1, "OpenProject"),
+            ("opj", "12", "all", 1, "OpenProject"),
             ("adu", "1", "ap", 1, "Azure DNS Updater"),
             ("tr", "1", "in", 1, "Traefik Reverse Proxy / Load Balancer"),
             ("ml", "1", "in", 1, "Mailu"),

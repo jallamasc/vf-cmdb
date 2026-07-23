@@ -6,18 +6,68 @@ from typing import Optional
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     DateTime,
+    Enum,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import CIDR, INET, JSONB
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, declared_attr, mapped_column, relationship
 
 from .database import Base
+
+# ---------------------------------------------------------------------------
+# Shared enum value sets and validation helpers
+# ---------------------------------------------------------------------------
+# Case-enforcement is configured per record-type / category. It controls how
+# abbreviation/code values (and relevant name fields) are normalised.
+CASE_ENFORCEMENT_VALUES = ("uppercase", "lowercase", "mixed")
+
+# Trim modes control how a short code is auto-derived from a full name on the
+# naming-convention records.
+TRIM_MODE_VALUES = (
+    "manual",
+    "first_1",
+    "first_2",
+    "first_3",
+    "first_4",
+    "acronym",
+    "consonants",
+)
+
+# Domain-name charset for all abbreviation/code columns:
+#   - only [A-Za-z0-9-]
+#   - no leading hyphen, no trailing hyphen, no consecutive hyphens ("--")
+# Expressed as a POSIX regular expression usable in a Postgres CHECK.
+DOMAIN_NAME_REGEX = r"^[A-Za-z0-9]+(-[A-Za-z0-9]+)*$"
+
+
+def _case_enum(name: str) -> Enum:
+    """A non-native (VARCHAR + CHECK) enum for case enforcement."""
+    return Enum(*CASE_ENFORCEMENT_VALUES, name=name, native_enum=False)
+
+
+def _trim_enum(name: str) -> Enum:
+    """A non-native (VARCHAR + CHECK) enum for trim modes."""
+    return Enum(*TRIM_MODE_VALUES, name=name, native_enum=False)
+
+
+def _charset_check(column: str, constraint_name: str) -> CheckConstraint:
+    """Domain-name charset CHECK constraint for an abbreviation/code column.
+
+    NULL values are allowed so nullable code columns remain optional.
+    """
+    return CheckConstraint(
+        f"{column} IS NULL OR {column} ~ '{DOMAIN_NAME_REGEX}'",
+        name=constraint_name,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -29,6 +79,25 @@ class LookupMixin:
     abbreviation: Mapped[str] = mapped_column(String(20), nullable=False)
     max_length: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Per record-type case enforcement applied to abbreviation + name fields.
+    case_enforcement: Mapped[str] = mapped_column(
+        _case_enum("case_enforcement"), nullable=False, default="mixed",
+        server_default="mixed",
+    )
+    # How the abbreviation is auto-derived from the full name.
+    trim_mode: Mapped[str] = mapped_column(
+        _trim_enum("trim_mode"), nullable=False, default="manual",
+        server_default="manual",
+    )
+
+    @declared_attr.directive
+    def __table_args__(cls):
+        # Domain-name charset CHECK on the shared abbreviation column.
+        return (
+            _charset_check(
+                "abbreviation", f"ck_{cls.__tablename__}_abbreviation_charset"
+            ),
+        )
 
 
 class Organization(LookupMixin, Base):
@@ -145,11 +214,99 @@ class Site(Base):
     notes: Mapped[Optional[str]] = mapped_column(Text)
 
 
+# ---------------------------------------------------------------------------
+# Physical hierarchy: Site > Datacenter > Floor > Room > Rack
+# ---------------------------------------------------------------------------
+class Datacenter(Base):
+    __tablename__ = "datacenters"
+    __table_args__ = (
+        _charset_check("code", "ck_datacenters_code_charset"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    code: Mapped[Optional[str]] = mapped_column(String(16))  # abbreviation
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    site_id: Mapped[Optional[int]] = mapped_column(ForeignKey("sites.id"))
+    # Per record-type case enforcement for this hierarchy level.
+    case_enforcement: Mapped[str] = mapped_column(
+        _case_enum("dc_case_enforcement"), nullable=False, default="mixed",
+        server_default="mixed",
+    )
+    notes: Mapped[Optional[str]] = mapped_column(Text)
+
+
+class DatacenterFloor(Base):
+    __tablename__ = "datacenter_floors"
+    __table_args__ = (
+        _charset_check("code", "ck_datacenter_floors_code_charset"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    code: Mapped[Optional[str]] = mapped_column(String(16))
+    floor_number: Mapped[Optional[int]] = mapped_column(Integer)
+    datacenter_id: Mapped[Optional[int]] = mapped_column(ForeignKey("datacenters.id"))
+    case_enforcement: Mapped[str] = mapped_column(
+        _case_enum("floor_case_enforcement"), nullable=False, default="mixed",
+        server_default="mixed",
+    )
+    description: Mapped[Optional[str]] = mapped_column(Text)
+
+
+class Room(Base):
+    __tablename__ = "rooms"
+    __table_args__ = (
+        _charset_check("code", "ck_rooms_code_charset"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    code: Mapped[Optional[str]] = mapped_column(String(16))
+    datacenter_floor_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("datacenter_floors.id")
+    )
+    case_enforcement: Mapped[str] = mapped_column(
+        _case_enum("room_case_enforcement"), nullable=False, default="mixed",
+        server_default="mixed",
+    )
+    description: Mapped[Optional[str]] = mapped_column(Text)
+
+
+class RackType(Base):
+    """Reference table of standard rack heights / categories (e.g. 42U)."""
+
+    __tablename__ = "rack_types"
+    __table_args__ = (
+        _charset_check("code", "ck_rack_types_code_charset"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    code: Mapped[Optional[str]] = mapped_column(String(16))
+    total_units: Mapped[int] = mapped_column(Integer, default=42)
+    case_enforcement: Mapped[str] = mapped_column(
+        _case_enum("rack_type_case_enforcement"), nullable=False, default="mixed",
+        server_default="mixed",
+    )
+    description: Mapped[Optional[str]] = mapped_column(Text)
+
+
 class Rack(Base):
     __tablename__ = "racks"
+    __table_args__ = (
+        _charset_check("code", "ck_racks_code_charset"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     site_id: Mapped[Optional[int]] = mapped_column(ForeignKey("sites.id"))
+    # Physical hierarchy links (nullable for backward compatibility).
+    datacenter_floor_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("datacenter_floors.id")
+    )
+    room_id: Mapped[Optional[int]] = mapped_column(ForeignKey("rooms.id"))
+    rack_type_id: Mapped[Optional[int]] = mapped_column(ForeignKey("rack_types.id"))
+    code: Mapped[Optional[str]] = mapped_column(String(16))  # abbreviation
     grid_coordinates: Mapped[Optional[str]] = mapped_column(String(20))
     total_units: Mapped[int] = mapped_column(Integer, default=42)
     description: Mapped[Optional[str]] = mapped_column(Text)
@@ -306,6 +463,9 @@ class NetworkDevice(Base):
     model: Mapped[Optional[str]] = mapped_column(String(120))
     serial_number: Mapped[Optional[str]] = mapped_column(String(120))
     consecutive: Mapped[Optional[int]] = mapped_column(Integer)
+    # Naming: base convention prefix + per-prefix auto-assigned sequence.
+    name_prefix: Mapped[Optional[str]] = mapped_column(String(40))
+    sequence_number: Mapped[Optional[int]] = mapped_column(Integer)
     os_version: Mapped[Optional[str]] = mapped_column(String(60))
     description: Mapped[Optional[str]] = mapped_column(Text)
     management_ipv4: Mapped[Optional[str]] = mapped_column(INET)
@@ -368,6 +528,9 @@ class PhysicalServer(Base):
     os_family_id: Mapped[Optional[int]] = mapped_column(ForeignKey("os_families.id"))
     os_version_id: Mapped[Optional[int]] = mapped_column(ForeignKey("os_versions.id"))
     consecutive: Mapped[Optional[int]] = mapped_column(Integer)
+    # Naming: base convention prefix + per-prefix auto-assigned sequence.
+    name_prefix: Mapped[Optional[str]] = mapped_column(String(40))
+    sequence_number: Mapped[Optional[int]] = mapped_column(Integer)
     vf_long_name: Mapped[Optional[str]] = mapped_column(String(200))
     vf_short_name: Mapped[Optional[str]] = mapped_column(String(120))
     alternative_name: Mapped[Optional[str]] = mapped_column(String(120))
@@ -394,6 +557,9 @@ class VirtualMachine(Base):
     os_version_id: Mapped[Optional[int]] = mapped_column(ForeignKey("os_versions.id"))
     role_id: Mapped[Optional[int]] = mapped_column(ForeignKey("device_roles.id"))
     consecutive: Mapped[Optional[int]] = mapped_column(Integer)
+    # Naming: base convention prefix + per-prefix auto-assigned sequence.
+    name_prefix: Mapped[Optional[str]] = mapped_column(String(40))
+    sequence_number: Mapped[Optional[int]] = mapped_column(Integer)
     vf_short_name: Mapped[Optional[str]] = mapped_column(String(120))
     friendly_name: Mapped[Optional[str]] = mapped_column(String(120))
     description: Mapped[Optional[str]] = mapped_column(Text)
@@ -415,6 +581,9 @@ class ContainerApp(Base):
     version: Mapped[Optional[str]] = mapped_column(String(30))
     role_id: Mapped[Optional[int]] = mapped_column(ForeignKey("device_roles.id"))
     consecutive: Mapped[Optional[int]] = mapped_column(Integer)
+    # Naming: base convention prefix + per-prefix auto-assigned sequence.
+    name_prefix: Mapped[Optional[str]] = mapped_column(String(40))
+    sequence_number: Mapped[Optional[int]] = mapped_column(Integer)
     vf_short_name: Mapped[Optional[str]] = mapped_column(String(120))
     friendly_name: Mapped[Optional[str]] = mapped_column(String(120))
     description: Mapped[Optional[str]] = mapped_column(Text)
@@ -435,6 +604,9 @@ class Workstation(Base):
     os_family_id: Mapped[Optional[int]] = mapped_column(ForeignKey("os_families.id"))
     os_version_id: Mapped[Optional[int]] = mapped_column(ForeignKey("os_versions.id"))
     consecutive: Mapped[Optional[int]] = mapped_column(Integer)
+    # Naming: base convention prefix + per-prefix auto-assigned sequence.
+    name_prefix: Mapped[Optional[str]] = mapped_column(String(40))
+    sequence_number: Mapped[Optional[int]] = mapped_column(Integer)
     vf_long_name: Mapped[Optional[str]] = mapped_column(String(200))
     vf_short_name: Mapped[Optional[str]] = mapped_column(String(120))
     alternative_name: Mapped[Optional[str]] = mapped_column(String(120))
@@ -480,3 +652,30 @@ class ChangeLog(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     change_source: Mapped[str] = mapped_column(String(30), default="web_ui")
+
+
+# ---------------------------------------------------------------------------
+# Global abbreviation registry
+#
+# Every abbreviation / code used anywhere in the system is mirrored here so a
+# single case-insensitive UNIQUE index guarantees global uniqueness across ALL
+# record types. Rows are kept in sync by the CRUD layer (and the seeder).
+# ---------------------------------------------------------------------------
+class AbbreviationRegistry(Base):
+    __tablename__ = "abbreviation_registry"
+    __table_args__ = (
+        # Case-insensitive global uniqueness on the abbreviation value.
+        Index(
+            "uq_abbreviation_registry_lower",
+            text("lower(abbreviation)"),
+            unique=True,
+        ),
+        _charset_check("abbreviation", "ck_abbreviation_registry_charset"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    abbreviation: Mapped[str] = mapped_column(String(40), nullable=False)
+    # Which table + row currently owns this abbreviation.
+    entity_type: Mapped[str] = mapped_column(String(60), nullable=False)
+    entity_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    field_name: Mapped[str] = mapped_column(String(40), nullable=False, default="abbreviation")

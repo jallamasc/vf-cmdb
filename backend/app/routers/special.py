@@ -8,8 +8,17 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .. import crud, models
+from .. import abbrev, crud, models
 from ..database import get_session
+
+# Device tables that carry a naming prefix + sequence number.
+_SEQUENCE_MODELS = [
+    models.NetworkDevice,
+    models.PhysicalServer,
+    models.VirtualMachine,
+    models.ContainerApp,
+    models.Workstation,
+]
 
 router = APIRouter(tags=["special"])
 
@@ -181,6 +190,92 @@ async def naming_generate(
         "vf_short_name": short,
         "vf_long_name": vf_long,
         "tia606b_name": vf_long,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Naming: abbreviation preview + global uniqueness check
+# ---------------------------------------------------------------------------
+@router.get("/naming/preview")
+async def naming_preview(
+    full_name: str = "",
+    trim_mode: str = "manual",
+    case_enforcement: str = "mixed",
+) -> dict[str, str]:
+    """Preview the abbreviation derived from a full name by trim mode + case."""
+    return {
+        "full_name": full_name,
+        "trim_mode": trim_mode,
+        "case_enforcement": case_enforcement,
+        "abbreviation": abbrev.preview_abbreviation(
+            full_name, trim_mode, case_enforcement
+        ),
+    }
+
+
+@router.get("/naming/check-abbreviation")
+async def naming_check_abbreviation(
+    value: str,
+    entity_type: str = "",
+    entity_id: Optional[int] = None,
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Return whether *value* is available across the global namespace."""
+    owner = await abbrev.check_available(session, value, entity_type or None, entity_id)
+    return {"value": value, "available": owner is None, "owner": owner}
+
+
+# ---------------------------------------------------------------------------
+# Naming: sequence-number gap detection
+# ---------------------------------------------------------------------------
+@router.get("/naming/gaps")
+async def naming_gaps(
+    prefix: str = Query(..., min_length=1),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Report used sequence numbers, available gaps and the next value for a prefix.
+
+    Sequence numbers are scoped per ``name_prefix`` across all device tables and
+    are plain integers (no zero padding). A gap is any missing integer between 1
+    and the current maximum used sequence number.
+    """
+    used: set[int] = set()
+    for model in _SEQUENCE_MODELS:
+        result = await session.execute(
+            select(model.sequence_number).where(
+                model.name_prefix == prefix,
+                model.sequence_number.isnot(None),
+            )
+        )
+        for value in result.scalars().all():
+            if value is not None:
+                used.add(int(value))
+
+    used_sorted = sorted(used)
+    highest = used_sorted[-1] if used_sorted else 0
+    gaps = [n for n in range(1, highest) if n not in used]
+    next_sequential = highest + 1
+    next_value = gaps[0] if gaps else next_sequential
+
+    # Human-readable prompt, e.g. "Gaps available: RTSL2, RTSL3 -- use next gap,
+    # or continue with RTSL4?"
+    if gaps:
+        gap_labels = ", ".join(f"{prefix}{n}" for n in gaps)
+        message = (
+            f"Gaps available: {gap_labels} -- use next gap, "
+            f"or continue with {prefix}{next_sequential}?"
+        )
+    else:
+        message = f"No gaps. Next available is {prefix}{next_sequential}."
+
+    return {
+        "prefix": prefix,
+        "used": used_sorted,
+        "gaps": gaps,
+        "next_gap": gaps[0] if gaps else None,
+        "next_sequential": next_sequential,
+        "recommended": next_value,
+        "message": message,
     }
 
 

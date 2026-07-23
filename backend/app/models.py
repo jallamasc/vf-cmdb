@@ -42,6 +42,18 @@ TRIM_MODE_VALUES = (
     "consonants",
 )
 
+# Reservation anchor controls where a segment's reserved-IP pool starts from.
+#   - "from_end":  assign reservations from the last usable host address downward
+#     (default per Phase 2 spec).
+#   - "from_start": assign reservations from the first usable host address upward.
+RESERVATION_ANCHOR_VALUES = ("from_end", "from_start")
+
+
+def _anchor_enum(name: str) -> Enum:
+    """A non-native (VARCHAR + CHECK) enum for reservation anchors."""
+    return Enum(*RESERVATION_ANCHOR_VALUES, name=name, native_enum=False)
+
+
 # Domain-name charset for all abbreviation/code columns:
 #   - only [A-Za-z0-9-]
 #   - no leading hyphen, no trailing hyphen, no consecutive hyphens ("--")
@@ -402,37 +414,80 @@ class Cable(Base):
 # ---------------------------------------------------------------------------
 class Vlan(Base):
     __tablename__ = "vlans"
+    # Phase 2 — IPAM by site: a VLAN belongs to exactly one site. The global
+    # ``unique`` on ``vlan_id`` (option a) prevents a VLAN number from being
+    # reused on any other site; the composite adds query ergonomics + a per-site
+    # guarantee.
+    __table_args__ = (
+        UniqueConstraint("site_id", "vlan_id", name="uq_vlan_site_vlanid"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     vlan_id: Mapped[Optional[int]] = mapped_column(Integer, unique=True)
     name: Mapped[Optional[str]] = mapped_column(String(120))
     description: Mapped[Optional[str]] = mapped_column(Text)
     zone: Mapped[Optional[str]] = mapped_column(String(20))
-    site_id: Mapped[Optional[int]] = mapped_column(ForeignKey("sites.id"))
+    # Phase 2: every VLAN must belong to a site.
+    site_id: Mapped[int] = mapped_column(ForeignKey("sites.id"), nullable=False)
 
 
 class SubnetIpv4(Base):
     __tablename__ = "subnets_ipv4"
+    # Phase 2 — IPAM by site: a segment is scoped to a site (derived/validated
+    # from its parent VLAN's site) and carries a configurable reserved-IP pool.
+    __table_args__ = (
+        CheckConstraint(
+            "reservation_anchor IN ('from_end', 'from_start')",
+            name="ck_subnets_ipv4_reservation_anchor",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     vlan_id: Mapped[Optional[int]] = mapped_column(ForeignKey("vlans.id"))
+    # Phase 2: every segment belongs to a site.
+    site_id: Mapped[int] = mapped_column(ForeignKey("sites.id"), nullable=False)
     network_cidr: Mapped[Optional[str]] = mapped_column(CIDR)
     gateway: Mapped[Optional[str]] = mapped_column(INET)
     range_from: Mapped[Optional[str]] = mapped_column(INET)
     range_to: Mapped[Optional[str]] = mapped_column(INET)
     expansion_ceiling: Mapped[Optional[str]] = mapped_column(INET)
     description: Mapped[Optional[str]] = mapped_column(Text)
+    # Phase 2 — configurable reserved-IP pool.
+    reserved_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    reservation_anchor: Mapped[str] = mapped_column(
+        _anchor_enum("subnets_ipv4_reservation_anchor"),
+        nullable=False, default="from_end", server_default="from_end",
+    )
 
 
 class SubnetIpv6(Base):
     __tablename__ = "subnets_ipv6"
+    # Phase 2 — IPAM by site: mirror of SubnetIpv4 (site scoping + reserved pool).
+    __table_args__ = (
+        CheckConstraint(
+            "reservation_anchor IN ('from_end', 'from_start')",
+            name="ck_subnets_ipv6_reservation_anchor",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     vlan_id: Mapped[Optional[int]] = mapped_column(ForeignKey("vlans.id"))
+    # Phase 2: every segment belongs to a site.
+    site_id: Mapped[int] = mapped_column(ForeignKey("sites.id"), nullable=False)
     network_cidr: Mapped[Optional[str]] = mapped_column(CIDR)
     range_from: Mapped[Optional[str]] = mapped_column(INET)
     range_to: Mapped[Optional[str]] = mapped_column(INET)
     description: Mapped[Optional[str]] = mapped_column(Text)
+    # Phase 2 — configurable reserved-IP pool.
+    reserved_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    reservation_anchor: Mapped[str] = mapped_column(
+        _anchor_enum("subnets_ipv6_reservation_anchor"),
+        nullable=False, default="from_end", server_default="from_end",
+    )
 
 
 class SubnetRoleAssignment(Base):
@@ -442,11 +497,18 @@ class SubnetRoleAssignment(Base):
     subnet_ipv4_id: Mapped[Optional[int]] = mapped_column(ForeignKey("subnets_ipv4.id"))
     subnet_ipv6_id: Mapped[Optional[int]] = mapped_column(ForeignKey("subnets_ipv6.id"))
     role: Mapped[str] = mapped_column(String(30))
+    # Phase 2 — reserved-IP pool: free-text label distinct from the role
+    # (e.g. "core switch #1", "edge firewall").
+    label: Mapped[Optional[str]] = mapped_column(String(80))
     slot_number: Mapped[Optional[int]] = mapped_column(Integer)
     ipv4_address: Mapped[Optional[str]] = mapped_column(INET)
     ipv6_address: Mapped[Optional[str]] = mapped_column(INET)
     assigned_device_id: Mapped[Optional[int]] = mapped_column(Integer)
     assigned_device_table: Mapped[Optional[str]] = mapped_column(String(50))
+    # Phase 2 — protect a reservation from automatic reallocation.
+    is_locked: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
     notes: Mapped[Optional[str]] = mapped_column(Text)
 
 

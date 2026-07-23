@@ -10,6 +10,7 @@ import ContainersApps from "./pages/ContainersApps";
 import Workstations from "./pages/Workstations";
 import Vlans from "./pages/Vlans";
 import Subnets from "./pages/Subnets";
+import IPAM from "./pages/IPAM";
 import IpAssignments from "./pages/IpAssignments";
 import NetworkDevices from "./pages/NetworkDevices";
 import PortConfig from "./pages/PortConfig";
@@ -34,6 +35,7 @@ export default function App() {
         <Route path="virtual-machines" element={<VirtualMachines />} />
         <Route path="containers-apps" element={<ContainersApps />} />
         <Route path="workstations" element={<Workstations />} />
+        <Route path="ipam" element={<IPAM />} />
         <Route path="vlans" element={<Vlans />} />
         <Route path="subnets" element={<Subnets />} />
         <Route path="ip-assignments" element={<IpAssignments />} />

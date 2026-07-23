@@ -2,7 +2,7 @@
 Description=Virtualfactor CMDB PostgreSQL data volume
 
 [Volume]
-VolumeName=vf-cmdb-pgdata
+VolumeName=vf-cmdb_pgdata
 
 [Install]
 WantedBy=default.target

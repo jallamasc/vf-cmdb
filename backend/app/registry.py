@@ -22,8 +22,12 @@ ENTITY_REGISTRY = {
     "network-id-types": models.NetworkIdType,
     # reference data (NON-naming lookup lists)
     "site-addresses": models.SiteAddress,
+    "rack-types": models.RackType,
     # physical
     "sites": models.Site,
+    "datacenters": models.Datacenter,
+    "datacenter-floors": models.DatacenterFloor,
+    "rooms": models.Room,
     "racks": models.Rack,
     "rack-units": models.RackUnit,
     "power-devices": models.PowerDevice,
@@ -63,4 +67,5 @@ LOOKUP_SLUGS = [
 # that never participate in name generation. Surfaced under "Reference Data".
 REFERENCE_SLUGS = [
     "site-addresses",
+    "rack-types",
 ]

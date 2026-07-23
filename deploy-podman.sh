@@ -52,8 +52,15 @@ require_compose() {
 # all persistent data lives in named volumes.
 clean_stale_containers() {
     echo ">>> Removing any stale stack containers..."
+    # Remove by fixed name AND by project-name filter, so half-created
+    # containers left behind by a failed compose run are also cleared.
     podman rm -f vf_cmdb_db vf_cmdb_backend vf_cmdb_frontend vf_cmdb_pgadmin \
         >/dev/null 2>&1 || true
+    local ids
+    ids="$(podman ps -aq --filter 'name=vf_cmdb_' 2>/dev/null || true)"
+    if [[ -n "$ids" ]]; then
+        podman rm -f $ids >/dev/null 2>&1 || true
+    fi
 }
 
 # Remove the pgadmin volume(s) that can end up duplicated and break
@@ -61,10 +68,24 @@ clean_stale_containers() {
 # This ONLY touches pgadmin (UI settings) — never pgdata (the database).
 fix_pgadmin_volume() {
     echo ">>> Clearing pgadmin volume(s) (database volume is left untouched)..."
-    # Cover both possible project-prefix spellings.
-    for v in vf-cmdb_pgadmin vf_cmdb_pgadmin; do
+    # Cover every prefix/separator spelling that the compose and Quadlet paths
+    # may have produced. pgAdmin data is just UI settings and is disposable.
+    for v in vf-cmdb_pgadmin vf-cmdb-pgadmin vf_cmdb_pgadmin; do
+        # Repeat once: a corrupted store can register the same name twice
+        # ("more than one result for volume name"), so a single rm is not enough.
+        podman volume rm -f "$v" >/dev/null 2>&1 || true
         podman volume rm -f "$v" >/dev/null 2>&1 || true
     done
+    # If podman still reports duplicate/ambiguous volume entries, rebuild the
+    # storage index. This is non-destructive (it does not delete volume data).
+    if podman volume ls 2>&1 | grep -q pgadmin && \
+       ! podman volume inspect vf-cmdb_pgadmin >/dev/null 2>&1; then
+        echo ">>> Rebuilding podman storage index (podman system renumber)..."
+        podman system renumber >/dev/null 2>&1 || true
+        for v in vf-cmdb_pgadmin vf-cmdb-pgadmin vf_cmdb_pgadmin; do
+            podman volume rm -f "$v" >/dev/null 2>&1 || true
+        done
+    fi
 }
 
 case "${1:-}" in

@@ -32,15 +32,111 @@
 
 ## 1. Phase 2 Objective
 
+Two parallel work streams:
+
+### 1.1 Complete the Rack View Upgrade (deferred from Phase 1 original scope)
+Hierarchy tables exist, but the **RackView page** still has no hierarchy filters,
+no multi-rack layout, and no realistic SVG diagrams. Phase 2 delivers:
+- Datacenter/Floor/Rack cascading filter dropdowns.
+- Multi-rack side-by-side layout.
+- Professional **SVG-based rack elevation diagrams** (Visio-like, numbered U positions,
+  device rectangles with colors/labels).
+
+### 1.2 IPAM by Site (new requirements from user)
 Turn IPAM into a **site-scoped** system with **manageable reserved-IP pools** per
 network segment, and make reservation placement (from the last usable IP downward,
 gap-aware) fully configurable from the UI.
 
 ---
 
-## 2. New Requirements (confirmed with user)
+## 2. Work Stream A — Rack View Upgrade (deferred from Phase 1)
 
-### R1 — IPAM is scoped by Site
+### 2.1 Current State
+- **`RackView.tsx`** exists but shows only basic front-elevation diagrams (colored boxes
+  for device types).
+- Can filter "All racks" or a specific rack.
+- **No datacenter/floor hierarchy** in the UI (the tables exist in the DB but aren't
+  used by RackView).
+- **No realistic rack visualization** (no U numbering, no proper scaling, no
+  professional appearance).
+
+### 2.2 Requirements (from original Phase 1 scope)
+
+#### A. Hierarchy Filter UI
+Three cascading dropdowns at the top of the Rack View page:
+1. **Datacenter** (all datacenters for the selected site + "All Datacenters")
+2. **Floor** (floors for the selected datacenter + "All Floors")
+3. **Rack** (racks for the selected floor + "All Racks")
+
+Selection updates the rack display below. When "All Racks" or multiple racks are in
+scope, display them side-by-side (responsive grid, 2-3 columns on desktop).
+
+#### B. Multi-Rack Layout
+- When viewing multiple racks, display them in a **responsive grid** (flexbox or CSS grid).
+- Each rack labeled with **Datacenter / Floor / Rack name** above it.
+- Scroll horizontally/vertically as needed.
+
+#### C. Realistic SVG Rack Diagrams
+Replace the current colored-box diagrams with professional **SVG-based rack elevation
+diagrams** similar to Microsoft Visio rack stencils:
+
+**Visual Requirements:**
+- Vertical rectangle representing the rack.
+- **U positions numbered** (1U at bottom, ascending upward to 16U, 32U, 42U, or 48U
+  depending on `rack.total_units`).
+- Rails on the sides.
+- **Devices as colored rectangles** spanning their U height (`device.units`).
+- Device labels inside rectangles (truncate if needed).
+- Empty U slots shown as light gray background.
+- Color-code by device type (reuse existing `TYPE_COLORS` mapping).
+
+**SVG Specifications:**
+- Width: ~300px (rack front width).
+- Height: dynamic based on U count (1U ≈ 19px; 42U ≈ 800px).
+- ViewBox: `0 0 300 {height}`.
+- Elements:
+  - Outer frame: rectangle stroke.
+  - Rails: two vertical lines on sides.
+  - U position labels: text on left side, right-aligned, every 1U.
+  - Device rectangles:
+    - X: 50px (after rail), Width: 200px.
+    - Y: calculated from bottom up based on U position.
+    - Height: `device.units * 19px`.
+    - Fill: color from TYPE_COLORS (convert Tailwind classes to hex).
+    - Stroke: darker shade of same color.
+  - Device labels: text centered in rectangle.
+
+### 2.3 Backend Work (Rack View)
+**None required** — hierarchy tables and device tables already exist. The existing
+`GET /racks`, `GET /datacenters`, `GET /datacenter-floors`, `GET /rooms`,
+`GET /rack-units` endpoints provide all needed data.
+
+### 2.4 Frontend Work (Rack View)
+
+**Files to Create:**
+- `frontend/src/components/RackDiagramSVG.tsx` — the SVG rack visualization component.
+
+**Files to Modify:**
+- `frontend/src/pages/RackView.tsx` — complete rewrite:
+  - Add hierarchy filter dropdowns (site → datacenter → floor → rack).
+  - Multi-rack grid layout.
+  - Replace current diagram with `<RackDiagramSVG />`.
+
+**Component Structure:**
+```
+RackView.tsx
+├── HierarchyFilters (dropdowns for Site/DC/Floor/Rack)
+├── RackGrid (responsive grid container)
+│   └── RackCard (one per rack, includes DC/Floor/Rack label)
+│       └── RackDiagramSVG (the actual SVG visualization)
+└── Legend (device type colors)
+```
+
+---
+
+## 3. Work Stream B — IPAM by Site (new requirements)
+
+### 3.1 R1 — IPAM is scoped by Site
 > "IPAM should be by Site. E.g. Site *Korriban* has VLANs 100, 101, 66, 67, …;
 > those VLANs and network segments must not be used on other sites."
 
@@ -67,7 +163,7 @@ gap-aware) fully configurable from the UI.
   overlap another segment on the same site, and (per R1) may not be reused on another
   site.
 
-### R2 — Configurable reserved IPs per segment
+### 3.2 R2 — Configurable reserved IPs per segment
 > "Each segment normally reserves IPs for firewalls, switches, etc. This must be
 > configurable/manageable in the app. E.g. `192.168.0.0/24` but only 7 IPs reserved
 > for special devices/services."
@@ -84,7 +180,7 @@ gap-aware) fully configurable from the UI.
 - Reserved IPs are **excluded from `next-ip`** allocation (currently `next-ip` only
   skips `ip_assignments`; it must also skip `subnet_role_assignments`).
 
-### R3 — Reservation placement: from the last IP, gap-aware & configurable
+### 3.3 R3 — Reservation placement: from the last IP, gap-aware & configurable
 > "Reserved IPs are taken from the last IP and so on; that should be configurable and
 > gaps should be taken into account."
 
@@ -129,9 +225,7 @@ ALTER TABLE subnet_role_assignments ADD COLUMN is_locked BOOLEAN DEFAULT FALSE;
 Migration: new **`0004_ipam_by_site.py`**, guarded/idempotent (same helper pattern as
 `0003`). Backfill `subnets_ipv4.site_id` from the parent VLAN's site.
 
----
-
-## 4. Backend Work
+### 3.4 Backend Work (IPAM)
 
 - **Models** (`models.py`): site scoping + new columns above; relationships
   `Site → Vlan → Subnet → Reservation`.
@@ -146,7 +240,7 @@ Migration: new **`0004_ipam_by_site.py`**, guarded/idempotent (same helper patte
 - **Seed** (`seed.py` / `seed_subnets.json`): attach existing sample subnets to a site;
   demonstrate a reserved pool (e.g. 7 reserved from the top of a /24).
 
-## 5. Frontend Work
+### 3.5 Frontend Work (IPAM)
 
 - **New page `IPAM.tsx`** (site-scoped):
   - Site selector at top → cascades to that site's VLANs and segments only.
@@ -162,7 +256,7 @@ Migration: new **`0004_ipam_by_site.py`**, guarded/idempotent (same helper patte
 
 ---
 
-## 6. Open Questions for Kickoff
+## 4. Open Questions for Kickoff
 
 1. **VLAN reuse rule:** strict global (option a) or per-site unique with cross-site
    reject (option b)? (Doc leans **a** per your wording.)
@@ -176,27 +270,41 @@ Migration: new **`0004_ipam_by_site.py`**, guarded/idempotent (same helper patte
 
 ---
 
-## 7. Success Criteria
+## 5. Success Criteria
+
+### Rack View (Stream A)
+✅ Cascading hierarchy filters (Site → Datacenter → Floor → Rack) working.
+✅ Multi-rack side-by-side responsive grid layout.
+✅ Professional SVG rack diagrams with numbered U positions, device rectangles, colors, labels.
+✅ Visual appearance comparable to Visio rack stencils.
+
+### IPAM (Stream B)
 
 ✅ VLANs and segments are owned by a site and cannot be duplicated across sites.
 ✅ Each segment exposes a configurable reserved-IP pool, managed from the UI.
 ✅ Reservations default to allocation from the last usable IP downward, are gap-aware,
    and the anchor/direction is configurable per segment.
 ✅ `next-ip` never returns a reserved address; utilization reflects reservations.
-✅ No regressions; `alembic upgrade head`, `python -m app.seed`, and `npm run build`
-   all succeed.
+
+### General
+✅ No regressions; `alembic upgrade head`, `python -m app.seed`, and `npm run build` all succeed.
 
 ---
 
-## 8. Git Workflow
+## 6. Git Workflow
 
 1. Merge PR #3 to `master`.
-2. `git checkout -b feature/phase-2-ipam-by-site`.
-3. Commits: (1) schema+migration, (2) IPAM service/endpoints, (3) frontend IPAM page,
-   (4) seed + docs.
+2. `git checkout -b feature/phase-2-rack-ipam`.
+3. Commits (suggested order):
+   - (1) Frontend: RackDiagramSVG component
+   - (2) Frontend: RackView rewrite with hierarchy filters + multi-rack layout
+   - (3) Backend: IPAM schema+migration (0004_ipam_by_site.py)
+   - (4) Backend: IPAM service/endpoints (reservation CRUD, site scoping)
+   - (5) Frontend: IPAM page (VLANs, segments, reservations)
+   - (6) Seed + docs update
 4. Open PR against `master`; update `docs/` on completion (`PHASE_2_COMPLETION.md`).
 
-## 9. Deployment Reminder (carried from Phase 1 incident)
+## 7. Deployment Reminder (carried from Phase 1 incident)
 
 Use **one** lifecycle manager per host (compose **or** Quadlet, never both). If a
 volume-store error recurs (*"more than one result for volume name"*), run

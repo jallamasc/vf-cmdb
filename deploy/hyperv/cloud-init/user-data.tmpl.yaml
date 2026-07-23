@@ -1,0 +1,90 @@
+#cloud-config
+# ===========================================================================
+# Virtualfactor IT CMDB — cloud-init user-data (Hyper-V NoCloud seed)
+#
+# This is a TEMPLATE. New-CmdbVM.ps1 substitutes the __PLACEHOLDERS__ and
+# writes the result onto a FAT32 disk labelled CIDATA that cloud-init reads on
+# first boot. It provisions the app user, installs your SSH key + Podman, then
+# runs bootstrap.sh — the same flow used for Proxmox, so the two stay identical.
+#
+# Placeholders (filled in automatically by the PowerShell script):
+#   __SSH_PUBLIC_KEY__   your ~/.ssh/id_ed25519.pub
+#   __HOSTNAME__         the VM name
+#   __REPO_BRANCH__      branch to deploy (default master)
+# ===========================================================================
+
+hostname: __HOSTNAME__
+manage_etc_hosts: true
+
+users:
+  - name: vfadmin
+    groups: [sudo]
+    shell: /bin/bash
+    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+    lock_passwd: false
+    ssh_authorized_keys:
+      - __SSH_PUBLIC_KEY__
+
+# Fallback console password (SSH keys are strongly preferred — change this!)
+chpasswd:
+  expire: false
+  users:
+    - name: vfadmin
+      password: "changeme-on-first-login"
+      type: text
+
+package_update: true
+package_upgrade: false
+packages:
+  - git
+  - curl
+  - podman
+  - ufw
+  - uidmap
+  - slirp4netns
+  - fuse-overlayfs
+  - python3-pip
+  # Hyper-V integration daemons — lets the Hyper-V host (and Manage-CmdbVM.ps1
+  # -Action ip / Hyper-V Manager) read the VM's IP address via KVP.
+  - linux-cloud-tools-virtual
+  - linux-tools-virtual
+
+write_files:
+  - path: /etc/profile.d/vf-cmdb.sh
+    permissions: "0644"
+    content: |
+      # Convenience aliases for CMDB operators
+      alias cmdb-status='systemctl --user status vf-cmdb-backend.service'
+      alias cmdb-logs='journalctl --user -u vf-cmdb-backend.service -f'
+      alias cmdb-update='~/vf-cmdb/deploy/scripts/vf-cmdb-update.sh'
+      alias cmdb-backup='~/vf-cmdb/deploy/scripts/vf-cmdb-backup.sh'
+
+  # Console login banner: agetty replaces \4 with the live IPv4 address, so the
+  # VM's IP is visible ON THE LOGIN SCREEN — no need to log in to find it.
+  - path: /etc/issue
+    permissions: "0644"
+    content: |
+      Ubuntu \r (\l)
+
+      ======================================================
+       Virtualfactor IT CMDB  (host: \n)
+      ------------------------------------------------------
+       IPv4 address .: \4
+       Web UI .......: http://\4:8080
+       API docs .....: http://\4:8000/docs
+       pgAdmin ......: http://\4:5050
+      ------------------------------------------------------
+       SSH login ....: vfadmin@\4   (key-based)
+       Console login : vfadmin / changeme-on-first-login
+      ======================================================
+
+runcmd:
+  # Make sure the Hyper-V KVP daemon is running so the host can read our IP.
+  - ["systemctl", "enable", "--now", "hv-kvp-daemon.service"]
+  # Refresh the console banner so the IP shows on the current login prompt.
+  - ["systemctl", "restart", "getty@tty1.service"]
+  # Deploy as the app user (rootless Podman requires a real login session).
+  - ["sudo", "-iu", "vfadmin", "bash", "-lc",
+     "REPO_BRANCH=__REPO_BRANCH__ CORS_ORIGINS='*' bash <(curl -fsSL https://raw.githubusercontent.com/jallamasc/vf-cmdb/__REPO_BRANCH__/deploy/scripts/bootstrap.sh)"]
+
+final_message: "Virtualfactor IT CMDB provisioned on __HOSTNAME__. UI :8080, API :8000/docs, pgAdmin :5050 once boot completes."

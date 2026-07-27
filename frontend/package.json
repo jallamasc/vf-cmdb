@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@tanstack/react-query": "^5.51.1",
+    "@tanstack/react-query": "^5.101.4",
     "ag-grid-community": "^32.0.2",
     "ag-grid-react": "^32.0.2",
     "react": "^18.3.1",

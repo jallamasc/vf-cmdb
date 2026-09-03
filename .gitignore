@@ -10,6 +10,7 @@ venv/
 node_modules/
 frontend/dist/
 frontend/.vite/
+frontend/tsconfig.tsbuildinfo
 npm-debug.log*
 
 # Local Postgres data (dev)
@@ -23,6 +24,10 @@ pgdata/
 .idea/
 .DS_Store
 .abacus.donotdelete
+
+# Auto-generated documentation (PDF/DOCX from markdown)
+*.pdf
+*.docx
 
 # Local backups (should live outside the repo, but guard anyway)
 vf-cmdb-backups/

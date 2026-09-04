@@ -68,6 +68,16 @@ const CATEGORIES: { name: string; description: string; lookups: Lookup[] }[] = [
 
 const ALL_LOOKUPS = CATEGORIES.flatMap((c) => c.lookups);
 
+/**
+ * Defaults for a brand-new lookup row. ``full_name`` and ``abbreviation`` are
+ * NOT NULL and the abbreviation is globally unique (case-insensitive), so a
+ * random suffix keeps repeated "Add row" clicks from colliding.
+ */
+const newLookupDefaults = () => ({
+  full_name: "New entry",
+  abbreviation: `new-${Math.random().toString(36).slice(2, 6)}`,
+});
+
 const columns = [
   roCol("id", "ID", 70),
   textCol("full_name", "Full Name", 220),
@@ -197,6 +207,18 @@ export default function Naming() {
             resource={active}
             title={activeLabel}
             columns={columns}
+            // full_name + abbreviation are NOT NULL on every naming lookup and
+            // the abbreviation must be globally unique — seed a placeholder so
+            // "Add row" always succeeds and the user just renames it.
+            newRowDefaults={newLookupDefaults}
+            requiredFields={[
+              { field: "full_name", label: "Full Name" },
+              {
+                field: "abbreviation",
+                label: "Abbreviation",
+                hint: "Abbreviations are globally unique (case-insensitive).",
+              },
+            ]}
           />
         </div>
       </div>

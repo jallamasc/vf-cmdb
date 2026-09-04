@@ -17,6 +17,7 @@ export default function PortConfig() {
   const columns = useMemo(
     () => [
       roCol("id", "ID", 70),
+      // DeviceInterface.network_device_id is NOT NULL — required on insert.
       fkCol("network_device_id", "Device", deviceOpts),
       numCol("port_number", "Port"),
       {
@@ -57,7 +58,18 @@ export default function PortConfig() {
       title="Device Port Configuration"
       description="Switch/router interface configuration. Use the Device column filter to focus on a single device."
       columns={columns}
-      newRowDefaults={{ admin_status: "up", port_mode: "access" }}
+      newRowDefaults={() => ({
+        admin_status: "up",
+        port_mode: "access",
+        network_device_id: deviceOpts[0]?.id ?? null,
+      })}
+      requiredFields={[
+        {
+          field: "network_device_id",
+          label: "Device",
+          hint: "Create a Network Device first — a port cannot exist without one.",
+        },
+      ]}
     />
   );
 }

@@ -1,6 +1,14 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, Row } from "../api";
+import { lookupLabel } from "../lib/columns";
+
+/** Human label for a site id; unassigned subnets are called out explicitly. */
+function siteLabel(sites: Row[], id: number | null | undefined): string {
+  if (id == null) return "unassigned";
+  const s = sites.find((x) => x.id === id);
+  return s ? lookupLabel(s) : `Site #${id}`;
+}
 
 function UtilBar({ pct }: { pct: number }) {
   const color =
@@ -12,7 +20,15 @@ function UtilBar({ pct }: { pct: number }) {
   );
 }
 
-function Ipv4Row({ subnet, vlanLabel }: { subnet: Row; vlanLabel: string }) {
+function Ipv4Row({
+  subnet,
+  vlanLabel,
+  site,
+}: {
+  subnet: Row;
+  vlanLabel: string;
+  site: string;
+}) {
   const [nextIp, setNextIp] = useState<string | null>(null);
   const hasCidr = Boolean(subnet.network_cidr);
   const { data: util } = useQuery({
@@ -31,6 +47,26 @@ function Ipv4Row({ subnet, vlanLabel }: { subnet: Row; vlanLabel: string }) {
       <td className="px-3 py-2 font-mono text-sm">{subnet.network_cidr}</td>
       <td className="px-3 py-2 font-mono text-xs">{subnet.gateway ?? "—"}</td>
       <td className="px-3 py-2">{vlanLabel}</td>
+      <td
+        className={`px-3 py-2 text-xs ${
+          subnet.site_id == null ? "text-amber-600 italic" : "text-slate-600"
+        }`}
+      >
+        {site}
+      </td>
+      {/* BUG-D: range / expansion / reservation fields from the model */}
+      <td className="px-3 py-2 font-mono text-xs">{subnet.range_from ?? "—"}</td>
+      <td className="px-3 py-2 font-mono text-xs">{subnet.range_to ?? "—"}</td>
+      <td className="px-3 py-2 font-mono text-xs">
+        {subnet.expansion_ceiling ?? "—"}
+      </td>
+      <td className="px-3 py-2 text-xs text-slate-600">
+        {subnet.reserved_count ?? 0}
+        <span className="text-slate-400">
+          {" "}
+          · {subnet.reservation_anchor ?? "from_end"}
+        </span>
+      </td>
       <td className="px-3 py-2 whitespace-nowrap">
         {!hasCidr ? (
           <span className="text-slate-400 text-xs">no CIDR</span>
@@ -67,7 +103,9 @@ export default function Subnets() {
   const { data: v4 } = useQuery({ queryKey: ["subnets-ipv4"], queryFn: () => api.list("subnets-ipv4") });
   const { data: v6 } = useQuery({ queryKey: ["subnets-ipv6"], queryFn: () => api.list("subnets-ipv6") });
   const { data: vlans } = useQuery({ queryKey: ["vlans"], queryFn: () => api.list("vlans") });
+  const { data: sites } = useQuery({ queryKey: ["sites"], queryFn: () => api.list("sites") });
   const [tab, setTab] = useState<"v4" | "v6">("v4");
+  const siteList = sites ?? [];
 
   const vlanLabel = (id: number | null) => {
     const v = (vlans ?? []).find((x) => x.id === id);
@@ -107,6 +145,11 @@ export default function Subnets() {
                 <th className="text-left px-3 py-2">Network</th>
                 <th className="text-left px-3 py-2">Gateway</th>
                 <th className="text-left px-3 py-2">VLAN</th>
+                <th className="text-left px-3 py-2">Site</th>
+                <th className="text-left px-3 py-2">Range from</th>
+                <th className="text-left px-3 py-2">Range to</th>
+                <th className="text-left px-3 py-2">Expansion ceiling</th>
+                <th className="text-left px-3 py-2">Reserved · anchor</th>
                 <th className="text-left px-3 py-2">Utilisation</th>
                 <th className="text-left px-3 py-2">IPAM</th>
                 <th className="text-left px-3 py-2">Description</th>
@@ -114,7 +157,12 @@ export default function Subnets() {
             </thead>
             <tbody>
               {(v4 ?? []).map((s) => (
-                <Ipv4Row key={s.id} subnet={s} vlanLabel={vlanLabel(s.vlan_id)} />
+                <Ipv4Row
+                  key={s.id}
+                  subnet={s}
+                  vlanLabel={vlanLabel(s.vlan_id)}
+                  site={siteLabel(siteList, s.site_id)}
+                />
               ))}
             </tbody>
           </table>
@@ -124,8 +172,10 @@ export default function Subnets() {
               <tr>
                 <th className="text-left px-3 py-2">Network</th>
                 <th className="text-left px-3 py-2">VLAN</th>
+                <th className="text-left px-3 py-2">Site</th>
                 <th className="text-left px-3 py-2">Range from</th>
                 <th className="text-left px-3 py-2">Range to</th>
+                <th className="text-left px-3 py-2">Reserved · anchor</th>
                 <th className="text-left px-3 py-2">Description</th>
               </tr>
             </thead>
@@ -134,8 +184,24 @@ export default function Subnets() {
                 <tr key={s.id} className="border-t border-slate-100">
                   <td className="px-3 py-2 font-mono text-xs">{s.network_cidr}</td>
                   <td className="px-3 py-2">{vlanLabel(s.vlan_id)}</td>
+                  <td
+                    className={`px-3 py-2 text-xs ${
+                      s.site_id == null
+                        ? "text-amber-600 italic"
+                        : "text-slate-600"
+                    }`}
+                  >
+                    {siteLabel(siteList, s.site_id)}
+                  </td>
                   <td className="px-3 py-2 font-mono text-xs">{s.range_from ?? "—"}</td>
                   <td className="px-3 py-2 font-mono text-xs">{s.range_to ?? "—"}</td>
+                  <td className="px-3 py-2 text-xs text-slate-600">
+                    {s.reserved_count ?? 0}
+                    <span className="text-slate-400">
+                      {" "}
+                      · {s.reservation_anchor ?? "from_end"}
+                    </span>
+                  </td>
                   <td className="px-3 py-2 text-slate-500">{s.description}</td>
                 </tr>
               ))}

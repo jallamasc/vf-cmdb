@@ -18,6 +18,7 @@ const ZONES = [
 
 export default function Vlans() {
   const { map, isLoading } = useLookups(["sites"]);
+  const sites = map["sites"] ?? [];
   const columns = useMemo(
     () => [
       roCol("id", "ID", 70),
@@ -34,10 +35,12 @@ export default function Vlans() {
         ),
         width: 140,
       },
-      fkCol("site_id", "Site", map["sites"]),
+      // Vlan.site_id is NOT NULL in the database — it must stay editable here
+      // or every insert fails with a constraint error (BUG-A / BUG-C).
+      fkCol("site_id", "Site", sites),
       textCol("description", "Description", 240),
     ],
-    [map]
+    [sites]
   );
   if (isLoading) return <div className="text-slate-500">Loading…</div>;
   return (
@@ -46,6 +49,16 @@ export default function Vlans() {
       title="VLANs"
       description="Layer-2 segments. The zone drives IP colour coding across the app."
       columns={columns}
+      // Every VLAN belongs to exactly one site: pre-fill the first site so
+      // "Add row" cannot hit a NOT NULL violation, and let the user change it.
+      newRowDefaults={() => ({ site_id: sites[0]?.id ?? null })}
+      requiredFields={[
+        {
+          field: "site_id",
+          label: "Site",
+          hint: "Create a Site on the Sites page first.",
+        },
+      ]}
     />
   );
 }

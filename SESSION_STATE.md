@@ -32,6 +32,40 @@
 
 ---
 
+## 🆕 This Session (2026-09-03/04): Codebase Indexing & Vector Search
+
+Added the **third pillar** of the memory system — a self-hosted semantic search
+over the codebase — so agents recall code on demand and never rely on stale
+context.
+
+**What was built** (`tools/codebase_index/` + `./cbindex` wrapper):
+- `indexer.py` — CLI: `build` (incremental), `build --full`, `search`, `stats`,
+  `backends`. ChromaDB vector store + local `all-MiniLM-L6-v2` embeddings
+  (offline, no API key); optional OpenAI backend.
+- `mcp_server.py` — MCP server exposing `search_codebase`, `index_stats`,
+  `rebuild_index` to MCP-native clients (works with mcp v1 `FastMCP` and v2
+  `MCPServer`).
+- `requirements.txt`, `README.md`, root `cbindex` wrapper (`setup/build/search/
+  stats/backends/mcp`).
+- `AGENT_ONBOARDING.md` — **the new "read me first" file** with bootstrap
+  commands + a paste-ready bootstrap prompt for provisioning a fresh session.
+- `.gitignore` updated: `.codebase_index/` (vector store) and tool `.venv/` are
+  generated/ignored — never commit embeddings.
+
+**Validated** (in the dev environment):
+- Index built: 122 files → 421 chunks in ~15s.
+- Semantic search returns correct files/line-ranges (naming engine, next-free-IP,
+  quadlet units, changelog logic) with relevance scores.
+- Incremental build verified: adding a file re-embeds only it; deleting purges
+  its chunks (anti-rotten-memory guarantee holds).
+- MCP tool functions verified against the same index.
+
+**Note**: The vector store must be **rebuilt per machine** (`./cbindex build`) —
+it is intentionally not committed. On the air-gapped Proxmox VM, cache the
+embedding model during setup while internet is available.
+
+---
+
 ## 🔄 Recent Changes (Last 3 Commits)
 
 ### Commit `212988c` - 2026-09-03

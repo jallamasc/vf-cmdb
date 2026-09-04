@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# ---------------------------------------------------------------------------
+# cbindex - convenience wrapper for the VF CMDB codebase index
+# ---------------------------------------------------------------------------
+# Usage:
+#   ./cbindex build            # build/refresh the semantic index (incremental)
+#   ./cbindex build --full     # wipe and rebuild
+#   ./cbindex search "query"   # semantic search
+#   ./cbindex stats            # index status
+#   ./cbindex backends         # show usable embedding backends
+#   ./cbindex mcp              # start the MCP server (stdio)
+#   ./cbindex setup            # create venv + install deps (first-time)
+#
+# It auto-uses tools/codebase_index/.venv if present, else the system python.
+# ---------------------------------------------------------------------------
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TOOL_DIR="$REPO_ROOT/tools/codebase_index"
+VENV="$TOOL_DIR/.venv"
+export CBINDEX_REPO="$REPO_ROOT"
+
+pick_python() {
+  if [[ -x "$VENV/bin/python" ]]; then
+    echo "$VENV/bin/python"
+  else
+    command -v python3
+  fi
+}
+
+case "${1:-}" in
+  setup)
+    echo "[cbindex] creating venv at $VENV"
+    python3 -m venv "$VENV"
+    "$VENV/bin/pip" install --upgrade pip
+    "$VENV/bin/pip" install -r "$TOOL_DIR/requirements.txt"
+    echo "[cbindex] setup complete. Now run: ./cbindex build"
+    ;;
+  mcp)
+    PY="$(pick_python)"
+    exec "$PY" "$TOOL_DIR/mcp_server.py"
+    ;;
+  "")
+    echo "usage: ./cbindex {setup|build|search|stats|backends|mcp} [args...]" >&2
+    exit 1
+    ;;
+  *)
+    PY="$(pick_python)"
+    exec "$PY" "$TOOL_DIR/indexer.py" "$@"
+    ;;
+esac

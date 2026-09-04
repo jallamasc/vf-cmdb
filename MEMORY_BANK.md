@@ -673,14 +673,54 @@ vf_cmdb/
 
 ---
 
+## 🔎 Codebase Indexing & Vector Search (Semantic Memory)
+
+The project ships a **self-hosted semantic search** system so agents can recall
+any code/doc on demand instead of loading the whole repo into context. It is the
+third pillar of the memory system (prose memory = MEMORY_BANK + SESSION_STATE;
+generated recall = this index).
+
+**Location**: `tools/codebase_index/` + `./cbindex` wrapper at repo root.
+
+**Stack (best-available, self-hostable, offline-first)**:
+- **ChromaDB** — embedded persistent vector DB (no server process).
+- **sentence-transformers `all-MiniLM-L6-v2`** — local CPU embeddings, no API
+  key, works air-gapped once cached (384-dim, cosine).
+- **OpenAI `text-embedding-3-small`** — optional higher-quality backend.
+- **MCP server** (`mcp_server.py`) — exposes `search_codebase`, `index_stats`,
+  `rebuild_index` to MCP-native clients (Claude Desktop, Cursor, Continue).
+
+**Commands**:
+```bash
+./cbindex setup                       # one-time: venv + deps
+./cbindex build                       # incremental build/refresh
+./cbindex build --full                # rebuild from scratch
+./cbindex search "question" --json    # semantic search (agent mode)
+./cbindex search "q" --language tsx   # filter by language
+./cbindex stats                       # index status
+./cbindex mcp                         # start MCP server (stdio)
+```
+
+**Anti-rotten-memory design**: a SHA-256 manifest (`manifest.json`) tracks every
+file; `build` re-embeds only changed files and purges vectors for deleted ones,
+so the index never drifts from the code. The vector store (`.codebase_index/`)
+and tool venv are **git-ignored and regenerated** — never commit embeddings.
+
+**Rule**: after editing code, run `./cbindex build` so future searches are fresh.
+Full usage in `tools/codebase_index/README.md`; session provisioning in
+`AGENT_ONBOARDING.md`.
+
+---
+
 ## 🧠 Agent Operating Instructions
 
 ### On Session Start:
 
 1. **Read these files IN ORDER**:
+   - `AGENT_ONBOARDING.md` (how to provision context + tools this session)
    - `SESSION_STATE.md` (current state, recent changes, blockers)
    - `MEMORY_BANK.md` (this file - full context)
-   - Relevant source files only as needed
+   - Then use `./cbindex search "..."` to pull relevant source on demand
 
 2. **Verify git status**: `cd /home/ubuntu/vf_cmdb && git status`
 

@@ -1,0 +1,19 @@
+# Codebase Indexing & Vector Search dependencies
+# Install into a dedicated venv:
+#   python3 -m venv .venv && source .venv/bin/activate
+#   pip install -r tools/codebase_index/requirements.txt
+
+# Vector store (embedded, persistent, no server process required)
+chromadb>=1.0,<2.0
+
+# Local, offline embedding model (CPU). Default backend - no API key needed.
+sentence-transformers>=3.0
+
+# --- Optional backends / integrations (uncomment as needed) ---
+
+# OpenAI embeddings backend (set OPENAI_API_KEY, run with --backend openai)
+# openai>=1.40
+
+# MCP server so MCP-native assistants (Claude Desktop, Cursor, ...) can query
+# the index as a native tool. Not required for the CLI.
+# mcp[cli]>=1.2

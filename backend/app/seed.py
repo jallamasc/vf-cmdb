@@ -303,9 +303,13 @@ async def seed() -> None:
                 except ValueError:
                     cidr = None
             sub = models.SubnetIpv4(
-                vlan_id=vlan_pk, network_cidr=cidr, gateway=s.get("gateway"),
+                vlan_id=vlan_pk, site_id=site.id, network_cidr=cidr,
+                gateway=s.get("gateway"),
                 range_from=s.get("range_from"), range_to=s.get("range_to"),
-                expansion_ceiling=s.get("expansion_ceiling"), description=s["description"],
+                expansion_ceiling=s.get("expansion_ceiling"),
+                reserved_count=s.get("reserved_count", 0),
+                reservation_anchor=s.get("reservation_anchor", "from_end"),
+                description=s["description"],
             )
             session.add(sub)
             await session.flush()
@@ -316,13 +320,28 @@ async def seed() -> None:
                     subnet_ipv4_id=sub.id, role=r["role"], slot_number=r["slot"],
                     ipv4_address=r["ipv4"],
                 ))
+            # Auto-create a locked Gateway reservation (decision Q6) whenever the
+            # segment carries a gateway and one is not already present as a role.
+            gw = s.get("gateway")
+            if gw:
+                gw_ip = str(gw).split("/")[0]
+                have_gw = any(
+                    str(r.get("ipv4") or "").split("/")[0] == gw_ip for r in s["roles"]
+                )
+                if not have_gw:
+                    session.add(models.SubnetRoleAssignment(
+                        subnet_ipv4_id=sub.id, role="gateway", label="Gateway",
+                        ipv4_address=gw_ip, is_locked=True,
+                    ))
 
         for s in subnet_data["subnets_ipv6"]:
             vid = s["vlan_id"]
             vlan_pk = vlan_by_id.get(vid) if vid is not None else None
             session.add(models.SubnetIpv6(
-                vlan_id=vlan_pk, network_cidr=s["network"],
+                vlan_id=vlan_pk, site_id=site.id, network_cidr=s["network"],
                 range_from=s.get("range_from"), range_to=s.get("range_to"),
+                reserved_count=s.get("reserved_count", 0),
+                reservation_anchor=s.get("reservation_anchor", "from_end"),
                 description=s["description"],
             ))
 

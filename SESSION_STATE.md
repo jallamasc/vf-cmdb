@@ -1,9 +1,51 @@
 # Virtualfactor IT CMDB - Session State
 ## Living Document - Read on Every Interaction
 
-**Last Updated**: 2026-09-03 (Current session)  
-**Project Phase**: Development → Ready for Deployment  
-**Status**: ✅ Phase 2 code complete (Rack View SVG + IPAM by Site)  
+**Last Updated**: 2026-09-04 (Current session)  
+**Project Phase**: Development — Fully Tested, Ready for Proxmox Deployment  
+**Status**: ✅ Phase 2 complete + Full QA test run + 3 bugs fixed (commit `46b3164`)
+
+---
+
+## 🆕 Phase 2 QA Session (2026-09-04): Full-Stack Testing + Bug Fixes
+
+### Test Environment (SuperComputer VM)
+- PostgreSQL 16 running on port 5432 (DB: `cmdb`, user: `cmdb`)
+- Backend: uvicorn on port 8000 (`--reload`)
+- Frontend: built dist served by nginx on port 3000 (SPA + API proxy)
+- Public URL tested: `https://33e3a5dc9.na113.preview.abacusai.app`
+
+### QA Results Summary: 7 PASS / 1 PARTIAL / 1 FAIL → **All Fixed**
+| Test Case | Result |
+|-----------|--------|
+| TC-01 Dashboard & App Load | ✅ PASS |
+| TC-02 Sites, Hierarchy, SVG Rack View | ✅ PASS |
+| TC-03 Network Devices & Naming | ✅ PASS |
+| TC-04 Racks, Servers, Compute Pages | ✅ PASS |
+| TC-05 IPAM Core (VLANs, Subnets, Utilization) | ✅ PASS |
+| TC-06 IPAM Reservation CRUD & Next-IP | ⚠️ PARTIAL → **Fixed (BUG-01)** |
+| TC-07 API Guard Rails (VLAN/CIDR/IP dup guards) | ✅ PASS |
+| TC-08 Reference Data & `/meta/entities` | ❌ FAIL → **Fixed (BUG-02)** |
+| TC-09 Navigation Resilience (21 SPA routes) | ✅ PASS |
+
+### Bugs Found & Fixed (commit `46b3164`)
+- **BUG-01** (Medium, Frontend): Reservation form pre-filled hardcoded `192.168.1.254` — fixed to call `/api/v1/ipam/subnets/{id}/next-reserved` dynamically
+- **BUG-02** (Medium, Backend): `/api/v1/meta/entities` shadowed by catch-all `/{resource}/{item_id}` route → 422 — fixed by reordering router registration in `main.py`
+- **BUG-03** (Low, Seed): Changelog showed `simple_name: "Korriban → None"` spurious entry — fixed in `seed.py`, stale DB row purged
+
+### Validated API Endpoints (all ✅)
+- `GET /api/v1/sites` → 2 sites (Korriban + test artifact)
+- `GET /api/v1/vlans` → 43 VLANs
+- `GET /api/v1/subnets-ipv4` → 46 subnets
+- `GET /api/v1/ipam/subnets/3/next-ip` → `10.100.107.2`
+- `GET /api/v1/ipam/subnets/3/next-reserved` → `10.100.107.253`
+- `GET /api/v1/ipam/subnets/3/utilization` → 254 total / 3 used / 1.2%
+- `GET /api/v1/meta/entities` → 3 entity types (was 422, now ✅)
+- `GET /api/v1/ansible/inventory` → 12 groups ✅
+- VLAN dup 409 ✅ | CIDR overlap 409 ✅ | IP dup 409 ✅ | out-of-range 422 ✅
+
+### Current HEAD
+`46b3164` — `fix: BUG-01 IPAM form IP prefill, BUG-02 meta/entities route shadowing, BUG-03 seed changelog artifact`
 
 ---
 

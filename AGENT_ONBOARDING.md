@@ -157,10 +157,9 @@ git clone https://github.com/jallamasc/vf-cmdb.git && cd vf-cmdb
 > changelog and the auto-naming engine intact; design for multi-site even though
 > only the "Home" site exists today.
 >
-> There is one open decision to confirm with the user before touching IPAM data:
-> the invalid WLAN range `192.169.0.0/24` must be replaced with a valid RFC 1918
-> range (recommended `192.168.13.0/24`). Do not change seed/DB data until the
-> user picks the range.
+> **WLAN Addressing** (RESOLVED 2026-09-04): WLAN ranges start at 192.168.100.0/24
+> and continue sequentially (100-103, 104-107, 108-111, 112-115 for 4 subnets).
+> Applied in `backend/app/seed_subnets.json`.
 >
 > When you finish: update `SESSION_STATE.md` (and `MEMORY_BANK.md` if a decision
 > changed), run `./cbindex build`, then commit and push.

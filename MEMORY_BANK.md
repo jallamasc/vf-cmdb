@@ -215,11 +215,15 @@ REFERENCE_SLUGS = ["site-addresses"]  # General reference data
 
 ### Critical Data Quality Issues Fixed
 
-**WLAN Addressing Error** (USER CONFIRMED):
-- **Original**: 192.169.0.0/24 (INVALID - public IP space)
-- **Correction**: ⚠️ **PENDING USER DECISION** (see SESSION_STATE.md)
-- **Context**: User raised this issue 2026-09-03, needs to choose valid range
-- **Options presented**: 192.168.13.0/24 (next sequential), 192.168.20.0/24 (reserved block)
+**WLAN Addressing Error** (USER CONFIRMED & CORRECTED):
+- **Original**: 192.168.40-55.x (from early seed data, scattered ranges)
+- **User Decision** (2026-09-04): Start WLAN ranges at **192.168.100.0/24** and continue sequentially
+- **Final Allocation**:
+  - WLAN / 1: `192.168.100.0/24` (expansion to .103.254)
+  - WLAN / 2: `192.168.104.0/24` (expansion to .107.254)
+  - WLAN / 3: `192.168.108.0/24` (expansion to .111.254)
+  - WLAN / Reserved: `192.168.112.0/24` (expansion to .115.254)
+- **Applied**: `backend/app/seed_subnets.json` updated
 
 **Other Corrections Applied**:
 - Removed duplicate entries (same device listed multiple times)
@@ -268,7 +272,7 @@ REFERENCE_SLUGS = ["site-addresses"]  # General reference data
 
 **Current Allocations**:
 - LANs: 192.168.1.0/24 through 192.168.12.0/24
-- WLANs: ⚠️ **PENDING** - needs user decision on 192.169.x.x replacement
+- WLANs: 192.168.100.0/24 through 192.168.115.0/24 (4 subnets with expansion)
 - Management: Various subnets
 - Guest: Isolated network
 

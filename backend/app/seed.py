@@ -165,13 +165,17 @@ async def seed() -> None:
         session.add(home_address)
         await session.flush()
 
-        # ---- Site: Home Datacenter (Korriban) ----
+        # ---- Site: Home Datacenter ----
+        # NOTE: `simple_name` is intentionally NOT set here. A site's names are
+        # produced by the naming engine (vf_long_name / vf_short_name /
+        # tia606b_name via generate_site below); seeding a redundant
+        # `simple_name` only to have it cleared later produced the spurious
+        # "simple_name: Korriban -> None" changelog artifact (BUG-03).
         site = models.Site(
             description="Bogota, Home, 1st Floor Datacenter",
             organization_id=ORG["vf"], cloud_id=CLOUD["vs"], region_id=REGION["cc"],
             campus_id=CAMPUS["hm"], building_id=BUILDING["M1"], floor_section_id=FS["F1S1"],
             site_address_id=home_address.id,
-            simple_name="Korriban",
         )
         session.add(site)
         await session.flush()

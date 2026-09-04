@@ -18,12 +18,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Special routers first so their concrete paths win over the generic
-# "/{resource}" catch-all.
-app.include_router(special.router, prefix=settings.api_prefix)
-app.include_router(ansible.router, prefix=settings.api_prefix)
-app.include_router(generic.router, prefix=settings.api_prefix)
-
 
 @app.get("/health")
 async def health() -> dict[str, str]:
@@ -38,3 +32,13 @@ async def list_entities() -> dict:
         "lookups": LOOKUP_SLUGS,
         "reference_tables": REFERENCE_SLUGS,
     }
+
+
+# Router registration order matters: FastAPI matches routes first-come-first-
+# served, so every concrete path (including the "/meta/entities" route defined
+# above) MUST be registered BEFORE the generic "/{resource}/{item_id}" catch-all
+# router — otherwise "GET /meta/entities" is captured by "/{resource}/{item_id}"
+# and fails with 422 (trying to parse "entities" as an int item_id).
+app.include_router(special.router, prefix=settings.api_prefix)
+app.include_router(ansible.router, prefix=settings.api_prefix)
+app.include_router(generic.router, prefix=settings.api_prefix)

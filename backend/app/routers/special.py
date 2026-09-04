@@ -400,6 +400,9 @@ async def next_reserved_ip(
                 "family": fam,
                 "network": str(net),
                 "anchor": anchor,
+                # `ip` is the documented key; `next_reserved_ip` retained for
+                # backward compatibility with earlier callers.
+                "ip": str(host),
                 "next_reserved_ip": str(host),
             }
     raise HTTPException(status_code=409, detail="No free reservation IP available")

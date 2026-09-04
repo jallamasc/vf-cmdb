@@ -1,6 +1,14 @@
 import { useMemo } from "react";
 import EntityGrid from "../components/EntityGrid";
-import { useLookups, textCol, roCol, numCol, fkCol, ipCol } from "../lib/columns";
+import {
+  useLookups,
+  textCol,
+  roCol,
+  numCol,
+  fkCol,
+  ipCol,
+  deviceLinkCol,
+} from "../lib/columns";
 
 const LK = [
   "sites",
@@ -19,7 +27,8 @@ export default function PhysicalServers() {
     () => [
       roCol("id", "ID", 70),
       roCol("vf_short_name", "Short Name", 130),
-      roCol("vf_long_name", "VF Long Name", 220),
+      // FEAT-7: the long name opens the device detail dashboard.
+      deviceLinkCol("vf_long_name", "VF Long Name", "physical_servers", 240),
       fkCol("site_id", "Site", map["sites"]),
       fkCol("rack_id", "Rack", map["racks"]),
       numCol("rack_unit", "U"),
@@ -51,7 +60,7 @@ export default function PhysicalServers() {
     <EntityGrid
       resource="physical-servers"
       title="Physical Servers"
-      description="Bare-metal compute. Short & long names auto-generate from device type, brand, role, OS and sequence."
+      description="Bare-metal compute. Short & long names auto-generate from device type, brand, role, OS and sequence. Click a long name to open that server’s dashboard."
       columns={columns}
     />
   );

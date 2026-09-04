@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .. import abbrev, airports, crud, models, naming, themes
+from .. import abbrev, airports, crud, devices, models, naming, themes
 from ..database import get_session
 
 # Device tables that carry a naming prefix + sequence number.
@@ -655,6 +655,104 @@ async def naming_gaps(
         "recommended": next_value,
         "message": message,
     }
+
+
+# ---------------------------------------------------------------------------
+# FEAT-7: device detail dashboard
+# ---------------------------------------------------------------------------
+def _device_type_or_404(device_type: str) -> devices.DeviceType:
+    dt = devices.resolve(device_type)
+    if dt is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"Unknown device type '{device_type}'. "
+                f"Known values: {', '.join(devices.known_device_types())}"
+            ),
+        )
+    return dt
+
+
+@router.get("/devices/{device_type}/{device_id}")
+async def device_detail(
+    device_type: str,
+    device_id: int,
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """One device with every column, its location and the tabs that apply.
+
+    The record itself is also reachable through the generic
+    ``GET /api/v1/{resource}/{id}``; this endpoint adds the resolved parent
+    chain and the relation list so the dashboard never renders a tab that
+    cannot hold data for this device type.
+    """
+    dt = _device_type_or_404(device_type)
+    obj = await crud.get_item(session, dt.model, device_id)
+    if obj is None:
+        raise HTTPException(status_code=404, detail=f"{dt.label} {device_id} not found")
+
+    return {
+        "device_type": dt.key,
+        "resource": dt.slug,
+        "table": dt.table,
+        "label": dt.label,
+        "id": device_id,
+        "display_name": devices.device_display_name(dt, obj),
+        "name_fields": dt.name_fields,
+        "relations": dt.relations,
+        "relation_resources": {
+            rel: devices.RELATION_RESOURCES[rel] for rel in dt.relations
+        },
+        "context": await devices.device_context(session, dt, obj),
+        "record": crud.to_dict(obj),
+    }
+
+
+@router.get("/devices/{device_type}/{device_id}/related/{relation}")
+async def device_related(
+    device_type: str,
+    device_id: int,
+    relation: str,
+    limit: int = Query(500, le=5000),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Records related to one device, filtered server-side.
+
+    ``relation`` is one of the values in the device's ``relations`` list.
+    Rows come back in the same shape the generic list endpoint uses, so the
+    frontend can hand them straight to the grid and keep writing through the
+    normal CRUD routes (which is what keeps audit logging intact).
+    """
+    dt = _device_type_or_404(device_type)
+    if relation not in dt.relations:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"'{relation}' is not a relation of {dt.label}. "
+                f"Known values: {', '.join(dt.relations)}"
+            ),
+        )
+
+    obj = await crud.get_item(session, dt.model, device_id)
+    if obj is None:
+        raise HTTPException(status_code=404, detail=f"{dt.label} {device_id} not found")
+
+    loader = devices.RELATION_LOADERS[relation]
+    payload = (
+        await loader(session, dt, device_id, limit=limit)
+        if relation == "changelog"
+        else await loader(session, dt, device_id)
+    )
+    payload.update(
+        {
+            "device_type": dt.key,
+            "device_id": device_id,
+            "relation": relation,
+            "resource": devices.RELATION_RESOURCES[relation],
+            "count": len(payload["rows"]),
+        }
+    )
+    return payload
 
 
 # ---------------------------------------------------------------------------

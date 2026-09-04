@@ -1,6 +1,8 @@
 import { useQueries } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import type { ColDef, ICellRendererParams } from "ag-grid-community";
 import { api, Row } from "../api";
+import type { DeviceTypeKey } from "../api";
 
 // Load several lookup resources at once and return a map slug -> rows
 export function useLookups(slugs: string[]) {
@@ -68,6 +70,49 @@ export function DropdownCellRenderer(p: ICellRendererParams) {
       </span>
     </span>
   );
+}
+
+// ---------------------------------------------------------------------------
+// FEAT-7: link to the device detail dashboard
+// ---------------------------------------------------------------------------
+/**
+ * The primary name column of a device listing grid, rendered as a link to
+ * ``/devices/{type}/{id}``.
+ *
+ * The value stays read-only (these are naming-engine outputs, exactly like
+ * ``roCol``) but becomes clickable, which is how an operator gets from the
+ * table to the single-device dashboard. A row whose name has not been
+ * generated yet still links, using its id as the label, so the dashboard is
+ * never unreachable.
+ */
+export function deviceLinkCol(
+  field: string,
+  headerName: string,
+  type: DeviceTypeKey,
+  width = 220
+): ColDef {
+  return {
+    field,
+    headerName,
+    editable: false,
+    width,
+    cellClass: "vf-device-link-cell",
+    cellRenderer: (p: ICellRendererParams) => {
+      const id = p.data?.id;
+      if (id == null) return null;
+      const label =
+        p.value == null || p.value === "" ? `(unnamed) #${id}` : String(p.value);
+      return (
+        <Link
+          to={`/devices/${type}/${id}`}
+          className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
+          title={`Open the ${label} dashboard`}
+        >
+          {label}
+        </Link>
+      );
+    },
+  };
 }
 
 // A read-only text column

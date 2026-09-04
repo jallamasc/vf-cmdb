@@ -3,7 +3,15 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import EntityGrid from "../components/EntityGrid";
 import SequenceGapHelper from "../components/SequenceGapHelper";
 import { api } from "../api";
-import { useLookups, textCol, roCol, numCol, fkCol, ipCol } from "../lib/columns";
+import {
+  useLookups,
+  textCol,
+  roCol,
+  numCol,
+  fkCol,
+  ipCol,
+  deviceLinkCol,
+} from "../lib/columns";
 
 const LK = [
   "sites",
@@ -24,7 +32,8 @@ export default function NetworkDevices() {
   const columns = useMemo(
     () => [
       roCol("id", "ID", 70),
-      roCol("vf_long_name", "VF Long Name", 220),
+      // FEAT-7: the long name opens the device detail dashboard.
+      deviceLinkCol("vf_long_name", "VF Long Name", "network_devices", 240),
       textCol("vf_friendly_name", "Friendly Name", 150),
       textCol("alternative_name", "Alt Name", 140),
       fkCol("site_id", "Site", map["sites"]),
@@ -59,7 +68,7 @@ export default function NetworkDevices() {
         <EntityGrid
           resource="network-devices"
           title="Network Devices"
-          description="Switches, routers, firewalls and access points. Long name auto-generates from type, brand and sequence."
+          description="Switches, routers, firewalls and access points. Long name auto-generates from type, brand and sequence. Click a long name to open that device’s dashboard."
           columns={columns}
         />
       </div>

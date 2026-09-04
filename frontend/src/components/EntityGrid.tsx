@@ -21,6 +21,30 @@ export interface RequiredField {
   hint?: string;
 }
 
+/**
+ * FEAT-7 — an alternative source of rows for the grid.
+ *
+ * Listing pages read the whole table through ``api.list(resource)``. A device
+ * dashboard tab instead reads a server-side filtered slice
+ * (``/devices/{type}/{id}/related/{relation}``) but must still *write* through
+ * the normal CRUD routes for ``resource``, because that is where audit logging
+ * and the naming generators live. Both caches are invalidated after a save so
+ * the tab and the full listing page never drift apart.
+ */
+export interface GridDataSource {
+  /** React Query key for the filtered slice. */
+  queryKey: unknown[];
+  /** Loader for the filtered slice. */
+  fetch: () => Promise<unknown>;
+  /**
+   * Pull the grid rows out of whatever ``fetch`` resolves to. Defaults to the
+   * identity, so a plain ``Row[]`` loader needs nothing extra. Supplying it
+   * lets a page share one cache entry (and one request) between the grid and
+   * an envelope of metadata around the rows.
+   */
+  select?: (data: unknown) => Row[];
+}
+
 interface Props {
   resource: string;
   title: string;
@@ -30,7 +54,7 @@ interface Props {
    * computed per click (e.g. a unique placeholder abbreviation).
    */
   newRowDefaults?: Row | (() => Row);
-  description?: string;
+  description?: ReactNode;
   toolbarExtra?: ReactNode;
   /**
    * Rendered between the header and the grid. Used by pages that drive an
@@ -44,6 +68,16 @@ interface Props {
    * so a page can render an editor for the highlighted record.
    */
   onSelectionChanged?: (rows: Row[]) => void;
+  /** FEAT-7 — read a filtered slice instead of the whole table. */
+  dataSource?: GridDataSource;
+  /** FEAT-7 — hide "+ Add row" for relations this device cannot own. */
+  allowAdd?: boolean;
+  /** FEAT-7 — hide "Delete selected" for read-only relations. */
+  allowDelete?: boolean;
+  /** FEAT-7 — shrink the grid so several tabs fit without a page scroll. */
+  minHeight?: number;
+  /** FEAT-7 — replace the footer hint (or hide it with ``null``). */
+  footerHint?: ReactNode;
 }
 
 type ToastKind = "error" | "info";
@@ -153,6 +187,11 @@ export default function EntityGrid({
   panel,
   requiredFields = [],
   onSelectionChanged,
+  dataSource,
+  allowAdd = true,
+  allowDelete = true,
+  minHeight = 480,
+  footerHint,
 }: Props) {
   const qc = useQueryClient();
   const gridRef = useRef<AgGridReact>(null);
@@ -179,31 +218,46 @@ export default function EntityGrid({
     return () => clearTimeout(t);
   }, [toast]);
 
+  const selectRows = dataSource?.select;
   const { data, isLoading, isError, error: queryError } = useQuery({
-    queryKey: [resource],
-    queryFn: () => api.list(resource),
+    queryKey: dataSource ? dataSource.queryKey : [resource],
+    queryFn: dataSource ? dataSource.fetch : () => api.list(resource),
+    select: useMemo(
+      () => selectRows ?? ((d: unknown) => d as Row[]),
+      [selectRows]
+    ),
   });
+
+  /**
+   * Refresh both the rows on screen and the full table cache. When a device
+   * tab is showing a filtered slice, the listing page for the same resource is
+   * now stale too — invalidating both keeps them consistent.
+   */
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: [resource] });
+    if (dataSource) qc.invalidateQueries({ queryKey: dataSource.queryKey });
+  };
 
   const updateMut = useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: Row }) =>
       api.update(resource, id, payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: [resource] }),
+    onSuccess: refresh,
     onError: (e: Error) => {
       fail(e);
       // Roll the cell back to the persisted value.
-      qc.invalidateQueries({ queryKey: [resource] });
+      refresh();
     },
   });
 
   const createMut = useMutation({
     mutationFn: (payload: Row) => api.create(resource, payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: [resource] }),
+    onSuccess: refresh,
     onError: (e: Error) => fail(e),
   });
 
   const deleteMut = useMutation({
     mutationFn: (id: number) => api.remove(resource, id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: [resource] }),
+    onSuccess: refresh,
     onError: (e: Error) => fail(e),
   });
 
@@ -285,7 +339,7 @@ export default function EntityGrid({
           `“${required.label}” is required and cannot be cleared.` +
             (required.hint ? ` ${required.hint}` : "")
         );
-        qc.invalidateQueries({ queryKey: [resource] });
+        refresh();
         return;
       }
       payload = { [field]: value };
@@ -359,18 +413,22 @@ export default function EntityGrid({
           >
             Auto-fit columns
           </button>
-          <button
-            onClick={handleAdd}
-            className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
-          >
-            + Add row
-          </button>
-          <button
-            onClick={handleDelete}
-            className="px-3 py-1.5 bg-red-600 text-white rounded text-sm hover:bg-red-700"
-          >
-            Delete selected
-          </button>
+          {allowAdd && (
+            <button
+              onClick={handleAdd}
+              className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+            >
+              + Add row
+            </button>
+          )}
+          {allowDelete && (
+            <button
+              onClick={handleDelete}
+              className="px-3 py-1.5 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+            >
+              Delete selected
+            </button>
+          )}
         </div>
       </div>
 
@@ -396,7 +454,8 @@ export default function EntityGrid({
 
       {panel}
 
-      {requiredFields.length > 0 && (
+      {/* Only useful when the user can actually create rows here. */}
+      {allowAdd && requiredFields.length > 0 && (
         <p className="text-xs text-slate-400 mb-1">
           Required by the database:{" "}
           {requiredFields.map((r) => r.label).join(", ")}.
@@ -412,7 +471,7 @@ export default function EntityGrid({
       )}
 
       {!isLoading && !isError && (
-        <div className="ag-theme-quartz flex-1" style={{ minHeight: 480 }}>
+        <div className="ag-theme-quartz flex-1" style={{ minHeight }}>
           <AgGridReact
             ref={gridRef}
             rowData={data}
@@ -432,12 +491,17 @@ export default function EntityGrid({
           />
         </div>
       )}
-      <p className="text-xs text-slate-400 mt-2">
-        Click a cell to edit · Enter to save · Esc to cancel · cells marked with
-        ▼ open a dropdown · long values wrap instead of being cut off, and
-        “Auto-fit columns” widens every column to its content. Every change is
-        written to the changelog; computed name columns are read-only.
-      </p>
+      {footerHint !== undefined ? (
+        footerHint && <p className="text-xs text-slate-400 mt-2">{footerHint}</p>
+      ) : (
+        <p className="text-xs text-slate-400 mt-2">
+          Click a cell to edit · Enter to save · Esc to cancel · cells marked
+          with ▼ open a dropdown · long values wrap instead of being cut off,
+          and “Auto-fit columns” widens every column to its content. Every
+          change is written to the changelog; computed name columns are
+          read-only.
+        </p>
+      )}
     </div>
   );
 }

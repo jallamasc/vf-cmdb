@@ -79,6 +79,76 @@ export interface AirportCodeResult {
   matches: Airport[];
 }
 
+/**
+ * FEAT-7 — the four device types that have a detail dashboard. These are the
+ * underscored keys used in the ``/devices/:type/:id`` route; the backend also
+ * accepts the kebab-case API slug.
+ */
+export type DeviceTypeKey =
+  | "physical_servers"
+  | "virtual_machines"
+  | "workstations"
+  | "network_devices";
+
+export const DEVICE_TYPE_KEYS: DeviceTypeKey[] = [
+  "physical_servers",
+  "virtual_machines",
+  "workstations",
+  "network_devices",
+];
+
+/** FEAT-7 — resolved parent chain of a device, for the dashboard header. */
+export interface DeviceContext {
+  site: string | null;
+  datacenter: string | null;
+  room: string | null;
+  rack: string | null;
+  rack_unit: number | null;
+  host_server: string | null;
+  /** All of the above joined for a one-line breadcrumb. */
+  position: string | null;
+}
+
+/** FEAT-7 — result of GET /devices/{type}/{id}. */
+export interface DeviceDetail {
+  device_type: DeviceTypeKey;
+  /** Kebab-case CRUD slug of the device itself (``physical-servers``). */
+  resource: string;
+  table: string;
+  label: string;
+  id: number;
+  display_name: string;
+  /** Generated-name columns this model actually has, most significant first. */
+  name_fields: string[];
+  /** Tabs that can hold data for this device type. */
+  relations: string[];
+  /** relation name -> the CRUD slug writes must go to. */
+  relation_resources: Record<string, string>;
+  context: DeviceContext;
+  record: Row;
+}
+
+/** FEAT-7 — result of GET /devices/{type}/{id}/related/{relation}. */
+export interface DeviceRelated {
+  device_type: DeviceTypeKey;
+  device_id: number;
+  relation: string;
+  /** CRUD slug the rows live in, or null for read-only relations. */
+  resource: string | null;
+  count: number;
+  rows: Row[];
+  /** False when the rows are reachable but not owned by this device. */
+  owned: boolean;
+  /** Foreign key a new row must carry, or null when adding is not possible. */
+  fk_field: string | null;
+  /** Human explanation of what the relation contains. */
+  note: string;
+  /** Polymorphic discriminator a new IP assignment must carry. */
+  assigned_to_type?: string;
+  /** Polymorphic discriminator a new cable end must carry. */
+  port_type?: string;
+}
+
 async function handle(res: Response) {
   if (!res.ok) {
     let detail = res.statusText;
@@ -230,4 +300,22 @@ export const api = {
     recommended: number;
     message: string;
   }> => fetch(`${BASE}/naming/gaps?prefix=${encodeURIComponent(prefix)}`).then(handle),
+  /**
+   * FEAT-7 — one device with every column, its resolved location and the list
+   * of tabs that apply to its type. ``type`` may be either the underscored
+   * route key or the kebab-case CRUD slug.
+   */
+  deviceDetail: (type: string, id: number): Promise<DeviceDetail> =>
+    fetch(`${BASE}/devices/${type}/${id}`).then(handle),
+  /**
+   * FEAT-7 — records related to one device, already filtered server-side by
+   * the device's id (and polymorphic discriminator where one exists).
+   */
+  deviceRelated: (
+    type: string,
+    id: number,
+    relation: string,
+    limit = 500,
+  ): Promise<DeviceRelated> =>
+    fetch(`${BASE}/devices/${type}/${id}/related/${relation}?limit=${limit}`).then(handle),
 };

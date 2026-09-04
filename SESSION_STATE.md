@@ -3,7 +3,46 @@
 
 **Last Updated**: 2026-09-03 (Current session)  
 **Project Phase**: Development → Ready for Deployment  
-**Status**: ✅ Code complete, 🔄 Awaiting user decision on WLAN addressing  
+**Status**: ✅ Phase 2 code complete (Rack View SVG + IPAM by Site)  
+
+---
+
+## 🆕 Phase 2 (2026-09-03): Rack View SVG upgrade + IPAM by Site
+
+Branch `feature/phase-2-rack-ipam`. Full detail in `docs/PHASE_2_COMPLETION.md`.
+
+**Stream A — Rack View SVG**
+- New `frontend/src/components/RackDiagramSVG.tsx` — scalable SVG elevation
+  (U-numbered from bottom, rails, device rects scaled by units×19px, type
+  colours via shared `TYPE_HEX`, empty slots grey).
+- `frontend/src/pages/RackView.tsx` rewritten — cascading Site→Datacenter→
+  Floor→Rack filter, responsive multi-rack grid, type legend.
+
+**Stream B — IPAM by Site + reserved pool**
+- Migration `0004_ipam_by_site.py` (guarded/idempotent): `vlans.site_id` NOT
+  NULL + composite `UNIQUE(site_id, vlan_id)` (kept global `UNIQUE(vlan_id)`);
+  `site_id`/`reserved_count`/`reservation_anchor` on both subnet tables;
+  `label`/`is_locked` on `subnet_role_assignments`; backfills.
+- `models.py` updated to match.
+- `crud.py`: 409 duplicate global VLAN (Q1); 409 overlapping/duplicate CIDR
+  (Q2); auto-create locked `Gateway` reservation on subnet create (Q6). Wired
+  into create/update.
+- `special.py`: GET/POST/DELETE `/ipam/subnets/{id}/reservations` (family-aware,
+  ceiling-enforced, locked-protected) + `next-reserved` (anchor + gap-aware);
+  `utilization` reports reserved counts + anchor.
+- `seed.py`: VLANs/subnets attached to Home site; reserved pool + locked
+  gateway seeded.
+- `frontend/src/pages/IPAM.tsx` (route `/ipam`, nav "IPAM by Site"): site
+  selector, Segments tab (IPv4 primary + collapsible IPv6) with per-segment
+  reservation manager + "Suggest next", VLANs tab with quick-add. `api.ts`
+  extended with reservation helpers.
+
+**Validated**: `npm run build` zero TS errors; `from app.main import app` OK
+(all IPAM routes register); seed syntax OK. Live DB apply not run here (no
+local Postgres; INET/CIDR types are Postgres-specific).
+
+---
+## (Prior session snapshot below)
 
 ---
 

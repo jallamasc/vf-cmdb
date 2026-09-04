@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .. import abbrev, crud, models, naming
+from .. import abbrev, airports, crud, models, naming, themes
 from ..database import get_session
 
 # Device tables that carry a naming prefix + sequence number.
@@ -437,8 +437,8 @@ async def naming_generate(
       model column (``site_id``, ``organization_id``, ``code``, …). The values
       are fed to the very same generator used on create/update, so the live
       preview shown in the UI cannot drift from what gets persisted. Levels
-      outside the naming chain (datacenter / floor / room) return ``null``
-      names plus the readable location ``path``.
+      outside the naming chain (floor / room) return ``null`` names plus the
+      readable location ``path``.
     * **no entity_type** — the original abbreviation-joining behaviour, kept so
       existing callers keep working.
     """
@@ -471,6 +471,103 @@ async def naming_generate(
         "vf_short_name": short,
         "vf_long_name": vf_long,
         "tia606b_name": vf_long,
+    }
+
+
+# ---------------------------------------------------------------------------
+# FEAT-1: automatic site code
+# ---------------------------------------------------------------------------
+@router.get("/naming/site-code")
+async def naming_site_code(
+    org_id: Optional[int] = None,
+    campus_id: Optional[int] = None,
+    region_id: Optional[int] = None,
+    site_id: Optional[int] = None,
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Derive the automatic ``simple_name`` for a site (e.g. ``vfhmcc1``).
+
+    The code is ``organization + campus + region + sequence``. Pass ``site_id``
+    when editing an existing site so its own code is not counted as taken.
+    Nothing is written — this is a pure preview used by the tri-mode selector.
+    """
+    code = await naming.auto_site_code(
+        session, org_id, campus_id, region_id, exclude_site_id=site_id
+    )
+    return {
+        "org_id": org_id,
+        "campus_id": campus_id,
+        "region_id": region_id,
+        "site_code": code,
+        # Which pickers still have to be filled in for a full code.
+        "missing": [
+            field
+            for field, value in (
+                ("org_id", org_id),
+                ("campus_id", campus_id),
+                ("region_id", region_id),
+            )
+            if value is None
+        ],
+        "complete": bool(code) and None not in (org_id, campus_id, region_id),
+    }
+
+
+# ---------------------------------------------------------------------------
+# FEAT-3: themed fun names
+# ---------------------------------------------------------------------------
+@router.get("/naming/theme-names")
+async def naming_theme_names(
+    category: str = "",
+    q: str = "",
+    limit: int = 200,
+) -> dict[str, Any]:
+    """Search the built-in themed name catalogues.
+
+    ``category`` is one of ``star_wars``, ``greek_mythology``,
+    ``mountain_peaks`` or ``space_missions`` (omit it to search all of them);
+    ``q`` filters case/accent insensitively with prefix matches ranked first.
+    """
+    results = themes.search(category or None, q, limit)
+    return {
+        "category": category or None,
+        "q": q,
+        "categories": themes.categories(),
+        "count": len(results),
+        "names": results,
+    }
+
+
+# ---------------------------------------------------------------------------
+# FEAT-5: airport (IATA) code lookup for datacenters
+# ---------------------------------------------------------------------------
+@router.get("/naming/airport-code")
+async def naming_airport_code(
+    city: str = "",
+    limit: int = 25,
+) -> dict[str, Any]:
+    """Resolve a city to the IATA code of its main airport.
+
+    Returns the best match plus ``alternatives`` (cities such as London or
+    Tokyo have several airports) and ``matches`` for autocomplete lists. An
+    empty ``city`` returns suggestions instead of an error so the field can
+    show options before the user types.
+    """
+    resolved = airports.lookup_city(city) if city else {
+        "city": city,
+        "iata_code": None,
+        "airport": None,
+        "country": None,
+        "alternatives": [],
+    }
+    return {
+        "query": city,
+        "city": resolved["city"],
+        "iata_code": resolved["iata_code"],
+        "airport": resolved["airport"],
+        "country": resolved["country"],
+        "alternatives": resolved["alternatives"],
+        "matches": airports.search(city, limit),
     }
 
 

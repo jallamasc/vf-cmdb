@@ -32,8 +32,18 @@ interface Props {
   newRowDefaults?: Row | (() => Row);
   description?: string;
   toolbarExtra?: ReactNode;
+  /**
+   * Rendered between the header and the grid. Used by pages that drive an
+   * editor panel from the row the user selected (FEAT-1's tri-mode site code).
+   */
+  panel?: ReactNode;
   /** Fields the database requires (NOT NULL). Checked before POST. */
   requiredFields?: RequiredField[];
+  /**
+   * Called with the currently selected rows every time the selection changes,
+   * so a page can render an editor for the highlighted record.
+   */
+  onSelectionChanged?: (rows: Row[]) => void;
 }
 
 type ToastKind = "error" | "info";
@@ -140,7 +150,9 @@ export default function EntityGrid({
   newRowDefaults = {},
   description,
   toolbarExtra,
+  panel,
   requiredFields = [],
+  onSelectionChanged,
 }: Props) {
   const qc = useQueryClient();
   const gridRef = useRef<AgGridReact>(null);
@@ -232,6 +244,22 @@ export default function EntityGrid({
     if (!api) return;
     api.autoSizeAllColumns(false);
   };
+
+  /**
+   * Re-publish the selection to the parent page. Called both by AG Grid's own
+   * event and after a refetch, because the refreshed row object is a new
+   * reference and an open editor panel must not keep showing stale values.
+   */
+  const publishSelection = () => {
+    if (!onSelectionChanged) return;
+    onSelectionChanged(gridRef.current?.api?.getSelectedRows() ?? []);
+  };
+
+  useEffect(() => {
+    if (!onSelectionChanged) return;
+    publishSelection();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
 
   const onCellValueChanged = (e: CellValueChangedEvent) => {
     setToast(null);
@@ -366,6 +394,8 @@ export default function EntityGrid({
         </div>
       )}
 
+      {panel}
+
       {requiredFields.length > 0 && (
         <p className="text-xs text-slate-400 mb-1">
           Required by the database:{" "}
@@ -389,6 +419,10 @@ export default function EntityGrid({
             columnDefs={columns}
             defaultColDef={defaultColDef}
             onCellValueChanged={onCellValueChanged}
+            onSelectionChanged={publishSelection}
+            // Stable ids keep the selection (and any editor panel bound to it)
+            // alive across the refetch that follows every save.
+            getRowId={(p) => String(p.data.id)}
             rowSelection="multiple"
             stopEditingWhenCellsLoseFocus
             animateRows

@@ -11,10 +11,16 @@ from __future__ import annotations
 
 from typing import Optional
 
-from sqlalchemy import Integer
+from sqlalchemy import Integer, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import models
+
+# FEAT-1: a short name made of only two 2-letter abbreviations ("VF") carries
+# no context. Keep padding it with the next hierarchy levels until it reaches
+# this many characters, so operators can recognise the site at a glance.
+SHORT_NAME_MIN_LENGTH = 4
+SHORT_NAME_MAX_LENGTH = 12
 
 
 async def _abbr(session: AsyncSession, model, pk: Optional[int]) -> str:
@@ -37,14 +43,117 @@ async def site_long_name(session: AsyncSession, site: models.Site) -> str:
     return "".join(p for p in parts).upper()
 
 
+async def site_short_name(session: AsyncSession, site: models.Site) -> str:
+    """Recognisable short name for a site.
+
+    Starts from organization + campus (``VFHM`` for Virtualfactor / Home) and,
+    when that is too terse to be meaningful — e.g. a site with no campus would
+    collapse to just ``VF`` — keeps appending the next most identifying levels
+    (region, cloud, building, floor/section) until ``SHORT_NAME_MIN_LENGTH`` is
+    reached. Sites that already produce a long-enough code are left untouched,
+    so existing values never churn.
+    """
+    short = (
+        await _abbr(session, models.Organization, site.organization_id)
+        + await _abbr(session, models.Campus, site.campus_id)
+    )
+    fallbacks = (
+        (models.Region, site.region_id),
+        (models.Cloud, site.cloud_id),
+        (models.Building, site.building_id),
+        (models.FloorSection, site.floor_section_id),
+    )
+    for model, pk in fallbacks:
+        if len(short) >= SHORT_NAME_MIN_LENGTH:
+            break
+        short += await _abbr(session, model, pk)
+    return short[:SHORT_NAME_MAX_LENGTH].upper()
+
+
+async def auto_site_code(
+    session: AsyncSession,
+    organization_id: Optional[int],
+    campus_id: Optional[int],
+    region_id: Optional[int],
+    exclude_site_id: Optional[int] = None,
+) -> str:
+    """FEAT-1: derive the automatic site code, e.g. ``vfhmcc1``.
+
+    Composition is ``organization + campus + region + sequence``, lowercased.
+    The sequence is the lowest positive integer not already taken by another
+    site sharing the same prefix, so codes stay stable and gaps get reused
+    instead of drifting upwards. Returns ``""`` when no component resolves
+    (nothing meaningful can be derived yet).
+    """
+    prefix = (
+        await _abbr(session, models.Organization, organization_id)
+        + await _abbr(session, models.Campus, campus_id)
+        + await _abbr(session, models.Region, region_id)
+    ).lower()
+    if not prefix:
+        return ""
+
+    rows = (
+        await session.execute(
+            select(models.Site.id, models.Site.simple_name).where(
+                models.Site.simple_name.ilike(f"{prefix}%")
+            )
+        )
+    ).all()
+    taken: set[int] = set()
+    for site_id, simple_name in rows:
+        if exclude_site_id is not None and site_id == exclude_site_id:
+            continue
+        suffix = (simple_name or "")[len(prefix):]
+        if suffix.isdigit():
+            taken.add(int(suffix))
+
+    sequence = 1
+    while sequence in taken:
+        sequence += 1
+    return f"{prefix}{sequence}"
+
+
 async def generate_site(session: AsyncSession, site: models.Site) -> None:
     long_name = await site_long_name(session, site)
     site.vf_long_name = long_name
-    # short name: organization + campus + building
-    org = await _abbr(session, models.Organization, site.organization_id)
-    campus = await _abbr(session, models.Campus, site.campus_id)
-    site.vf_short_name = (org + campus).upper()
+    site.vf_short_name = await site_short_name(session, site)
     site.tia606b_name = long_name
+
+    # FEAT-1: simple_name is tri-mode. Only "auto" and "theme" are engine
+    # driven; "custom" keeps whatever the user typed, untouched.
+    code_type = (getattr(site, "site_code_type", None) or "auto").strip().lower()
+    if code_type == "auto":
+        code = await auto_site_code(
+            session,
+            site.organization_id,
+            site.campus_id,
+            site.region_id,
+            exclude_site_id=getattr(site, "id", None),
+        )
+        if code:
+            site.simple_name = code
+    elif code_type == "theme":
+        theme_name = (getattr(site, "theme_name", None) or "").strip()
+        if theme_name:
+            site.simple_name = theme_name
+
+
+async def generate_datacenter(session: AsyncSession, dc: models.Datacenter) -> None:
+    """FEAT-5: datacenter long name = parent site + IATA city code + dc code.
+
+    Using the IATA code of the nearest major airport as the city component is
+    the industry-standard convention (``…BOG…``) and keeps the identifier both
+    short and globally unambiguous.
+    """
+    base = ""
+    if dc.site_id:
+        site = await session.get(models.Site, dc.site_id)
+        if site and site.vf_long_name:
+            base = site.vf_long_name
+    iata = (getattr(dc, "iata_code", None) or "").strip()
+    code = (dc.code or "").strip()
+    dc.vf_long_name = f"{base}{iata}{code}".upper() or None
 
 
 async def generate_rack(session: AsyncSession, rack: models.Rack) -> None:
@@ -132,6 +241,7 @@ async def generate_network_device(session: AsyncSession, d: models.NetworkDevice
 # Dispatch table: model class -> generator coroutine
 GENERATORS = {
     models.Site: generate_site,
+    models.Datacenter: generate_datacenter,
     models.Rack: generate_rack,
     models.PhysicalServer: generate_physical_server,
     models.VirtualMachine: generate_vm,
@@ -188,6 +298,8 @@ _NAME_INPUTS: dict[type, list[str]] = {
         "building_id",
         "floor_section_id",
     ],
+    # FEAT-5: the datacenter name is the parent site plus the IATA city code.
+    models.Datacenter: ["site_id", "iata_code"],
     models.Rack: ["site_id", "grid_coordinates"],
     models.PhysicalServer: [
         "site_id",
@@ -208,9 +320,9 @@ _NAME_INPUTS: dict[type, list[str]] = {
     models.NetworkDevice: ["site_id", "device_type_id", "subtype_id", "brand_id"],
 }
 
-# Hierarchy levels that have no generator: Datacenter / Floor / Room are not
-# part of the Organization>Cloud>…>Rack naming chain, so we never invent a
-# vf_* name for them — only the readable location path is previewed.
+# Readable location path. Floor / Room have no generator (they are not part of
+# the Organization>Cloud>…>Rack naming chain) so only their path is previewed;
+# Datacenter does have one since FEAT-5 but still needs its parent path.
 # Each entry lists the parent FKs to try, most specific first.
 _PARENT_CHAIN: dict[type, list[tuple[str, type]]] = {
     models.Datacenter: [("site_id", models.Site)],
@@ -313,6 +425,9 @@ async def preview_names(
     return {
         "entity_type": entity_type,
         "resource": model.__tablename__,
+        # FEAT-1: for sites in "auto"/"theme" mode the generator fills this in,
+        # so the form can show the code that will actually be stored.
+        "simple_name": getattr(obj, "simple_name", None) or None,
         "vf_long_name": getattr(obj, "vf_long_name", None) or None,
         "vf_short_name": getattr(obj, "vf_short_name", None) or None,
         "tia606b_name": getattr(obj, "tia606b_name", None) or None,

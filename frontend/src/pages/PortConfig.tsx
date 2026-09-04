@@ -1,6 +1,13 @@
 import { useMemo } from "react";
 import EntityGrid from "../components/EntityGrid";
-import { useLookups, textCol, roCol, numCol, fkCol } from "../lib/columns";
+import {
+  useLookups,
+  textCol,
+  roCol,
+  numCol,
+  fkCol,
+  selectCol,
+} from "../lib/columns";
 
 export default function PortConfig() {
   const { map, isLoading } = useLookups(["network-devices", "vlans"]);
@@ -20,16 +27,12 @@ export default function PortConfig() {
       // DeviceInterface.network_device_id is NOT NULL — required on insert.
       fkCol("network_device_id", "Device", deviceOpts),
       numCol("port_number", "Port"),
-      {
-        field: "port_mode",
-        headerName: "Mode",
-        editable: true,
-        cellEditor: "agSelectCellEditor",
-        cellEditorParams: {
-          values: ["access", "trunk", "aggregation", "disabled"],
-        },
-        width: 130,
-      },
+      selectCol(
+        "port_mode",
+        "Mode",
+        ["access", "trunk", "aggregation", "disabled"],
+        { width: 150 }
+      ),
       textCol("portgroup", "Port Group"),
       textCol("aggregation_id", "Agg ID"),
       fkCol("pvid_vlan_id", "PVID VLAN", vlanOpts),
@@ -38,14 +41,7 @@ export default function PortConfig() {
       textCol("connected_device_type", "Conn Type"),
       numCol("connected_device_id", "Conn ID"),
       textCol("connected_port", "Conn Port"),
-      {
-        field: "admin_status",
-        headerName: "Admin",
-        editable: true,
-        cellEditor: "agSelectCellEditor",
-        cellEditorParams: { values: ["up", "down"] },
-        width: 100,
-      },
+      selectCol("admin_status", "Admin", ["up", "down"], { width: 120 }),
       textCol("description", "Description", 180),
       textCol("notes", "Notes"),
     ],

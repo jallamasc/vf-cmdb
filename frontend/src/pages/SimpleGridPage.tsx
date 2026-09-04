@@ -1,9 +1,16 @@
 import { useMemo } from "react";
 import EntityGrid from "../components/EntityGrid";
-import { useLookups, textCol, roCol, numCol, fkCol } from "../lib/columns";
+import {
+  useLookups,
+  textCol,
+  roCol,
+  numCol,
+  fkCol,
+  selectCol,
+} from "../lib/columns";
 import type { ColDef } from "ag-grid-community";
 
-type Kind = "patch-panels" | "power" | "cables";
+type Kind = "patch-panels" | "power" | "cables" | "racks";
 
 interface Config {
   resource: string;
@@ -26,7 +33,7 @@ const CONFIGS: Record<Kind, Config> = {
       numCol("rack_unit", "Rack U"),
       numCol("port_count", "Ports"),
       textCol("panel_id_label", "Panel ID"),
-      textCol("side", "Side"),
+      selectCol("side", "Side", ["front", "rear", "both"]),
       textCol("notes", "Notes"),
     ],
     defaults: { port_count: 24, side: "front" },
@@ -40,7 +47,7 @@ const CONFIGS: Record<Kind, Config> = {
       roCol("id", "ID", 70),
       fkCol("site_id", "Site", l.sites),
       fkCol("rack_id", "Rack", l.racks),
-      textCol("device_type", "Type (ups/pdu)"),
+      selectCol("device_type", "Type", ["ups", "pdu"]),
       numCol("device_number", "No."),
       textCol("brand", "Brand"),
       textCol("model", "Model"),
@@ -57,7 +64,7 @@ const CONFIGS: Record<Kind, Config> = {
     lookups: [],
     build: () => [
       roCol("id", "ID", 70),
-      textCol("cable_type", "Type"),
+      selectCol("cable_type", "Type", ["structured", "patchcord"]),
       textCol("port_a_type", "A Type"),
       numCol("port_a_id", "A ID"),
       textCol("label_a", "A Label"),
@@ -69,6 +76,30 @@ const CONFIGS: Record<Kind, Config> = {
       textCol("notes", "Notes"),
     ],
     defaults: { cable_type: "patchcord" },
+  },
+  // UX-3: racks carry simple_name + the auto-generated vf_long_name but had no
+  // tabular view — the Rack View page only draws the elevation diagram.
+  racks: {
+    resource: "racks",
+    title: "Racks",
+    description:
+      "Rack inventory. VF Long Name is auto-generated from the parent site and the rack's grid coordinates; use the Rack View page for the elevation diagram.",
+    lookups: ["sites", "datacenter-floors", "rooms", "rack-types"],
+    build: (l) => [
+      roCol("id", "ID", 70),
+      textCol("simple_name", "Simple Name", 170),
+      textCol("code", "Code", 120),
+      roCol("vf_long_name", "VF Long Name", 220),
+      fkCol("site_id", "Site", l.sites),
+      fkCol("datacenter_floor_id", "Floor", l["datacenter-floors"]),
+      fkCol("room_id", "Room", l.rooms),
+      fkCol("rack_type_id", "Rack Type", l["rack-types"]),
+      textCol("grid_coordinates", "Grid Coords", 130),
+      numCol("total_units", "Total U"),
+      textCol("description", "Description", 220),
+      textCol("notes", "Notes"),
+    ],
+    defaults: { total_units: 42 },
   },
 };
 

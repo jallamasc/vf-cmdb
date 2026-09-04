@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, Row } from "../api";
 import AbbrevField, { CASE_MODES } from "../components/AbbrevField";
 import { lookupLabel } from "../lib/columns";
+import { useNamePreview } from "../lib/useNamePreview";
 
 // ---------------------------------------------------------------------------
 // Small building blocks
@@ -316,6 +317,112 @@ export default function Hierarchy() {
 }
 
 // ---------------------------------------------------------------------------
+// UX-4: live name preview
+// ---------------------------------------------------------------------------
+// Human labels for the FK inputs the backend reports as still missing.
+const FIELD_LABELS: Record<string, string> = {
+  organization_id: "Organization",
+  cloud_id: "Cloud",
+  region_id: "Region",
+  campus_id: "Campus",
+  building_id: "Building",
+  floor_section_id: "Floor / Section",
+  site_id: "Site",
+  room_id: "Room",
+  datacenter_id: "Datacenter",
+  datacenter_floor_id: "Floor",
+  rack_type_id: "Rack type",
+  grid_coordinates: "Grid coordinates",
+};
+
+function PreviewLine({ label, value }: { label: string; value: string | null }) {
+  return (
+    <div className="flex items-baseline gap-2">
+      <span className="w-28 shrink-0 text-[11px] uppercase tracking-wide text-slate-400">
+        {label}
+      </span>
+      {value ? (
+        <code className="font-mono text-sm text-slate-800 break-all">{value}</code>
+      ) : (
+        <span className="text-xs italic text-slate-400">
+          not enough information yet
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Card shown under a Quick Add form with the names the entity will get.
+ *
+ * The values come from the backend naming engine (300 ms debounced), so what
+ * the user sees here is exactly what gets written on Create.
+ */
+function NamePreviewCard({
+  entityType,
+  params,
+}: {
+  entityType: string;
+  params: Record<string, unknown>;
+}) {
+  const { preview, loading, error } = useNamePreview(entityType, params);
+
+  return (
+    <div className="rounded-md border border-slate-200 bg-white/70 px-3 py-2">
+      <div className="mb-1.5 flex items-center gap-2">
+        <span className="text-xs font-semibold text-slate-600">
+          Live name preview
+        </span>
+        {loading && <span className="text-[11px] text-slate-400">updating…</span>}
+        {!loading && preview?.complete && (
+          <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] text-green-700">
+            complete
+          </span>
+        )}
+      </div>
+
+      {error && (
+        <p className="text-xs text-red-700">Preview unavailable: {error}</p>
+      )}
+
+      {!error && preview && (
+        <div className="flex flex-col gap-1">
+          {preview.generated ? (
+            <>
+              <PreviewLine label="VF Long" value={preview.vf_long_name} />
+              <PreviewLine label="VF Short" value={preview.vf_short_name} />
+              <PreviewLine label="TIA-606-B" value={preview.tia606b_name} />
+            </>
+          ) : (
+            <p className="text-xs text-slate-500">
+              This level is not part of the auto-naming chain — it keeps the
+              name and code you type here.
+            </p>
+          )}
+          {preview.path && (
+            <PreviewLine label="Location" value={preview.path} />
+          )}
+          {preview.missing.length > 0 && (
+            <p className="mt-1 text-[11px] text-amber-700">
+              Still missing:{" "}
+              {preview.missing
+                .map((f) => FIELD_LABELS[f] ?? f)
+                .join(", ")}
+            </p>
+          )}
+        </div>
+      )}
+
+      {!error && !preview && !loading && (
+        <p className="text-xs italic text-slate-400">
+          Pick the values above to see the generated name.
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Per-level inline forms. Each form owns its create mutation via ``useCreate``.
 // ---------------------------------------------------------------------------
 function SubmitRow({
@@ -389,6 +496,12 @@ function DatacenterForm({
         </Field>
       </div>
       <div className="col-span-2">
+        <NamePreviewCard
+          entityType="datacenter"
+          params={{ site_id: siteId, name, code }}
+        />
+      </div>
+      <div className="col-span-2">
         <SubmitRow disabled={!name || (!!code && !valid)} pending={create.isPending} />
       </div>
     </form>
@@ -451,6 +564,12 @@ function FloorForm({
         />
       </div>
       <div className="col-span-2">
+        <NamePreviewCard
+          entityType="datacenter_floor"
+          params={{ datacenter_id: dcId, name, code, floor_number: floorNo }}
+        />
+      </div>
+      <div className="col-span-2">
         <SubmitRow disabled={!name || (!!code && !valid)} pending={create.isPending} />
       </div>
     </form>
@@ -508,6 +627,12 @@ function RoomForm({
         </Field>
       </div>
       <div className="col-span-2">
+        <NamePreviewCard
+          entityType="room"
+          params={{ datacenter_floor_id: floorId, name, code }}
+        />
+      </div>
+      <div className="col-span-2">
         <SubmitRow disabled={!name || (!!code && !valid)} pending={create.isPending} />
       </div>
     </form>
@@ -537,6 +662,7 @@ function RackForm({
   const [roomId, setRoomId] = useState("");
   const [typeId, setTypeId] = useState("");
   const [units, setUnits] = useState("42");
+  const [gridCoords, setGridCoords] = useState("");
   const [valid, setValid] = useState(false);
   return (
     <form
@@ -548,6 +674,7 @@ function RackForm({
           datacenter_floor_id: floorId ? Number(floorId) : null,
           room_id: roomId ? Number(roomId) : null,
           rack_type_id: typeId ? Number(typeId) : null,
+          grid_coordinates: gridCoords || null,
           total_units: units ? Number(units) : 42,
         });
       }}
@@ -568,7 +695,14 @@ function RackForm({
       <Field label="Total units (U)">
         <input type="number" className={inputCls} value={units} onChange={(e) => setUnits(e.target.value)} />
       </Field>
-      <div />
+      <Field label="Grid coordinates">
+        <input
+          className={inputCls}
+          value={gridCoords}
+          onChange={(e) => setGridCoords(e.target.value)}
+          placeholder="e.g. C07"
+        />
+      </Field>
       <div className="col-span-2">
         <AbbrevField
           value={code}
@@ -580,6 +714,18 @@ function RackForm({
           entityType="racks"
           label="Rack code"
           onValidityChange={setValid}
+        />
+      </div>
+      <div className="col-span-2">
+        <NamePreviewCard
+          entityType="rack"
+          params={{
+            site_id: siteId,
+            datacenter_floor_id: floorId,
+            room_id: roomId,
+            code,
+            grid_coordinates: gridCoords,
+          }}
         />
       </div>
       <div className="col-span-2">
@@ -654,6 +800,20 @@ function SiteForm({
         <Select value={fsId} onChange={setFsId} rows={floorSections} placeholder="— floor / section —" />
       </Field>
       <div />
+      <div className="col-span-2">
+        <NamePreviewCard
+          entityType="site"
+          params={{
+            organization_id: orgId,
+            cloud_id: cloudId,
+            region_id: regionId,
+            campus_id: campusId,
+            building_id: buildingId,
+            floor_section_id: fsId,
+            simple_name: simpleName,
+          }}
+        />
+      </div>
       <div className="col-span-2">
         <SubmitRow disabled={false} pending={create.isPending} />
       </div>

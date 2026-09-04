@@ -1,6 +1,14 @@
 import { useMemo } from "react";
 import EntityGrid from "../components/EntityGrid";
-import { useLookups, textCol, roCol, numCol, fkCol, ipCol } from "../lib/columns";
+import {
+  useLookups,
+  textCol,
+  roCol,
+  numCol,
+  fkCol,
+  ipCol,
+  selectCol,
+} from "../lib/columns";
 
 const LK = [
   "virtual-machines",
@@ -17,7 +25,7 @@ export default function ContainersApps() {
       roCol("id", "ID", 70),
       roCol("vf_short_name", "Short Name", 130),
       textCol("friendly_name", "Friendly Name", 160),
-      textCol("container_type", "Type (cn/ap)", 110),
+      selectCol("container_type", "Type", ["cn", "ap"], { width: 120 }),
       fkCol("host_vm_id", "Host VM", map["virtual-machines"]),
       fkCol("host_server_id", "Host Server", map["physical-servers"]),
       fkCol("site_id", "Site", map["sites"]),

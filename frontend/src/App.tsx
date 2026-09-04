@@ -28,6 +28,7 @@ export default function App() {
         <Route path="sites" element={<Sites />} />
         <Route path="hierarchy" element={<Hierarchy />} />
         <Route path="racks" element={<RackView />} />
+        <Route path="racks-list" element={<SimpleGridPage kind="racks" />} />
         <Route path="patch-panels" element={<SimpleGridPage kind="patch-panels" />} />
         <Route path="power" element={<SimpleGridPage kind="power" />} />
         <Route path="cables" element={<SimpleGridPage kind="cables" />} />

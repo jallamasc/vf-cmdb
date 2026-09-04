@@ -1,5 +1,5 @@
 import { useQueries } from "@tanstack/react-query";
-import type { ColDef } from "ag-grid-community";
+import type { ColDef, ICellRendererParams } from "ag-grid-community";
 import { api, Row } from "../api";
 
 // Load several lookup resources at once and return a map slug -> rows
@@ -36,6 +36,40 @@ export function lookupLabel(o: Row): string {
   );
 }
 
+// ---------------------------------------------------------------------------
+// UX-2: dropdown affordance
+// ---------------------------------------------------------------------------
+/**
+ * Cell renderer used by every dropdown-backed column (``fkCol`` / ``selectCol``).
+ *
+ * Renders the formatted value plus a small muted ▼ on the right so the user can
+ * tell at a glance that the cell opens a picker. AG Grid swaps the renderer for
+ * the cell *editor* while editing, so the chevron is only ever visible in
+ * read mode — exactly what UX-2 asks for.
+ */
+export function DropdownCellRenderer(p: ICellRendererParams) {
+  const formatted =
+    p.valueFormatted != null && p.valueFormatted !== ""
+      ? p.valueFormatted
+      : p.value == null || p.value === ""
+        ? ""
+        : String(p.value);
+  return (
+    <span className="vf-dd-cell">
+      <span className="vf-dd-text">
+        {formatted !== "" ? (
+          formatted
+        ) : (
+          <span className="vf-dd-empty">— select —</span>
+        )}
+      </span>
+      <span className="vf-dd-caret" aria-hidden="true">
+        ▼
+      </span>
+    </span>
+  );
+}
+
 // A read-only text column
 export const textCol = (field: string, headerName?: string, width?: number): ColDef => ({
   field,
@@ -64,19 +98,54 @@ export const numCol = (field: string, headerName?: string): ColDef => ({
 export function fkCol(
   field: string,
   headerName: string,
-  options: Row[]
+  options: Row[],
+  extra: Partial<ColDef> = {}
 ): ColDef {
   const idToLabel = new Map<number, string>();
-  options.forEach((o) => idToLabel.set(o.id, lookupLabel(o)));
+  (options ?? []).forEach((o) => idToLabel.set(o.id, lookupLabel(o)));
+  const format = (v: unknown) =>
+    v == null || v === "" ? "" : idToLabel.get(Number(v)) ?? String(v);
   return {
     field,
     headerName,
     editable: true,
     cellEditor: "agSelectCellEditor",
-    cellEditorParams: { values: [null, ...options.map((o) => o.id)] },
+    cellEditorParams: { values: [null, ...(options ?? []).map((o) => o.id)] },
+    valueFormatter: (p) => format(p.value),
+    // UX-2: show a ▼ so the cell reads as a picker, not as plain text.
+    cellRenderer: DropdownCellRenderer,
+    // Filter / quick-search on the human label instead of the raw id.
+    filterValueGetter: (p) => format(p.data?.[field]),
+    width: 180,
+    ...extra,
+  };
+}
+
+/**
+ * A column backed by a fixed list of literal values (enum-ish), rendered with
+ * the same dropdown affordance as ``fkCol``.
+ *
+ * ``values`` is passed straight to ``agSelectCellEditor``; include ``null``
+ * first when the column is clearable. ``extra`` is merged last so callers can
+ * override the width, add ``cellClassRules`` etc.
+ */
+export function selectCol(
+  field: string,
+  headerName: string,
+  values: unknown[],
+  extra: Partial<ColDef> = {}
+): ColDef {
+  return {
+    field,
+    headerName,
+    editable: true,
+    cellEditor: "agSelectCellEditor",
+    cellEditorParams: { values },
     valueFormatter: (p) =>
-      p.value == null ? "" : idToLabel.get(Number(p.value)) ?? String(p.value),
-    width: 160,
+      p.value == null || p.value === "" ? "" : String(p.value),
+    cellRenderer: DropdownCellRenderer,
+    width: 140,
+    ...extra,
   };
 }
 
@@ -155,6 +224,8 @@ export function customCol(def: CustomColumnDef, refRows: Row[] = []): ColDef {
       cellEditorParams: { values: [null, ...refRows.map((o) => o.id)] },
       valueFormatter: (p) =>
         p.value == null ? "" : idToLabel.get(Number(p.value)) ?? String(p.value),
+      // UX-2: user-defined reference columns are dropdowns too.
+      cellRenderer: DropdownCellRenderer,
       valueSetter: (p) => {
         if (!p.data.custom_fields || typeof p.data.custom_fields !== "object") {
           p.data.custom_fields = {};

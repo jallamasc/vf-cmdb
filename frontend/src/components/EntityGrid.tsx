@@ -195,15 +195,43 @@ export default function EntityGrid({
     onError: (e: Error) => fail(e),
   });
 
+  /**
+   * UX-1 — nothing in a cell may be clipped.
+   *
+   * ``wrapText`` + ``autoHeight`` let a long value flow onto extra lines and
+   * grow the row instead of being cut off with an ellipsis; the header gets the
+   * same treatment. A tooltip carries the full value for quick hover reads, and
+   * no ``maxWidth`` is set anywhere so "Auto-fit columns" can grow a column as
+   * wide as its widest value.
+   */
   const defaultColDef = useMemo<ColDef>(
     () => ({
       sortable: true,
       filter: true,
       resizable: true,
       minWidth: 110,
+      wrapText: true,
+      autoHeight: true,
+      wrapHeaderText: true,
+      autoHeaderHeight: true,
+      tooltipValueGetter: (p) => {
+        const v = p.valueFormatted ?? p.value;
+        return v == null || v === "" ? null : String(v);
+      },
     }),
     []
   );
+
+  /**
+   * UX-1 — resize every column to the width of its widest rendered value.
+   * ``autoSizeAllColumns`` only measures the rows currently rendered, which is
+   * exactly what the user sees, and it ignores ``minWidth``-only constraints.
+   */
+  const handleAutoFit = () => {
+    const api = gridRef.current?.api;
+    if (!api) return;
+    api.autoSizeAllColumns(false);
+  };
 
   const onCellValueChanged = (e: CellValueChangedEvent) => {
     setToast(null);
@@ -297,6 +325,13 @@ export default function EntityGrid({
         <div className="flex gap-2">
           {toolbarExtra}
           <button
+            onClick={handleAutoFit}
+            title="Resize every column to fit its widest value"
+            className="px-3 py-1.5 border border-slate-300 bg-white text-slate-700 rounded text-sm hover:bg-slate-50"
+          >
+            Auto-fit columns
+          </button>
+          <button
             onClick={handleAdd}
             className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
           >
@@ -359,12 +394,15 @@ export default function EntityGrid({
             animateRows
             pagination
             paginationPageSize={50}
+            tooltipShowDelay={400}
           />
         </div>
       )}
       <p className="text-xs text-slate-400 mt-2">
-        Click a cell to edit · Enter to save · Esc to cancel · every change is
-        written to the changelog. Computed name columns are read-only.
+        Click a cell to edit · Enter to save · Esc to cancel · cells marked with
+        ▼ open a dropdown · long values wrap instead of being cut off, and
+        “Auto-fit columns” widens every column to its content. Every change is
+        written to the changelog; computed name columns are read-only.
       </p>
     </div>
   );

@@ -11,6 +11,7 @@ const NAV: { section: string; items: { to: string; label: string }[] }[] = [
       { to: "/sites", label: "Sites" },
       { to: "/hierarchy", label: "Physical Hierarchy" },
       { to: "/racks", label: "Rack View" },
+      { to: "/racks-list", label: "Racks (list)" },
       { to: "/patch-panels", label: "Patch Panels" },
       { to: "/power", label: "Power" },
       { to: "/cables", label: "Cables" },

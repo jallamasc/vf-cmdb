@@ -32,7 +32,9 @@
 
 ---
 
-## 🆕 This Session (2026-09-03/04): Codebase Indexing & Vector Search
+## 🆕 This Session (2026-09-03/04): Codebase Indexing & WLAN Addressing
+
+### Codebase Indexing & Vector Search
 
 Added the **third pillar** of the memory system — a self-hosted semantic search
 over the codebase — so agents recall code on demand and never rely on stale
@@ -63,6 +65,27 @@ context.
 **Note**: The vector store must be **rebuilt per machine** (`./cbindex build`) —
 it is intentionally not committed. On the air-gapped Proxmox VM, cache the
 embedding model during setup while internet is available.
+
+### ✅ WLAN Addressing Decision (RESOLVED)
+
+**User Decision** (2026-09-04): Start WLAN ranges at **192.168.100.0/24** and continue sequentially.
+
+**Implementation**:
+- WLAN / 1: `192.168.100.0/24`, expansion to `192.168.103.254` (4 × /24)
+- WLAN / 2: `192.168.104.0/24`, expansion to `192.168.107.254` (4 × /24)
+- WLAN / 3: `192.168.108.0/24`, expansion to `192.168.111.254` (4 × /24)
+- WLAN / Reserved: `192.168.112.0/24`, expansion to `192.168.115.254` (4 × /24)
+
+**Files Updated**:
+- `backend/app/seed_subnets.json` — all WLAN IPv4 subnets and role assignments updated
+
+**Old (INVALID) ranges** (replaced):
+- ~~192.168.40-43~~ → 192.168.100-103
+- ~~192.168.44-47~~ → 192.168.104-107
+- ~~192.168.48-51~~ → 192.168.108-111
+- ~~192.168.52-55~~ → 192.168.112-115
+
+**Status**: ✅ Complete. Ready for fresh database seeding or migration.
 
 ---
 
@@ -104,35 +127,9 @@ embedding model during setup while internet is available.
 
 ## ⚠️ Active Issues & Blockers
 
-### 🚨 CRITICAL: Wireless Network Addressing (USER INPUT REQUIRED)
-
-**Issue**: WLAN networks currently use **192.169.0.0/24** which is INVALID (not RFC 1918 private space)
-
-**Context**:
-- User uploaded IPAM data with 192.169.x.x addresses
-- This is public IP space, will cause routing conflicts
-- Last LAN segment: **192.168.12.0/24**
-
-**Options Presented**:
-1. **192.168.13.0/24** (next sequential - cleanest)
-2. **192.168.20.0/24** (reserved block for wireless)
-3. **User custom choice**
-
-**Status**: ⏳ Awaiting user decision (raised 2026-09-03)
-
-**Impact**: 
-- Database currently contains invalid addresses in `subnets_ipv4` table
-- Affects WLAN-related `ip_assignments`
-- Needs correction before production deployment
-
-**Next Action**: Once user decides, update:
-1. `backend/app/seed.py` (initial data)
-2. Database records (if already seeded)
-3. Documentation (if pattern changes)
-
 ### 📋 Known Issues (None blocking deployment)
 
-No other known issues at this time.
+No known issues at this time.
 
 ---
 
@@ -140,16 +137,15 @@ No other known issues at this time.
 
 ### For User:
 1. ✅ **DONE**: Repository pushed to GitHub
-2. 🔄 **PENDING**: Decide on wireless network addressing (192.169.x.x replacement)
+2. ✅ **DONE**: Decided on wireless network addressing (192.168.100-115.x)
 3. ⏳ **TODO**: Create Proxmox Ubuntu VM for deployment
 4. ⏳ **TODO**: Install Podman on VM
 5. ⏳ **TODO**: Clone repo and run `./deploy-podman.sh up` or `./deploy-podman.sh quadlet`
 
 ### For Agent (on next interaction):
 1. Check git status for user changes (UI edits)
-2. Apply WLAN addressing correction (once user decides)
-3. Assist with deployment to Proxmox VM (if requested)
-4. Help with any runtime issues during first deployment
+2. Assist with deployment to Proxmox VM (if requested)
+3. Help with any runtime issues during first deployment
 
 ---
 
@@ -176,9 +172,9 @@ No other known issues at this time.
 - ✅ Cables
 
 ### IPAM
-- ⚠️ Subnets IPv4 (contains invalid 192.169.x.x - needs correction)
+- ✅ Subnets IPv4 (WLAN ranges corrected to 192.168.100-115.x)
 - ✅ Subnets IPv6
-- ⚠️ IP Assignments (affected by subnet issue)
+- ✅ IP Assignments
 
 ### Auditing & Integration
 - ✅ Changelog (automatic via SQLAlchemy events)
@@ -259,9 +255,13 @@ No other known issues at this time.
   - 192.168.13.0/24 (next sequential)
   - 192.168.20.0/24 (reserved for wireless)
   - User choice
-- Offered to update CMDB data once decision made
 
-**Status**: ⏳ Awaiting user decision
+**Status**: ✅ RESOLVED
+
+### User Decision (2026-09-04):
+> "We will start WLAN ranges on 192.168.100.X/24 and continue from there"
+
+**Implementation**: Applied to `backend/app/seed_subnets.json` (4 WLAN subnets: 100-103, 104-107, 108-111, 112-115)
 
 ### User Request (Previous):
 > "Please proceed to push the repo"

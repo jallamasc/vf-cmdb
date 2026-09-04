@@ -1,7 +1,15 @@
 """Seed the CMDB with initial data extracted from the source Excel files.
 
-Idempotent: if the ``organizations`` table already has rows the seeder exits
-without touching the database.
+Idempotent, in two layers:
+
+* **Lookup dictionaries** (``LOOKUPS``) are *additively* upserted on every run.
+  A lookup row is matched case-insensitively on its abbreviation, so adding a
+  new entry to ``LOOKUPS`` and re-running the seeder inserts only that entry
+  and leaves everything else untouched.
+* **Demo topology** (site, racks, servers, VLANs, …) is inserted only on a
+  virgin database — detected by the ``organizations`` table being empty.
+  Re-running the seeder against a populated database therefore refreshes the
+  lookups and stops before it could duplicate the topology.
 """
 from __future__ import annotations
 
@@ -28,8 +36,39 @@ LOOKUPS: dict = {
         ("Microsoft Azure", "az", 2), ("Oracle Cloud", "oc", 2),
         ("Virtualfactor Storm", "vs", 2),
     ],
+    # FEAT-4: Colombia's six natural regions plus the international regions
+    # used for cloud / multi-site deployments.
+    #
+    # NOTE on the codes: every abbreviation in this system is validated against
+    # the domain-name charset ``^[A-Za-z0-9]+(-[A-Za-z0-9]+)*$`` (a DB CHECK on
+    # every abbreviation/code column plus ``abbrev.validate_charset``), so
+    # underscores and slashes cannot be stored. The requested ``CO_CTR`` style
+    # codes therefore use a hyphen (``CO-CTR``), and ``UK/IE`` becomes
+    # ``UK-IE``. Everything else is stored exactly as requested.
     models.Region: [
         ("Central Colombia 1", "cc", 3), ("EastUS 1", "eu1", 3),
+        # -- Colombia: natural regions -------------------------------------
+        ("Región Central", "CO-CTR", 6),
+        ("Región Caribe", "CO-CAR", 6),
+        ("Región Pacífica", "CO-PAC", 6),
+        ("Región Andina", "CO-AND", 6),
+        ("Región Orinoquía", "CO-ORI", 6),
+        ("Región Amazonía", "CO-AMZ", 6),
+        # -- International --------------------------------------------------
+        ("North America East", "NAEAST", 6),
+        ("North America West", "NAWEST", 6),
+        ("Europe, Middle East and Africa", "EMEA", 4),
+        ("Asia Pacific", "APAC", 4),
+        ("Latin America South", "LATAM-S", 7),
+        ("United Kingdom and Ireland", "UK-IE", 5),
+        ("Central Europe", "C-EU", 4),
+        ("Nordics", "NORD", 4),
+        ("Southeast Asia", "SEA", 3),
+        ("Australia and New Zealand", "ANZ", 3),
+        ("Middle East", "ME", 2),
+        ("Africa Sub-Saharan", "AFSS", 4),
+        ("India", "IND", 3),
+        ("Japan", "JPN", 3),
     ],
     models.Campus: [
         ("Headquarters", "hq", 2), ("Home", "hm", 2),
@@ -104,22 +143,49 @@ LOOKUPS: dict = {
 }
 
 
-async def _seed_lookups(session) -> dict:
-    """Insert lookups, register their abbreviations and return {model: {abbr: id}}."""
+async def _seed_lookups(session) -> tuple[dict, list[str]]:
+    """Additively upsert every lookup row.
+
+    Returns ``({model: {abbr: id}}, ["regions.CO-CTR", …])`` where the second
+    element lists the rows that were actually inserted by this run.
+
+    Rows are matched on the abbreviation, case-insensitively, mirroring the
+    case-insensitive global uniqueness enforced by
+    :func:`app.abbrev.sync_registry`. An abbreviation that is already present
+    is reused as-is — its ``full_name`` / ``max_length`` are left alone so a
+    re-run never clobbers edits a user made through the UI.
+    """
     maps: dict = {}
+    created: list[str] = []
     for model, rows in LOOKUPS.items():
         maps[model] = {}
+
+        # One query per table instead of one per row.
+        existing = (await session.execute(select(model))).scalars().all()
+        by_lower = {
+            (row.abbreviation or "").lower(): row
+            for row in existing
+            if row.abbreviation
+        }
+
         for full_name, abbr, max_len in rows:
-            obj = model(full_name=full_name, abbreviation=abbr, max_length=max_len)
-            session.add(obj)
-            await session.flush()
-            # Register in the global abbreviation namespace (case-insensitive
-            # uniqueness + charset validation).
+            obj = by_lower.get(abbr.lower())
+            if obj is None:
+                obj = model(
+                    full_name=full_name, abbreviation=abbr, max_length=max_len
+                )
+                session.add(obj)
+                await session.flush()
+                by_lower[abbr.lower()] = obj
+                created.append(f"{model.__tablename__}.{abbr}")
+            # Register (or re-affirm) the global abbreviation namespace entry:
+            # case-insensitive uniqueness + charset validation. This is a no-op
+            # update when the row already owns the value.
             await abbrev.sync_registry(
-                session, obj.__tablename__, obj.id, "abbreviation", abbr
+                session, obj.__tablename__, obj.id, "abbreviation", obj.abbreviation
             )
             maps[model][abbr] = obj.id
-    return maps
+    return maps, created
 
 
 async def _log_create(session, obj) -> None:
@@ -142,11 +208,22 @@ async def _log_create(session, obj) -> None:
 async def seed() -> None:
     async with AsyncSessionLocal() as session:
         existing = await session.execute(select(func.count()).select_from(models.Organization))
-        if int(existing.scalar() or 0) > 0:
-            print("Database already seeded; skipping.")
+        already_seeded = int(existing.scalar() or 0) > 0
+
+        # Lookups are additive on every run: this is what lets new dictionary
+        # entries (e.g. FEAT-4's regions) reach an existing database without
+        # re-importing — or duplicating — the demo topology below.
+        m, created = await _seed_lookups(session)
+
+        if already_seeded:
+            await session.commit()
+            if created:
+                print(f"Added {len(created)} new lookup row(s): {', '.join(created)}")
+            else:
+                print("Lookups already up to date; nothing to add.")
+            print("Demo topology already present; skipping.")
             return
 
-        m = await _seed_lookups(session)
         ORG = m[models.Organization]; CLOUD = m[models.Cloud]; REGION = m[models.Region]
         CAMPUS = m[models.Campus]; BUILDING = m[models.Building]; FS = m[models.FloorSection]
         CDT = m[models.ComputeDeviceType]; BRAND = m[models.Brand]; ROLE = m[models.DeviceRole]

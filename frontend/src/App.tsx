@@ -18,6 +18,7 @@ import Naming from "./pages/Naming";
 import ReferenceData from "./pages/ReferenceData";
 import Ansible from "./pages/Ansible";
 import Changelog from "./pages/Changelog";
+import DeviceDashboard from "./pages/DeviceDashboard";
 import SimpleGridPage from "./pages/SimpleGridPage";
 
 export default function App() {
@@ -46,6 +47,8 @@ export default function App() {
         <Route path="reference-data" element={<ReferenceData />} />
         <Route path="ansible" element={<Ansible />} />
         <Route path="changelog" element={<Changelog />} />
+        {/* FEAT-7: single-device dashboard, linked from every device grid. */}
+        <Route path="devices/:type/:id" element={<DeviceDashboard />} />
       </Route>
     </Routes>
   );

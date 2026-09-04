@@ -1,6 +1,14 @@
 import { useMemo } from "react";
 import EntityGrid from "../components/EntityGrid";
-import { useLookups, textCol, roCol, numCol, fkCol, ipCol } from "../lib/columns";
+import {
+  useLookups,
+  textCol,
+  roCol,
+  numCol,
+  fkCol,
+  ipCol,
+  deviceLinkCol,
+} from "../lib/columns";
 
 const LK = [
   "sites",
@@ -17,7 +25,8 @@ export default function Workstations() {
     () => [
       roCol("id", "ID", 70),
       roCol("vf_short_name", "Short Name", 130),
-      roCol("vf_long_name", "VF Long Name", 220),
+      // FEAT-7: the long name opens the device detail dashboard.
+      deviceLinkCol("vf_long_name", "VF Long Name", "workstations", 240),
       fkCol("site_id", "Site", map["sites"]),
       fkCol("device_type_id", "Device Type", map["compute-device-types"]),
       fkCol("brand_id", "Brand", map["brands"]),
@@ -39,7 +48,7 @@ export default function Workstations() {
     <EntityGrid
       resource="workstations"
       title="Workstations"
-      description="End-user workstations, laptops and thin clients."
+      description="End-user workstations, laptops and thin clients. Click a long name to open that workstation’s dashboard."
       columns={columns}
     />
   );

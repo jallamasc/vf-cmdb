@@ -310,8 +310,19 @@ App.tsx (Router)
     ├── Subnets.tsx (IPAM)
     ├── RackView.tsx (Visual diagrams)
     ├── Changelog.tsx (Audit log)
-    └── Ansible.tsx (Inventory viewer)
+    ├── Ansible.tsx (Inventory viewer)
+    └── DeviceDashboard.tsx  (route: /devices/:type/:id)
 ```
+
+**Device detail route** (`FEAT-7`): `/devices/:type/:id` where `type` is one of
+`physical_servers | virtual_machines | workstations | network_devices`.
+The primary name column of each of those four listing grids is a `<Link>` into
+this route (`deviceLinkCol()` in `lib/columns.tsx`). The page is tab-based —
+Overview (inline-editable form, not a grid), Interfaces, IP Assignments,
+VMs & Containers (hosts only), Cables, Changelog, Ansible Facts — with the
+active tab mirrored into the `?tab=` query parameter. Tabs are driven by the
+`relations` list returned by `GET /api/v1/devices/{type}/{id}`, so a device type
+never shows a tab that cannot apply to it.
 
 ### Shared Components
 
@@ -319,6 +330,16 @@ App.tsx (Router)
 - Props: `resource`, `columns`, `newRowDefaults`, `toolbarExtra`
 - Handles: CRUD operations, loading states, error handling
 - AG Grid wrapper with automatic API integration
+- Optional `dataSource` (`{ queryKey, fetch, select }`) swaps the default
+  "list the whole table" query for any other fetch — this is how the device
+  dashboard shows server-side-filtered rows while still reusing every editing,
+  validation and changelog behaviour. `allowAdd` / `allowDelete` / `minHeight` /
+  `footerHint` tune the chrome. All are optional and default to the previous
+  behaviour, so existing pages are unaffected.
+- ⚠️ The grid sizes itself with `height: 100%`, which CSS only resolves against
+  a parent with a *definite* height. If you stack two EntityGrids in one
+  container, give each an explicit pixel height or the grid body collapses
+  to zero and only the pagination bar renders.
 
 **ColumnManager.tsx**: Dynamic column builder
 - Allows users to add custom columns (text, number, dropdown)

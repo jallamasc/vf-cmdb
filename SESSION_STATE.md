@@ -7,6 +7,60 @@
 
 ---
 
+## 🆕 FEAT-7 (2026-09-04): Device Detail Dashboard
+
+New route **`/devices/:type/:id`** (`physical_servers`, `virtual_machines`,
+`workstations`, `network_devices`) rendered by
+`frontend/src/pages/DeviceDashboard.tsx`. The primary name column of all four
+device listing grids is now a link into it.
+
+**Tabs** — Overview · Interfaces · IP Assignments · VMs & Containers (hosts
+only) · Cables · Changelog · Ansible Facts. The tab strip is built from the
+`relations` array returned by the backend, so a device only ever sees tabs that
+can apply to it, and the active tab lives in `?tab=` so it can be bookmarked.
+
+**Overview** is a *form*, not a grid: `lib/deviceSchema.ts` maps every column of
+each of the four models into labelled sections (Identity, Placement,
+Classification, …) and `components/DeviceOverviewForm.tsx` edits them inline,
+one field per PATCH, through the normal CRUD route so naming and audit logging
+stay untouched. Generated names sit in a dark hero block at the top and the
+site → datacenter → room → rack → U position is in the page header.
+
+**Backend** — `backend/app/devices.py` (device-type resolver + relation loaders)
+and two endpoints in `routers/special.py`:
+- `GET /api/v1/devices/{type}/{id}` → record, display name, position/site
+  context, the tab list and the API resource behind each tab
+- `GET /api/v1/devices/{type}/{id}/related/{relation}` → rows filtered by
+  device, plus `owned` / `fk_field` so the UI knows whether add + delete are
+  legal on that tab
+
+Both accept either the underscored route key or the existing kebab-case API
+slug. Reads are the only new server code — every write still goes through the
+generic CRUD routes.
+
+**Things worth remembering**
+- `Cable` and `ChangeLog` models already exist, so those two tabs are real
+  grids, not placeholders.
+- **No device table has a `tia606b_name` column** (only `sites` does), so the
+  Overview hero explains where TIA-606-B labels live instead of showing an
+  empty field.
+- `device_interfaces.network_device_id` is NOT NULL, so only network devices
+  *own* ports. On servers/VMs/workstations the Interfaces tab shows the reverse
+  `connected_device_type` / `connected_device_id` match and is read-only.
+- The polymorphic discriminators (`assigned_to_type`, `port_a_type`,
+  `port_b_type`, `connected_device_type`) currently hold no data, so IP
+  Assignments / Cables read empty until records are created. Adding a row from
+  a tab pre-fills the discriminator correctly (verified round-trip).
+- There is no raw Ansible facts blob column — the Facts tab shows the existing
+  `POST /api/v1/devices/{slug}/{id}/facts` contract and the current values of
+  the fact-backed columns.
+
+**Verified**: `tsc -b` clean · `vite build` clean · backend endpoints curl-tested
+against live PostgreSQL (both slug spellings, 404 paths, every relation) · all
+seven tabs opened in the browser · IP-assignment add + delete round-trip.
+
+---
+
 ## 🆕 Phase 2 QA Session (2026-09-04): Full-Stack Testing + Bug Fixes
 
 ### Test Environment (SuperComputer VM)

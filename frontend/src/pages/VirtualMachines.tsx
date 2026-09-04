@@ -1,6 +1,14 @@
 import { useMemo } from "react";
 import EntityGrid from "../components/EntityGrid";
-import { useLookups, textCol, roCol, numCol, fkCol, ipCol } from "../lib/columns";
+import {
+  useLookups,
+  textCol,
+  roCol,
+  numCol,
+  fkCol,
+  ipCol,
+  deviceLinkCol,
+} from "../lib/columns";
 
 const LK = [
   "physical-servers",
@@ -16,7 +24,8 @@ export default function VirtualMachines() {
   const columns = useMemo(
     () => [
       roCol("id", "ID", 70),
-      roCol("vf_short_name", "Short Name", 130),
+      // FEAT-7: the short name opens the device detail dashboard.
+      deviceLinkCol("vf_short_name", "Short Name", "virtual_machines", 170),
       textCol("friendly_name", "Friendly Name", 160),
       fkCol("host_server_id", "Host Server", map["physical-servers"]),
       fkCol("site_id", "Site", map["sites"]),
@@ -38,7 +47,7 @@ export default function VirtualMachines() {
     <EntityGrid
       resource="virtual-machines"
       title="Virtual Machines"
-      description="Guest VMs hosted on physical servers. Short name auto-generates from role, OS and sequence."
+      description="Guest VMs hosted on physical servers. Short name auto-generates from role, OS and sequence. Click a short name to open that VM’s dashboard."
       columns={columns}
     />
   );

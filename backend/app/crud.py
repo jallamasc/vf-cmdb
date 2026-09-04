@@ -94,6 +94,121 @@ async def _sync_abbrev(session: AsyncSession, obj) -> None:
     )
 
 
+import ipaddress as _ip
+
+
+def _http409(detail: str):
+    from fastapi import HTTPException
+
+    return HTTPException(status_code=409, detail=detail)
+
+
+async def _validate_vlan_unique(session: AsyncSession, obj, entity_id) -> None:
+    """Enforce GLOBAL uniqueness of ``vlan_id`` across all sites (decision Q1).
+
+    A VLAN number may exist on only one site. Raises a clean 409 explaining the
+    conflict instead of surfacing a raw unique-index violation.
+    """
+    vlan_id = getattr(obj, "vlan_id", None)
+    if vlan_id is None:
+        return
+    stmt = select(models.Vlan).where(models.Vlan.vlan_id == vlan_id)
+    if entity_id is not None:
+        stmt = stmt.where(models.Vlan.id != entity_id)
+    existing = (await session.execute(stmt)).scalars().first()
+    if existing is not None:
+        raise _http409(
+            f"VLAN ID {vlan_id} is already in use globally"
+            f" (site #{existing.site_id})."
+            " VLAN IDs must be unique across all sites."
+        )
+
+
+async def _validate_cidr_overlap(session: AsyncSession, obj, entity_id) -> None:
+    """Reject overlapping CIDRs.
+
+    * Within the same site: any overlap is rejected (decision Q2).
+    * Across sites: the *same* network may not be reused (decision Q1/Q2).
+      Non-identical overlaps across different sites are allowed (different sites
+      legitimately reuse private ranges).
+    """
+    cidr = getattr(obj, "network_cidr", None)
+    if not cidr:
+        return
+    try:
+        new_net = _ip.ip_network(str(cidr), strict=False)
+    except ValueError:
+        return  # invalid CIDR handled elsewhere
+    model = type(obj)
+    site_id = getattr(obj, "site_id", None)
+    rows = (await session.execute(select(model))).scalars().all()
+    for other in rows:
+        if entity_id is not None and other.id == entity_id:
+            continue
+        if not other.network_cidr:
+            continue
+        try:
+            other_net = _ip.ip_network(str(other.network_cidr), strict=False)
+        except ValueError:
+            continue
+        if other_net.version != new_net.version:
+            continue
+        same_site = site_id is not None and other.site_id == site_id
+        if same_site and new_net.overlaps(other_net):
+            raise _http409(
+                f"CIDR {new_net} overlaps existing segment {other_net}"
+                f" (subnet #{other.id}) in the same site."
+                " Overlapping subnets are not allowed within a site."
+            )
+        if not same_site and new_net == other_net:
+            raise _http409(
+                f"CIDR {new_net} is already used by site #{other.site_id}"
+                f" (subnet #{other.id})."
+                " The same network may not be reused on another site."
+            )
+
+
+async def _validate_ipam(session: AsyncSession, obj, entity_id) -> None:
+    """Dispatch IPAM integrity checks based on the model type."""
+    if isinstance(obj, models.Vlan):
+        await _validate_vlan_unique(session, obj, entity_id)
+    elif isinstance(obj, (models.SubnetIpv4, models.SubnetIpv6)):
+        await _validate_cidr_overlap(session, obj, entity_id)
+
+
+async def _autoreserve_gateway(session: AsyncSession, obj) -> None:
+    """Auto-create a locked "Gateway" reservation for an IPv4 subnet (Q6).
+
+    When a subnet is created with a gateway value, one locked reservation is
+    created for it. Idempotent: skips if a gateway reservation already exists.
+    """
+    if not isinstance(obj, models.SubnetIpv4):
+        return
+    gateway = getattr(obj, "gateway", None)
+    if not gateway:
+        return
+    gw = str(gateway).split("/")[0]
+    existing = (
+        await session.execute(
+            select(models.SubnetRoleAssignment).where(
+                models.SubnetRoleAssignment.subnet_ipv4_id == obj.id,
+                models.SubnetRoleAssignment.ipv4_address == gw,
+            )
+        )
+    ).scalars().first()
+    if existing is not None:
+        return
+    session.add(
+        models.SubnetRoleAssignment(
+            subnet_ipv4_id=obj.id,
+            role="gateway",
+            label="Gateway",
+            ipv4_address=gw,
+            is_locked=True,
+        )
+    )
+
+
 async def _log(
     session: AsyncSession,
     table: str,
@@ -135,10 +250,12 @@ async def create_item(
     data = sanitize_payload(model, payload)
     obj = model(**data)
     await _validate_abbrev(session, obj, entity_id=None)
+    await _validate_ipam(session, obj, entity_id=None)
     session.add(obj)
     await session.flush()  # obtain PK
     await naming.apply_naming(session, obj)
     await _sync_abbrev(session, obj)
+    await _autoreserve_gateway(session, obj)
     await session.flush()
     for field, value in data.items():
         await _log(session, model.__tablename__, obj.id, field, None, value, source)
@@ -162,6 +279,7 @@ async def update_item(
             setattr(obj, field, new_value)
     if changes:
         await _validate_abbrev(session, obj, entity_id=obj.id)
+        await _validate_ipam(session, obj, entity_id=obj.id)
         await session.flush()
         await naming.apply_naming(session, obj)
         await _sync_abbrev(session, obj)

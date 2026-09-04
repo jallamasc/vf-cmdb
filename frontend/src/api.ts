@@ -45,6 +45,30 @@ export const api = {
     fetch(`${BASE}/ipam/subnets/${subnetId}/next-ip`).then(handle),
   utilization: (subnetId: number) =>
     fetch(`${BASE}/ipam/subnets/${subnetId}/utilization`).then(handle),
+  // --- Reservations (reserved pool) ---
+  reservations: (subnetId: number, family: "ipv4" | "ipv6" = "ipv4"): Promise<Row[]> =>
+    fetch(`${BASE}/ipam/subnets/${subnetId}/reservations?family=${family}`).then(handle),
+  createReservation: (
+    subnetId: number,
+    payload: Row,
+    family: "ipv4" | "ipv6" = "ipv4",
+  ): Promise<Row> =>
+    fetch(`${BASE}/ipam/subnets/${subnetId}/reservations?family=${family}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }).then(handle),
+  deleteReservation: (
+    subnetId: number,
+    reservationId: number,
+    family: "ipv4" | "ipv6" = "ipv4",
+  ): Promise<null> =>
+    fetch(
+      `${BASE}/ipam/subnets/${subnetId}/reservations/${reservationId}?family=${family}`,
+      { method: "DELETE" },
+    ).then(handle),
+  nextReserved: (subnetId: number, family: "ipv4" | "ipv6" = "ipv4") =>
+    fetch(`${BASE}/ipam/subnets/${subnetId}/next-reserved?family=${family}`).then(handle),
   naming: (qs: string) => fetch(`${BASE}/naming/generate?${qs}`).then(handle),
   // Abbreviation preview: derive a short code from a full name by trim mode.
   previewAbbrev: (

@@ -400,15 +400,26 @@ class Cable(Base):
 # ---------------------------------------------------------------------------
 # Network layer
 # ---------------------------------------------------------------------------
+RESERVATION_ANCHOR_VALUES = ("from_end", "from_start")
+
+
 class Vlan(Base):
     __tablename__ = "vlans"
+    __table_args__ = (
+        # Composite uniqueness for query ergonomics. The GLOBAL unique on
+        # vlan_id (below) is intentionally kept so a VLAN ID cannot be reused
+        # on a different site (user decision Q1).
+        UniqueConstraint("site_id", "vlan_id", name="uq_vlan_site_vlanid"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    # Globally unique VLAN id — a VLAN number may exist on only one site.
     vlan_id: Mapped[Optional[int]] = mapped_column(Integer, unique=True)
     name: Mapped[Optional[str]] = mapped_column(String(120))
     description: Mapped[Optional[str]] = mapped_column(Text)
     zone: Mapped[Optional[str]] = mapped_column(String(20))
-    site_id: Mapped[Optional[int]] = mapped_column(ForeignKey("sites.id"))
+    # Every VLAN belongs to exactly one site.
+    site_id: Mapped[int] = mapped_column(ForeignKey("sites.id"), nullable=False)
 
 
 class SubnetIpv4(Base):
@@ -416,11 +427,20 @@ class SubnetIpv4(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     vlan_id: Mapped[Optional[int]] = mapped_column(ForeignKey("vlans.id"))
+    site_id: Mapped[Optional[int]] = mapped_column(ForeignKey("sites.id"))
     network_cidr: Mapped[Optional[str]] = mapped_column(CIDR)
     gateway: Mapped[Optional[str]] = mapped_column(INET)
     range_from: Mapped[Optional[str]] = mapped_column(INET)
     range_to: Mapped[Optional[str]] = mapped_column(INET)
     expansion_ceiling: Mapped[Optional[str]] = mapped_column(INET)
+    # Reservation pool: number of IPs reserved for special devices/services and
+    # the direction reservations are auto-assigned from.
+    reserved_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    reservation_anchor: Mapped[str] = mapped_column(
+        String(10), nullable=False, default="from_end", server_default="from_end"
+    )
     description: Mapped[Optional[str]] = mapped_column(Text)
 
 
@@ -429,9 +449,16 @@ class SubnetIpv6(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     vlan_id: Mapped[Optional[int]] = mapped_column(ForeignKey("vlans.id"))
+    site_id: Mapped[Optional[int]] = mapped_column(ForeignKey("sites.id"))
     network_cidr: Mapped[Optional[str]] = mapped_column(CIDR)
     range_from: Mapped[Optional[str]] = mapped_column(INET)
     range_to: Mapped[Optional[str]] = mapped_column(INET)
+    reserved_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    reservation_anchor: Mapped[str] = mapped_column(
+        String(10), nullable=False, default="from_end", server_default="from_end"
+    )
     description: Mapped[Optional[str]] = mapped_column(Text)
 
 
@@ -445,6 +472,12 @@ class SubnetRoleAssignment(Base):
     slot_number: Mapped[Optional[int]] = mapped_column(Integer)
     ipv4_address: Mapped[Optional[str]] = mapped_column(INET)
     ipv6_address: Mapped[Optional[str]] = mapped_column(INET)
+    # Free-text reservation label (distinct from the structured `role`).
+    label: Mapped[Optional[str]] = mapped_column(String(80))
+    # Locked reservations (e.g. the gateway) are protected from deletion.
+    is_locked: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
     assigned_device_id: Mapped[Optional[int]] = mapped_column(Integer)
     assigned_device_table: Mapped[Optional[str]] = mapped_column(String(50))
     notes: Mapped[Optional[str]] = mapped_column(Text)

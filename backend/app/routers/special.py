@@ -4,11 +4,11 @@ from __future__ import annotations
 import ipaddress
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .. import abbrev, crud, models
+from .. import abbrev, crud, models, naming
 from ..database import get_session
 
 # Device tables that carry a naming prefix + sequence number.
@@ -413,6 +413,8 @@ async def next_reserved_ip(
 # ---------------------------------------------------------------------------
 @router.get("/naming/generate")
 async def naming_generate(
+    request: Request,
+    entity_type: str = "",
     organization: str = "",
     cloud: str = "",
     region: str = "",
@@ -425,7 +427,40 @@ async def naming_generate(
     role: str = "",
     os_family: str = "",
     consecutive: str = "",
-) -> dict[str, str]:
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Generate the names an entity would get, without writing anything.
+
+    Two modes:
+
+    * **entity_type given** (UX-4) — every other query parameter is read as a
+      model column (``site_id``, ``organization_id``, ``code``, …). The values
+      are fed to the very same generator used on create/update, so the live
+      preview shown in the UI cannot drift from what gets persisted. Levels
+      outside the naming chain (datacenter / floor / room) return ``null``
+      names plus the readable location ``path``.
+    * **no entity_type** — the original abbreviation-joining behaviour, kept so
+      existing callers keep working.
+    """
+    if entity_type:
+        # Everything except entity_type is treated as a model column; empty
+        # values are dropped so a half-filled form still previews what it can.
+        values: dict[str, Any] = {
+            key: raw
+            for key, raw in request.query_params.items()
+            if key != "entity_type" and raw != ""
+        }
+        try:
+            return await naming.preview_names(session, entity_type, values)
+        except KeyError:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Unknown entity_type '{entity_type}'. Known values: "
+                    + ", ".join(sorted(naming.PREVIEW_MODELS))
+                ),
+            )
+
     site_long = "".join(
         [organization, cloud, region, campus, building, floor_section]
     ).upper()

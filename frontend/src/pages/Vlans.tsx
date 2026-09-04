@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import EntityGrid from "../components/EntityGrid";
-import { useLookups, textCol, roCol, numCol, fkCol } from "../lib/columns";
+import { useLookups, textCol, roCol, numCol, fkCol, selectCol } from "../lib/columns";
 
 const ZONES = [
   "management",
@@ -24,17 +24,12 @@ export default function Vlans() {
       roCol("id", "ID", 70),
       numCol("vlan_id", "VLAN ID"),
       textCol("name", "Name", 160),
-      {
-        field: "zone",
-        headerName: "Zone",
-        editable: true,
-        cellEditor: "agSelectCellEditor",
-        cellEditorParams: { values: [null, ...ZONES] },
+      selectCol("zone", "Zone", [null, ...ZONES], {
         cellClassRules: Object.fromEntries(
           ZONES.map((z) => [`zone-${z}`, (p: any) => p.value === z])
         ),
-        width: 140,
-      },
+        width: 150,
+      }),
       // Vlan.site_id is NOT NULL in the database — it must stay editable here
       // or every insert fails with a constraint error (BUG-A / BUG-C).
       fkCol("site_id", "Site", sites),

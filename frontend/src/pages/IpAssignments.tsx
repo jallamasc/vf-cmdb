@@ -1,6 +1,14 @@
 import { useMemo } from "react";
 import EntityGrid from "../components/EntityGrid";
-import { useLookups, textCol, roCol, numCol, fkCol, ipCol } from "../lib/columns";
+import {
+  useLookups,
+  textCol,
+  roCol,
+  numCol,
+  fkCol,
+  ipCol,
+  selectCol,
+} from "../lib/columns";
 
 export default function IpAssignments() {
   const { map, isLoading } = useLookups(["subnets-ipv4", "subnets-ipv6"]);
@@ -25,22 +33,10 @@ export default function IpAssignments() {
       numCol("assigned_to_id", "Assigned ID"),
       textCol("interface_name", "Interface"),
       textCol("dns_name", "DNS Name", 200),
-      {
-        field: "is_primary",
-        headerName: "Primary",
-        editable: true,
-        cellEditor: "agSelectCellEditor",
-        cellEditorParams: { values: [true, false] },
-        width: 100,
-      },
-      {
-        field: "status",
-        headerName: "Status",
-        editable: true,
-        cellEditor: "agSelectCellEditor",
-        cellEditorParams: { values: ["active", "reserved", "deprecated"] },
-        width: 120,
-      },
+      selectCol("is_primary", "Primary", [true, false], { width: 120 }),
+      selectCol("status", "Status", ["active", "reserved", "deprecated"], {
+        width: 140,
+      }),
       textCol("notes", "Notes"),
     ],
     [map]

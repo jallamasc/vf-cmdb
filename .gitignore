@@ -29,6 +29,10 @@ pgdata/
 *.pdf
 *.docx
 
+# Codebase index store (generated - rebuild with ./cbindex build)
+.codebase_index/
+tools/codebase_index/.venv/
+
 # Local backups (should live outside the repo, but guard anyway)
 vf-cmdb-backups/
 *.tar.gz

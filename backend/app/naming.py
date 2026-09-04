@@ -238,6 +238,62 @@ async def generate_network_device(session: AsyncSession, d: models.NetworkDevice
     d.vf_long_name = f"{base}{rack_part}{dt}{sub}{brand}{cons}".upper()
 
 
+async def _device_display_name(
+    session: AsyncSession, device_type: Optional[str], device_id: Optional[int]
+) -> str:
+    """Best display name for a polymorphic (type, id) device reference.
+
+    FEAT-6 (6C): ``device_type`` is the kebab-case ENTITY_REGISTRY slug stored on
+    a cable end (``port_a_type`` / ``port_b_type``); ``device_id`` its PK. The
+    slug is mapped to its ORM model via the registry and the most identifying
+    name field is returned. Falls back to ``"{slug}#{id}"`` when the row cannot
+    be resolved, and ``""`` when the reference is empty.
+    """
+    if not device_type or device_id is None:
+        return ""
+    # Imported lazily to avoid a circular import (registry imports models).
+    from .registry import ENTITY_REGISTRY
+
+    model = ENTITY_REGISTRY.get(device_type)
+    if model is None:
+        return f"{device_type}#{device_id}"
+    obj = await session.get(model, device_id)
+    if obj is None:
+        return f"{device_type}#{device_id}"
+    for attr in (
+        "vf_long_name",
+        "vf_short_name",
+        "vf_friendly_name",
+        "simple_name",
+        "name",
+        "full_name",
+        "code",
+    ):
+        value = getattr(obj, attr, None)
+        if value:
+            return str(value)
+    return f"{device_type}#{device_id}"
+
+
+async def generate_cable(session: AsyncSession, cable: models.Cable) -> None:
+    """FEAT-6 (6C): auto-generate the physical-labeling Cable_Label.
+
+    Format: ``{from_device_name}-{from_port}->{to_device_name}-{to_port}`` using
+    the '->' arrow. ``label_a`` / ``label_b`` carry the per-end port labels; the
+    device names are resolved from the polymorphic ``port_a`` / ``port_b``
+    references. Empty ends collapse gracefully so a half-connected cable still
+    gets a sensible label. Regenerated on every create/update via apply_naming.
+    """
+    from_name = await _device_display_name(session, cable.port_a_type, cable.port_a_id)
+    to_name = await _device_display_name(session, cable.port_b_type, cable.port_b_id)
+    from_port = (cable.label_a or "").strip()
+    to_port = (cable.label_b or "").strip()
+    left = "-".join(p for p in (from_name, from_port) if p)
+    right = "-".join(p for p in (to_name, to_port) if p)
+    label = "→".join(p for p in (left, right) if p)
+    cable.label = (label or None)
+
+
 # Dispatch table: model class -> generator coroutine
 GENERATORS = {
     models.Site: generate_site,
@@ -248,6 +304,7 @@ GENERATORS = {
     models.ContainerApp: generate_container,
     models.Workstation: generate_workstation,
     models.NetworkDevice: generate_network_device,
+    models.Cable: generate_cable,
 }
 
 

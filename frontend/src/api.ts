@@ -149,6 +149,44 @@ export interface DeviceRelated {
   port_type?: string;
 }
 
+/** FEAT-6 (6C) — a port that a source port may be cabled to. */
+export interface PortCandidate {
+  port_kind: "interface" | "outlet";
+  port_id: number;
+  owner_type: string;
+  owner_id: number | null;
+  owner_name: string;
+  label: string;
+  /** copper | fiber | power — drives the connector dot colour. */
+  port_type: string;
+  rack_id: number;
+  same_rack: boolean;
+}
+
+/** FEAT-6 (6C) — result of GET /ports/candidates. */
+export interface PortCandidatesResult {
+  source: {
+    device_type: string;
+    device_id: number;
+    port_kind: string;
+    port_id: number;
+    rack_id: number | null;
+    datacenter_id: number | null;
+    site_id: number | null;
+  };
+  /** Which scope produced the candidates: rack | datacenter | site. */
+  scope: string;
+  candidates: PortCandidate[];
+}
+
+/** FEAT-6 (6C) — a source port handed to the Connect panel. */
+export interface SourcePort {
+  source_type: string;
+  source_id: number;
+  source_port_kind: "interface" | "outlet";
+  source_port_id: number;
+}
+
 async function handle(res: Response) {
   if (!res.ok) {
     let detail = res.statusText;
@@ -318,4 +356,35 @@ export const api = {
     limit = 500,
   ): Promise<DeviceRelated> =>
     fetch(`${BASE}/devices/${type}/${id}/related/${relation}?limit=${limit}`).then(handle),
+  /**
+   * FEAT-6 (6B) — URL of a device model's stencil SVG, for embedding in an
+   * <image href>. The GET endpoint serves cache-first (air-gap safe) and 404s
+   * when no stencil is available.
+   */
+  stencilUrl: (modelSlug: string): string => `${BASE}/stencils/${modelSlug}`,
+  /**
+   * FEAT-6 (6B) — upload an SVG stencil for a device model. Works offline; the
+   * uploaded file is cached and served without contacting Visio Café.
+   */
+  uploadStencil: (modelSlug: string, file: File): Promise<Row> => {
+    const form = new FormData();
+    form.append("file", file);
+    return fetch(`${BASE}/stencils/${modelSlug}`, {
+      method: "POST",
+      body: form,
+    }).then(handle);
+  },
+  /**
+   * FEAT-6 (6C) — connectable destination ports for a source port. Scoped to
+   * the same rack, else datacenter, else site (fallback).
+   */
+  portCandidates: (source: SourcePort): Promise<PortCandidatesResult> => {
+    const qs = new URLSearchParams({
+      source_type: source.source_type,
+      source_id: String(source.source_id),
+      source_port_kind: source.source_port_kind,
+      source_port_id: String(source.source_port_id),
+    });
+    return fetch(`${BASE}/ports/candidates?${qs.toString()}`).then(handle);
+  },
 };

@@ -1,7 +1,25 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, Row } from "../api";
-import RackDiagramSVG, { TYPE_HEX } from "../components/RackDiagramSVG";
+import RackDiagramSVG, { PORT_TYPE_HEX, RackPort } from "../components/RackDiagramSVG";
+import ConnectPanel from "../components/ConnectPanel";
+
+// Device resources whose ports we resolve into the back-face view. Maps the
+// kebab-case slug (as stored in owner_device_type / rack_units.device_table) to
+// the resource whose rows carry rack_id + rack_unit for the owner.
+const PORT_OWNER_RESOURCES = [
+  "network-devices",
+  "physical-servers",
+  "workstations",
+] as const;
+
+// copper vs fiber from an interface speed string (mirrors the backend rule).
+function interfacePortType(iface: Row): string {
+  const speed = String(iface.speed ?? "").toLowerCase();
+  if (["sfp", "fiber", "fibre", "lc", "sr", "lr", "optical"].some((t) => speed.includes(t)))
+    return "fiber";
+  return "copper";
+}
 
 // Tailwind classes for the legend swatches (kept in sync with TYPE_HEX).
 const TYPE_COLORS: Record<string, string> = {
@@ -87,11 +105,99 @@ export default function RackView() {
     queryKey: ["datacenter-floors"],
     queryFn: () => api.list("datacenter-floors"),
   });
+  // FEAT-6 (6A/6C): port + owner data, only used on the back face.
+  const { data: interfaces } = useQuery({
+    queryKey: ["device-interfaces"],
+    queryFn: () => api.list("device-interfaces"),
+  });
+  const { data: powerOutlets } = useQuery({
+    queryKey: ["power-outlets"],
+    queryFn: () => api.list("power-outlets"),
+  });
+  const { data: networkDevices } = useQuery({
+    queryKey: ["network-devices"],
+    queryFn: () => api.list("network-devices"),
+  });
+  const { data: physicalServers } = useQuery({
+    queryKey: ["physical-servers"],
+    queryFn: () => api.list("physical-servers"),
+  });
+  const { data: workstations } = useQuery({
+    queryKey: ["workstations"],
+    queryFn: () => api.list("workstations"),
+  });
 
   const [site, setSite] = useState<Filter>(ALL);
   const [dc, setDc] = useState<Filter>(ALL);
   const [floor, setFloor] = useState<Filter>(ALL);
   const [rack, setRack] = useState<Filter>(ALL);
+  const [face, setFace] = useState<"front" | "back">("front");
+  // FEAT-6 (6C): the source port the Connect panel is open for.
+  const [connectSource, setConnectSource] = useState<RackPort | null>(null);
+
+  // Owner lookup: slug -> Map(id -> owner row) for rack/U resolution (rule A).
+  const ownerById = useMemo(() => {
+    const m: Record<string, Map<number, Row>> = {
+      "network-devices": new Map((networkDevices ?? []).map((d) => [d.id, d])),
+      "physical-servers": new Map((physicalServers ?? []).map((d) => [d.id, d])),
+      workstations: new Map((workstations ?? []).map((d) => [d.id, d])),
+    };
+    return m;
+  }, [networkDevices, physicalServers, workstations]);
+
+  // Resolve an interface's owner (owner pair wins, else network_device_id).
+  const interfaceOwner = (iface: Row): { slug: string; id: number } | null => {
+    if (iface.owner_device_type && iface.owner_device_id)
+      return { slug: String(iface.owner_device_type), id: Number(iface.owner_device_id) };
+    if (iface.network_device_id)
+      return { slug: "network-devices", id: Number(iface.network_device_id) };
+    return null;
+  };
+
+  // FEAT-6 (6A/6C): all back-face ports grouped by rack_id, each carrying the
+  // owner's base U so the diagram can place its connector dot.
+  const portsByRack = useMemo(() => {
+    const byRack = new Map<number, RackPort[]>();
+    const push = (rackId: number | null | undefined, p: RackPort) => {
+      if (!rackId) return;
+      const arr = byRack.get(rackId) ?? [];
+      arr.push(p);
+      byRack.set(rackId, arr);
+    };
+    // Interfaces: resolve owner -> its rack_id + rack_unit.
+    (interfaces ?? []).forEach((iface) => {
+      const owner = interfaceOwner(iface);
+      if (!owner) return;
+      const ownerRow = ownerById[owner.slug]?.get(owner.id);
+      if (!ownerRow || !ownerRow.rack_id) return;
+      push(ownerRow.rack_id, {
+        port_kind: "interface",
+        port_id: iface.id,
+        owner_type: owner.slug,
+        owner_id: owner.id,
+        label:
+          iface.description ||
+          (iface.port_number != null ? `port ${iface.port_number}` : `if#${iface.id}`),
+        port_type: interfacePortType(iface),
+        unit_number: ownerRow.rack_unit ?? null,
+      });
+    });
+    // Power outlets: carry rack_id directly. They have no rack_unit column, so
+    // pin them to U1 (bottom) as a sensible default for the power face.
+    (powerOutlets ?? []).forEach((po) => {
+      push(po.rack_id, {
+        port_kind: "outlet",
+        port_id: po.id,
+        owner_type: "power-devices",
+        owner_id: po.power_device_id ?? null,
+        label: po.label || (po.port_number != null ? `outlet ${po.port_number}` : `po#${po.id}`),
+        port_type: "power",
+        unit_number: 1,
+      });
+    });
+    return byRack;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [interfaces, powerOutlets, ownerById]);
 
   // Lookup maps for labelling rack cards with their DC/Floor/Rack breadcrumb.
   const dcById = useMemo(
@@ -189,12 +295,33 @@ export default function RackView() {
 
   return (
     <div>
-      <div className="mb-4">
-        <h1 className="text-xl font-semibold">Rack Elevation View</h1>
-        <p className="text-sm text-slate-500">
-          Front elevation of each rack, unit by unit. Colour indicates device
-          type.
-        </p>
+      <div className="mb-4 flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-xl font-semibold">Rack Elevation View</h1>
+          <p className="text-sm text-slate-500">
+            {face === "front"
+              ? "Front elevation of each rack, unit by unit. Colour indicates device type."
+              : "Back of rack. Coloured dots are ports (blue=copper, orange=fiber, yellow=power). Click a port to connect it."}
+          </p>
+        </div>
+        {/* FEAT-6 (6A): Front/Back face toggle */}
+        <div className="inline-flex rounded-lg border border-slate-300 overflow-hidden text-sm">
+          {(["front", "back"] as const).map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setFace(f)}
+              className={
+                "px-4 py-1.5 capitalize " +
+                (face === f
+                  ? "bg-slate-800 text-white"
+                  : "bg-white text-slate-600 hover:bg-slate-50")
+              }
+            >
+              {f}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Cascading hierarchy filters */}
@@ -248,14 +375,24 @@ export default function RackView() {
         </div>
       </div>
 
-      {/* Legend */}
+      {/* Legend — device types (front) or port types (back) */}
       <div className="flex flex-wrap gap-3 mb-5 text-xs">
-        {Object.entries(TYPE_COLORS).map(([k, c]) => (
-          <span key={k} className="flex items-center gap-1">
-            <span className={`inline-block w-3 h-3 rounded border ${c}`} />
-            {k}
-          </span>
-        ))}
+        {face === "front"
+          ? Object.entries(TYPE_COLORS).map(([k, c]) => (
+              <span key={k} className="flex items-center gap-1">
+                <span className={`inline-block w-3 h-3 rounded border ${c}`} />
+                {k}
+              </span>
+            ))
+          : Object.entries(PORT_TYPE_HEX).map(([k, hex]) => (
+              <span key={k} className="flex items-center gap-1">
+                <span
+                  className="inline-block w-3 h-3 rounded-full border border-slate-700"
+                  style={{ backgroundColor: hex }}
+                />
+                {k}
+              </span>
+            ))}
       </div>
 
       {shown.length === 0 ? (
@@ -283,10 +420,21 @@ export default function RackView() {
               <RackDiagramSVG
                 rack={r}
                 units={(allUnits ?? []).filter((u) => u.rack_id === r.id)}
+                face={face}
+                ports={face === "back" ? portsByRack.get(r.id) ?? [] : []}
+                onPortClick={face === "back" ? setConnectSource : undefined}
               />
             </div>
           ))}
         </div>
+      )}
+
+      {/* FEAT-6 (6C): connect a clicked back-face port to a destination */}
+      {connectSource && (
+        <ConnectPanel
+          source={connectSource}
+          onClose={() => setConnectSource(null)}
+        />
       )}
     </div>
   );

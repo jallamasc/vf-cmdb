@@ -19,6 +19,7 @@ import ReferenceData from "./pages/ReferenceData";
 import Ansible from "./pages/Ansible";
 import Changelog from "./pages/Changelog";
 import DeviceDashboard from "./pages/DeviceDashboard";
+import CablesViewer from "./pages/CablesViewer";
 import SimpleGridPage from "./pages/SimpleGridPage";
 
 export default function App() {
@@ -32,7 +33,7 @@ export default function App() {
         <Route path="racks-list" element={<SimpleGridPage kind="racks" />} />
         <Route path="patch-panels" element={<SimpleGridPage kind="patch-panels" />} />
         <Route path="power" element={<SimpleGridPage kind="power" />} />
-        <Route path="cables" element={<SimpleGridPage kind="cables" />} />
+        <Route path="cables" element={<CablesViewer />} />
         <Route path="physical-servers" element={<PhysicalServers />} />
         <Route path="virtual-machines" element={<VirtualMachines />} />
         <Route path="containers-apps" element={<ContainersApps />} />

@@ -4,12 +4,15 @@ from __future__ import annotations
 import ipaddress
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlalchemy import func, select
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
+from fastapi.responses import Response
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .. import abbrev, airports, crud, devices, models, naming, themes
+from .. import abbrev, airports, crud, devices, models, naming, ports, stencils, themes
+from ..config import settings
 from ..database import get_session
+from ..registry import ENTITY_REGISTRY
 
 # Device tables that carry a naming prefix + sequence number.
 _SEQUENCE_MODELS = [
@@ -753,6 +756,125 @@ async def device_related(
         }
     )
     return payload
+
+
+# ---------------------------------------------------------------------------
+# FEAT-6 (6B): Visio Café stencil service (cache-first + manual upload)
+# ---------------------------------------------------------------------------
+# Device-type resources that carry a stencil_url column. A model slug passed to
+# the stencil endpoints is looked up here to find its configured download URL.
+STENCIL_RESOURCES = {
+    "network-device-types": models.NetworkDeviceType,
+    "compute-device-types": models.ComputeDeviceType,
+    "storage-device-types": models.StorageDeviceType,
+}
+
+_SVG_HEADERS = {"Cache-Control": "public, max-age=86400"}
+
+
+async def _stencil_url_for_slug(session: AsyncSession, model_slug: str) -> Optional[str]:
+    """The configured ``stencil_url`` for a device-type identified by slug.
+
+    ``model_slug`` may be either a device-type resource slug (a key of
+    STENCIL_RESOURCES) or ``{resource}-{id}`` naming a specific device-type row.
+    Returns None when no URL is configured or the row is not found.
+    """
+    # Exact resource match with no id -> cannot resolve a specific row.
+    for resource, model in STENCIL_RESOURCES.items():
+        prefix = f"{resource}-"
+        if model_slug.startswith(prefix):
+            tail = model_slug[len(prefix):]
+            if tail.isdigit():
+                row = await session.get(model, int(tail))
+                return getattr(row, "stencil_url", None) if row else None
+    return None
+
+
+@router.get("/stencils/{model_slug}")
+async def get_stencil(
+    model_slug: str,
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    """Serve a device model's stencil SVG, cache-first.
+
+    1. If the SVG is already cached on disk, serve it (no network — air-gap safe).
+    2. Else, if the device-type row has a ``stencil_url`` and Visio Café is
+       reachable, download it, cache it and serve it.
+    3. Else return 404.
+    """
+    try:
+        slug = stencils.validate_slug(model_slug)
+    except stencils.InvalidSlug as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    if stencils.is_cached(slug):
+        data = stencils.cache_path(slug).read_bytes()
+        return Response(content=data, media_type="image/svg+xml", headers=_SVG_HEADERS)
+
+    url = await _stencil_url_for_slug(session, slug)
+    if url:
+        path = stencils.download_and_cache(slug, url)
+        if path is not None:
+            return Response(
+                content=path.read_bytes(),
+                media_type="image/svg+xml",
+                headers=_SVG_HEADERS,
+            )
+    raise HTTPException(status_code=404, detail="No stencil available for this model")
+
+
+@router.post("/stencils/{model_slug}")
+async def upload_stencil(
+    model_slug: str,
+    file: UploadFile = File(...),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Upload an SVG stencil for a model, overwriting any cached copy.
+
+    Works fully offline: the uploaded SVG is stored in the cache and served by
+    the GET endpoint without ever contacting Visio Café.
+    """
+    try:
+        slug = stencils.validate_slug(model_slug)
+    except stencils.InvalidSlug as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    data = await file.read()
+    try:
+        stencils.store_bytes(slug, data, file.content_type)
+    except stencils.InvalidStencil as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return {
+        "model_slug": slug,
+        "stored": True,
+        "bytes": len(data),
+        "path": f"{settings.api_prefix}/stencils/{slug}",
+    }
+
+
+# ---------------------------------------------------------------------------
+# FEAT-6 (6C): connectable destination ports for a source port
+# ---------------------------------------------------------------------------
+@router.get("/ports/candidates")
+async def port_candidates(
+    source_type: str = Query(..., description="kebab-case device slug of the source port owner"),
+    source_id: int = Query(...),
+    source_port_kind: str = Query("interface", pattern="^(interface|outlet)$"),
+    source_port_id: int = Query(...),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """List ports the source port may be cabled to.
+
+    Scope is same rack, else same datacenter, else same site, else same rack
+    only (fallback), so a legitimately-placed rack always yields candidates.
+    Returns 404 only when the source device cannot be located to any rack.
+    """
+    try:
+        return await ports.candidate_ports(
+            session, source_type, source_id, source_port_kind, source_port_id
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
 
 # ---------------------------------------------------------------------------

@@ -6,7 +6,7 @@
 **Last Updated**: 2026-09-03  
 **Project Owner**: Alejandro (jallamasc), Virtualfactor, Bogotá, Colombia  
 **Repository**: https://github.com/jallamasc/vf-cmdb  
-**Local Path**: `/home/ubuntu/vf_cmdb/`
+**Local Path**: `/Volumes/development/vf-cmdb/`
 
 ---
 
@@ -399,9 +399,9 @@ lookupLabel(o) → "Full Name - abbreviation" (if both exist)
 ```
 
 **Services**:
-- Frontend: http://localhost:3001 (Nginx + React)
+- Frontend: http://localhost:8080 (Nginx + React)
 - Backend: http://localhost:8000 (FastAPI)
-- Database: localhost:5433 (PostgreSQL)
+- Database: localhost:5432 (PostgreSQL)
 - pgAdmin: http://localhost:5050
 
 **Environment**: `.env` file (copy from `.env.example`)
@@ -747,7 +747,7 @@ Full usage in `tools/codebase_index/README.md`; session provisioning in
    - `MEMORY_BANK.md` (this file - full context)
    - Then use `./cbindex search "..."` to pull relevant source on demand
 
-2. **Verify git status**: `cd /home/ubuntu/vf_cmdb && git status`
+2. **Verify git status**: `cd /Volumes/development/vf-cmdb && git status`
 
 3. **Check for uncommitted changes** (user may have edited in UI)
 

@@ -40,3 +40,6 @@ vf-cmdb-backups/
 *.sql
 *.sql.gz
 .env.restored
+
+# FEAT-6: runtime stencil cache (keep the dir, ignore downloaded SVGs)
+backend/static/stencils/*.svg

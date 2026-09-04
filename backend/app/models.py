@@ -145,6 +145,10 @@ class FloorSection(LookupMixin, Base):
 class ComputeDeviceType(LookupMixin, Base):
     __tablename__ = "compute_device_types"
 
+    # FEAT-6 (6B): optional Visio Café stencil for this device model. When set,
+    # the rack diagram embeds the cached SVG instead of a plain rectangle.
+    stencil_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+
 
 class Brand(LookupMixin, Base):
     __tablename__ = "brands"
@@ -156,6 +160,9 @@ class DeviceRole(LookupMixin, Base):
 
 class NetworkDeviceType(LookupMixin, Base):
     __tablename__ = "network_device_types"
+
+    # FEAT-6 (6B): optional Visio Café stencil for this device model.
+    stencil_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
 
 class NetworkSubtype(LookupMixin, Base):
@@ -180,6 +187,9 @@ class ClusterType(LookupMixin, Base):
 
 class StorageDeviceType(LookupMixin, Base):
     __tablename__ = "storage_device_types"
+
+    # FEAT-6 (6B): optional Visio Café stencil for this device model.
+    stencil_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
 
 class NetworkIdType(LookupMixin, Base):
@@ -435,6 +445,9 @@ class Cable(Base):
     label_b: Mapped[Optional[str]] = mapped_column(String(120))
     media_type: Mapped[Optional[str]] = mapped_column(String(40))
     length_meters: Mapped[Optional[float]] = mapped_column()
+    # FEAT-6 (6C): auto-generated Cable_Label ({from}-{a}->{to}-{b}), produced
+    # by naming.generate_cable. Additive — the a/b shape above is preserved.
+    label: Mapped[Optional[str]] = mapped_column(String(200))
     notes: Mapped[Optional[str]] = mapped_column(Text)
 
 
@@ -557,7 +570,19 @@ class DeviceInterface(Base):
     __tablename__ = "device_interfaces"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    network_device_id: Mapped[int] = mapped_column(ForeignKey("network_devices.id"))
+    # FEAT-6 (6C): relaxed to nullable so a data port can be owned by any device
+    # class, not only a network device. Legacy rows keep this FK set.
+    network_device_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("network_devices.id"), nullable=True
+    )
+    # FEAT-6 (6C): polymorphic physical owner of this port. Holds the kebab-case
+    # ENTITY_REGISTRY slug (e.g. "network-devices", "physical-servers") + id.
+    # This answers "which device owns this port" (rack membership / back face);
+    # it is DISTINCT from connected_device_* below, which is the far end of a
+    # link. Resolution rule: use (owner_device_type, owner_device_id) when set,
+    # else fall back to network_device_id.
+    owner_device_type: Mapped[Optional[str]] = mapped_column(String(40))
+    owner_device_id: Mapped[Optional[int]] = mapped_column(Integer)
     port_number: Mapped[Optional[int]] = mapped_column(Integer)
     port_mode: Mapped[Optional[str]] = mapped_column(String(20))  # access/trunk/aggregation/disabled
     portgroup: Mapped[Optional[str]] = mapped_column(String(60))

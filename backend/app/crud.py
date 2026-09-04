@@ -35,7 +35,7 @@ def _to_str(value: Any) -> Optional[str]:
 
 
 def sanitize_payload(model, payload: dict) -> dict:
-    cols = _columns(model)
+    cols = {c.key: c for c in inspect(model).columns}
     clean: dict[str, Any] = {}
     for key, value in payload.items():
         if key in COMPUTED_FIELDS:
@@ -43,6 +43,15 @@ def sanitize_payload(model, payload: dict) -> dict:
         if key in cols:
             if isinstance(value, str) and value.strip() == "":
                 value = None
+            if value is None:
+                column = cols[key]
+                # A cleared value on a NOT NULL column that has a default must
+                # fall back to that default (e.g. site_code_type -> "auto")
+                # instead of being written as an explicit NULL.
+                if not column.nullable and (
+                    column.default is not None or column.server_default is not None
+                ):
+                    continue
             clean[key] = value
     return clean
 

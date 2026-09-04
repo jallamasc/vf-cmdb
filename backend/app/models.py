@@ -48,6 +48,12 @@ TRIM_MODE_VALUES = (
 # Expressed as a POSIX regular expression usable in a Postgres CHECK.
 DOMAIN_NAME_REGEX = r"^[A-Za-z0-9]+(-[A-Za-z0-9]+)*$"
 
+# FEAT-1: how a site's short "simple_name" code is produced.
+#   auto   -> derived from organization + campus + region + sequence
+#   custom -> free text typed by the user
+#   theme  -> picked from a themed name catalogue (FEAT-3)
+SITE_CODE_TYPE_VALUES = ("auto", "custom", "theme")
+
 
 def _case_enum(name: str) -> Enum:
     """A non-native (VARCHAR + CHECK) enum for case enforcement."""
@@ -57,6 +63,18 @@ def _case_enum(name: str) -> Enum:
 def _trim_enum(name: str) -> Enum:
     """A non-native (VARCHAR + CHECK) enum for trim modes."""
     return Enum(*TRIM_MODE_VALUES, name=name, native_enum=False)
+
+
+def _site_code_type_enum(name: str) -> Enum:
+    """A non-native (VARCHAR + CHECK) enum for the site code mode.
+
+    ``create_constraint=True`` so the database itself rejects any value outside
+    the tri-mode set — the mode drives how ``simple_name`` is written, so a bad
+    value must never reach a row.
+    """
+    return Enum(
+        *SITE_CODE_TYPE_VALUES, name=name, native_enum=False, create_constraint=True
+    )
 
 
 def _charset_check(column: str, constraint_name: str) -> CheckConstraint:
@@ -206,6 +224,16 @@ class Site(Base):
     # Physical address — reference data, NOT a naming convention.
     site_address_id: Mapped[Optional[int]] = mapped_column(ForeignKey("site_addresses.id"))
     simple_name: Mapped[Optional[str]] = mapped_column(String(120))
+    # FEAT-1: how simple_name is produced — "auto" (derived from
+    # org+campus+region+sequence), "custom" (typed by the user) or "theme"
+    # (picked from a themed name list, see theme_name / theme_category).
+    site_code_type: Mapped[str] = mapped_column(
+        _site_code_type_enum("site_code_type"), nullable=False,
+        default="auto", server_default="auto",
+    )
+    # FEAT-3: themed fun name chosen for this site (when site_code_type=theme).
+    theme_name: Mapped[Optional[str]] = mapped_column(String(120))
+    theme_category: Mapped[Optional[str]] = mapped_column(String(40))
     vf_long_name: Mapped[Optional[str]] = mapped_column(String(200))
     vf_short_name: Mapped[Optional[str]] = mapped_column(String(120))
     tia606b_name: Mapped[Optional[str]] = mapped_column(String(200))
@@ -221,6 +249,7 @@ class Datacenter(Base):
     __tablename__ = "datacenters"
     __table_args__ = (
         _charset_check("code", "ck_datacenters_code_charset"),
+        _charset_check("iata_code", "ck_datacenters_iata_code_charset"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -228,6 +257,12 @@ class Datacenter(Base):
     code: Mapped[Optional[str]] = mapped_column(String(16))  # abbreviation
     description: Mapped[Optional[str]] = mapped_column(Text)
     site_id: Mapped[Optional[int]] = mapped_column(ForeignKey("sites.id"))
+    # FEAT-5: geographic identity. The IATA airport code of the nearest major
+    # airport is the industry-standard city component for datacenter names.
+    city: Mapped[Optional[str]] = mapped_column(String(120))
+    iata_code: Mapped[Optional[str]] = mapped_column(String(10))
+    # Generated from the parent site + IATA code (see naming.generate_datacenter).
+    vf_long_name: Mapped[Optional[str]] = mapped_column(String(200))
     # Per record-type case enforcement for this hierarchy level.
     case_enforcement: Mapped[str] = mapped_column(
         _case_enum("dc_case_enforcement"), nullable=False, default="mixed",
@@ -247,6 +282,9 @@ class DatacenterFloor(Base):
     code: Mapped[Optional[str]] = mapped_column(String(16))
     floor_number: Mapped[Optional[int]] = mapped_column(Integer)
     datacenter_id: Mapped[Optional[int]] = mapped_column(ForeignKey("datacenters.id"))
+    # FEAT-3: optional themed fun name for this floor.
+    theme_name: Mapped[Optional[str]] = mapped_column(String(120))
+    theme_category: Mapped[Optional[str]] = mapped_column(String(40))
     case_enforcement: Mapped[str] = mapped_column(
         _case_enum("floor_case_enforcement"), nullable=False, default="mixed",
         server_default="mixed",
@@ -266,6 +304,9 @@ class Room(Base):
     datacenter_floor_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("datacenter_floors.id")
     )
+    # FEAT-3: optional themed fun name for this room.
+    theme_name: Mapped[Optional[str]] = mapped_column(String(120))
+    theme_category: Mapped[Optional[str]] = mapped_column(String(40))
     case_enforcement: Mapped[str] = mapped_column(
         _case_enum("room_case_enforcement"), nullable=False, default="mixed",
         server_default="mixed",

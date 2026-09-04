@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, Row } from "../api";
 import AbbrevField, { CASE_MODES } from "../components/AbbrevField";
+import CityAirportField from "../components/CityAirportField";
 import { lookupLabel } from "../lib/columns";
 import { useNamePreview } from "../lib/useNamePreview";
 
@@ -231,12 +232,16 @@ export default function Hierarchy() {
       {/* ---- Datacenter ---- */}
       <LevelCard
         title="Datacenters"
-        subtitle="A datacenter belongs to a site."
+        subtitle="A datacenter belongs to a site. Its city resolves to an airport (IATA) code, which is appended to the site name to form the VF long name."
         count={datacenters.data?.length ?? 0}
         list={
           <SimpleList
             rows={datacenters.data ?? []}
-            render={(r) => `${r.name}${r.code ? ` (${r.code})` : ""}`}
+            render={(r) =>
+              `${r.name}${r.code ? ` (${r.code})` : ""}` +
+              (r.iata_code ? ` · ${r.iata_code}` : "") +
+              (r.vf_long_name ? ` · ${r.vf_long_name}` : "")
+            }
           />
         }
         renderForm={(onDone) => (
@@ -333,6 +338,8 @@ const FIELD_LABELS: Record<string, string> = {
   datacenter_floor_id: "Floor",
   rack_type_id: "Rack type",
   grid_coordinates: "Grid coordinates",
+  iata_code: "Airport (IATA) code",
+  city: "City",
 };
 
 function PreviewLine({ label, value }: { label: string; value: string | null }) {
@@ -351,6 +358,35 @@ function PreviewLine({ label, value }: { label: string; value: string | null }) 
     </div>
   );
 }
+
+type PreviewField =
+  | "simple_name"
+  | "vf_long_name"
+  | "vf_short_name"
+  | "tia606b_name";
+
+const PREVIEW_LABELS: Record<PreviewField, string> = {
+  simple_name: "Site Code",
+  vf_long_name: "VF Long",
+  vf_short_name: "VF Short",
+  tia606b_name: "TIA-606-B",
+};
+
+const DEFAULT_PREVIEW_FIELDS: PreviewField[] = [
+  "vf_long_name",
+  "vf_short_name",
+  "tia606b_name",
+];
+
+/**
+ * Which generated names a level actually produces. A site also gets the
+ * FEAT-1 site code; a datacenter (FEAT-5) only gets a VF long name, so the
+ * short / TIA lines are not rendered as perpetually empty for it.
+ */
+const PREVIEW_FIELDS: Record<string, PreviewField[]> = {
+  site: ["simple_name", ...DEFAULT_PREVIEW_FIELDS],
+  datacenter: ["vf_long_name"],
+};
 
 /**
  * Card shown under a Quick Add form with the names the entity will get.
@@ -389,9 +425,15 @@ function NamePreviewCard({
         <div className="flex flex-col gap-1">
           {preview.generated ? (
             <>
-              <PreviewLine label="VF Long" value={preview.vf_long_name} />
-              <PreviewLine label="VF Short" value={preview.vf_short_name} />
-              <PreviewLine label="TIA-606-B" value={preview.tia606b_name} />
+              {(PREVIEW_FIELDS[entityType] ?? DEFAULT_PREVIEW_FIELDS).map(
+                (field) => (
+                  <PreviewLine
+                    key={field}
+                    label={PREVIEW_LABELS[field]}
+                    value={preview[field]}
+                  />
+                ),
+              )}
             </>
           ) : (
             <p className="text-xs text-slate-500">
@@ -461,6 +503,9 @@ function DatacenterForm({
   const [caseEnf, setCaseEnf] = useState("mixed");
   const [siteId, setSiteId] = useState("");
   const [valid, setValid] = useState(false);
+  // FEAT-5: the city drives the IATA code that goes into the VF long name.
+  const [city, setCity] = useState("");
+  const [iataCode, setIataCode] = useState("");
   return (
     <form
       onSubmit={(e) => {
@@ -470,6 +515,8 @@ function DatacenterForm({
           code: code || null,
           case_enforcement: caseEnf,
           site_id: siteId ? Number(siteId) : null,
+          city: city.trim() || null,
+          iata_code: iataCode.trim() || null,
         });
       }}
       className="grid grid-cols-2 gap-3"
@@ -480,6 +527,16 @@ function DatacenterForm({
       <Field label="Site (parent)">
         <Select value={siteId} onChange={setSiteId} rows={sites} placeholder="— select site —" />
       </Field>
+      <div className="col-span-2">
+        <CityAirportField
+          city={city}
+          iataCode={iataCode}
+          onChange={(c, i) => {
+            setCity(c);
+            setIataCode(i);
+          }}
+        />
+      </div>
       <div className="col-span-2 grid grid-cols-2 gap-3">
         <AbbrevField
           value={code}
@@ -498,7 +555,7 @@ function DatacenterForm({
       <div className="col-span-2">
         <NamePreviewCard
           entityType="datacenter"
-          params={{ site_id: siteId, name, code }}
+          params={{ site_id: siteId, name, code, city, iata_code: iataCode }}
         />
       </div>
       <div className="col-span-2">
@@ -767,7 +824,11 @@ function SiteForm({
       onSubmit={(e) => {
         e.preventDefault();
         create.mutate({
-          simple_name: simpleName || null,
+          // FEAT-1: an empty box means "let the server generate the code";
+          // anything typed here is kept verbatim (custom mode). The themed
+          // mode is offered on the Sites page, which can open the picker.
+          site_code_type: simpleName.trim() ? "custom" : "auto",
+          simple_name: simpleName.trim() || null,
           organization_id: orgId ? Number(orgId) : null,
           cloud_id: cloudId ? Number(cloudId) : null,
           region_id: regionId ? Number(regionId) : null,
@@ -778,8 +839,13 @@ function SiteForm({
       }}
       className="grid grid-cols-2 gap-3"
     >
-      <Field label="Simple name">
-        <input className={inputCls} value={simpleName} onChange={(e) => setSimpleName(e.target.value)} />
+      <Field label="Site code (leave empty to auto-generate)">
+        <input
+          className={inputCls}
+          value={simpleName}
+          placeholder="auto: org + campus + region + sequence"
+          onChange={(e) => setSimpleName(e.target.value)}
+        />
       </Field>
       <Field label="Organization">
         <Select value={orgId} onChange={setOrgId} rows={orgs} placeholder="— organization —" />
@@ -811,6 +877,7 @@ function SiteForm({
             building_id: buildingId,
             floor_section_id: fsId,
             simple_name: simpleName,
+            site_code_type: simpleName.trim() ? "custom" : "auto",
           }}
         />
       </div>

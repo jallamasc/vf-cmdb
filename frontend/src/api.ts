@@ -7,11 +7,13 @@ export type Row = Record<string, any>;
  * Result of GET /naming/generate?entity_type=… — what an entity *would* be
  * called for the currently selected foreign keys. Nothing is persisted.
  * ``generated`` is false for hierarchy levels outside the naming chain
- * (datacenter / floor / room), which only get a readable ``path``.
+ * (floor / room), which only get a readable ``path``.
  */
 export interface NamePreview {
   entity_type: string;
   resource: string;
+  /** FEAT-1: the site code the tri-mode selector would store. */
+  simple_name: string | null;
   vf_long_name: string | null;
   vf_short_name: string | null;
   tia606b_name: string | null;
@@ -20,6 +22,61 @@ export interface NamePreview {
   missing: string[];
   complete: boolean;
   generated: boolean;
+}
+
+/** FEAT-1: how a site's ``simple_name`` is produced. */
+export type SiteCodeType = "auto" | "custom" | "theme";
+
+/** FEAT-1: result of GET /naming/site-code. */
+export interface SiteCodeResult {
+  org_id: number | null;
+  campus_id: number | null;
+  region_id: number | null;
+  site_code: string;
+  missing: string[];
+  complete: boolean;
+}
+
+/** FEAT-3: one entry of a themed name catalogue. */
+export interface ThemeName {
+  name: string;
+  category: string;
+  label: string;
+}
+
+/** FEAT-3: a themed name catalogue tab. */
+export interface ThemeCategory {
+  category: string;
+  label: string;
+  count: number;
+}
+
+/** FEAT-3: result of GET /naming/theme-names. */
+export interface ThemeNamesResult {
+  category: string | null;
+  q: string;
+  categories: ThemeCategory[];
+  count: number;
+  names: ThemeName[];
+}
+
+/** FEAT-5: one airport of the built-in catalogue. */
+export interface Airport {
+  iata: string;
+  city: string;
+  country: string;
+  name: string;
+}
+
+/** FEAT-5: result of GET /naming/airport-code. */
+export interface AirportCodeResult {
+  query: string;
+  city: string;
+  iata_code: string | null;
+  airport: string | null;
+  country: string | null;
+  alternatives: Airport[];
+  matches: Airport[];
 }
 
 async function handle(res: Response) {
@@ -104,6 +161,41 @@ export const api = {
     });
     return fetch(`${BASE}/naming/generate?${qs.toString()}`).then(handle);
   },
+  /**
+   * FEAT-1 — the automatic site code (``vfhmcc1``) for an org/campus/region
+   * combination. Pass ``siteId`` when editing so the row's own code is not
+   * counted as taken. Nothing is persisted.
+   */
+  siteCode: (
+    orgId?: number | null,
+    campusId?: number | null,
+    regionId?: number | null,
+    siteId?: number | null,
+  ): Promise<SiteCodeResult> => {
+    const qs = new URLSearchParams();
+    if (orgId != null) qs.set("org_id", String(orgId));
+    if (campusId != null) qs.set("campus_id", String(campusId));
+    if (regionId != null) qs.set("region_id", String(regionId));
+    if (siteId != null) qs.set("site_id", String(siteId));
+    return fetch(`${BASE}/naming/site-code?${qs.toString()}`).then(handle);
+  },
+  /**
+   * FEAT-3 — search the built-in themed name catalogues. Omit ``category`` to
+   * search every theme at once.
+   */
+  themeNames: (category = "", q = "", limit = 200): Promise<ThemeNamesResult> => {
+    const qs = new URLSearchParams({ q, limit: String(limit) });
+    if (category) qs.set("category", category);
+    return fetch(`${BASE}/naming/theme-names?${qs.toString()}`).then(handle);
+  },
+  /**
+   * FEAT-5 — resolve a city to the IATA code of its main airport, with
+   * ``matches`` for autocomplete and ``alternatives`` for multi-airport cities.
+   */
+  airportCode: (city: string, limit = 25): Promise<AirportCodeResult> =>
+    fetch(
+      `${BASE}/naming/airport-code?city=${encodeURIComponent(city)}&limit=${limit}`,
+    ).then(handle),
   // Abbreviation preview: derive a short code from a full name by trim mode.
   previewAbbrev: (
     fullName: string,

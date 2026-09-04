@@ -47,6 +47,52 @@ def sanitize_payload(model, payload: dict) -> dict:
     return clean
 
 
+def humanize_field(field: str) -> str:
+    """Turn a column name into the label the UI shows ("site_id" -> "Site")."""
+    name = field[:-3] if field.endswith("_id") else field
+    return name.replace("_", " ").strip().title()
+
+
+def missing_required(model, obj) -> list[str]:
+    """Columns the database declares NOT NULL that are still unset.
+
+    Columns with a Python-side or server-side default are skipped: SQLAlchemy /
+    PostgreSQL fills those in on flush.
+    """
+    missing: list[str] = []
+    for col in inspect(model).columns:
+        if col.primary_key or col.nullable:
+            continue
+        if col.default is not None or col.server_default is not None:
+            continue
+        if getattr(obj, col.key, None) is None:
+            missing.append(col.key)
+    return missing
+
+
+def validate_required(model, obj) -> None:
+    """Raise a readable 422 instead of letting Postgres emit a NOT NULL error.
+
+    The frontend surfaces ``detail`` verbatim in its error toast, so the message
+    must name the fields in the same words the grid headers use (BUG-C).
+    """
+    missing = missing_required(model, obj)
+    if not missing:
+        return
+    from fastapi import HTTPException
+
+    labels = ", ".join(f"'{humanize_field(f)}'" for f in missing)
+    plural = "s" if len(missing) > 1 else ""
+    raise HTTPException(
+        status_code=422,
+        detail=(
+            f"Missing required field{plural}: {labels}. "
+            f"Set {'them' if len(missing) > 1 else 'it'} on the row before saving "
+            f"— the database does not allow empty values here."
+        ),
+    )
+
+
 async def _validate_abbrev(session: AsyncSession, obj, entity_id) -> None:
     """Normalise the abbreviation/code and validate charset + global uniqueness.
 
@@ -249,6 +295,8 @@ async def create_item(
 ):
     data = sanitize_payload(model, payload)
     obj = model(**data)
+    # Fail fast with a readable message rather than a raw NOT NULL error.
+    validate_required(model, obj)
     await _validate_abbrev(session, obj, entity_id=None)
     await _validate_ipam(session, obj, entity_id=None)
     session.add(obj)
@@ -278,6 +326,7 @@ async def update_item(
             changes.append((field, old_value, new_value))
             setattr(obj, field, new_value)
     if changes:
+        validate_required(model, obj)
         await _validate_abbrev(session, obj, entity_id=obj.id)
         await _validate_ipam(session, obj, entity_id=obj.id)
         await session.flush()

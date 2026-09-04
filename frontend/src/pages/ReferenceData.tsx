@@ -1,5 +1,6 @@
 import { useState } from "react";
 import EntityGrid from "../components/EntityGrid";
+import type { RequiredField } from "../components/EntityGrid";
 import { textCol, roCol } from "../lib/columns";
 
 interface RefTable {
@@ -8,6 +9,8 @@ interface RefTable {
   description: string;
   columns: ReturnType<typeof textCol>[];
   newRowDefaults?: Record<string, unknown>;
+  /** Columns the database declares NOT NULL. */
+  requiredFields?: RequiredField[];
 }
 
 // Reference data = lookup lists that are NOT naming conventions. They hold
@@ -30,6 +33,7 @@ const TABLES: RefTable[] = [
       textCol("notes", "Notes", 240),
     ],
     newRowDefaults: { label: "New address" },
+    requiredFields: [{ field: "label", label: "Label" }],
   },
   {
     slug: "rack-types",
@@ -45,6 +49,7 @@ const TABLES: RefTable[] = [
       textCol("description", "Description", 260),
     ],
     newRowDefaults: { name: "New rack type", total_units: 42 },
+    requiredFields: [{ field: "name", label: "Name" }],
   },
 ];
 
@@ -87,6 +92,7 @@ export default function ReferenceData() {
           description={table.description}
           columns={table.columns}
           newRowDefaults={table.newRowDefaults ?? {}}
+          requiredFields={table.requiredFields ?? []}
         />
       </div>
     </div>

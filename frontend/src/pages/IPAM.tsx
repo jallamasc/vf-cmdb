@@ -1,12 +1,37 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, Row } from "../api";
+import { lookupLabel } from "../lib/columns";
 
 // The next-reserved endpoint historically returned the address under different
 // keys; accept either so the UI stays robust.
 function extractNextIp(d: any): string {
   return (d?.ip ?? d?.next_reserved_ip ?? "") as string;
 }
+
+/**
+ * Site scoping rule (BUG-B).
+ *
+ * A record is visible when: no site is selected ("All sites"), the record
+ * belongs to the selected site, OR the record has no site at all. Rows with
+ * ``site_id = NULL`` (legacy / imported data) must never disappear silently —
+ * that is exactly what made the IPAM page look empty.
+ */
+function inSiteScope(row: Row, siteId: number | null): boolean {
+  return siteId == null || row.site_id === siteId || row.site_id == null;
+}
+
+/** Human label for a site id; unassigned rows are called out explicitly. */
+function siteLabel(sites: Row[], id: number | null | undefined): string {
+  if (id == null) return "unassigned";
+  const s = sites.find((x) => x.id === id);
+  return s ? lookupLabel(s) : `Site #${id}`;
+}
+
+// Column counts of the segment tables (kept next to the headers so the
+// expandable reservation rows always span the full width).
+const IPV4_COLS = 10;
+const IPV6_COLS = 8;
 
 // ---------------------------------------------------------------------------
 // Small presentational helpers
@@ -180,7 +205,15 @@ function ReservationManager({
 // ---------------------------------------------------------------------------
 // IPv4 segment row (with utilisation + expandable reservations)
 // ---------------------------------------------------------------------------
-function Ipv4SegmentRow({ subnet, vlanLabel }: { subnet: Row; vlanLabel: string }) {
+function Ipv4SegmentRow({
+  subnet,
+  vlanLabel,
+  site,
+}: {
+  subnet: Row;
+  vlanLabel: string;
+  site: string;
+}) {
   const [open, setOpen] = useState(false);
   const hasCidr = Boolean(subnet.network_cidr);
   const { data: util } = useQuery({
@@ -195,6 +228,19 @@ function Ipv4SegmentRow({ subnet, vlanLabel }: { subnet: Row; vlanLabel: string 
         <td className="px-3 py-2 font-mono text-sm">{subnet.network_cidr ?? "—"}</td>
         <td className="px-3 py-2 font-mono text-xs">{subnet.gateway ?? "—"}</td>
         <td className="px-3 py-2">{vlanLabel}</td>
+        <td
+          className={`px-3 py-2 text-xs ${
+            subnet.site_id == null ? "text-amber-600 italic" : "text-slate-600"
+          }`}
+        >
+          {site}
+        </td>
+        {/* BUG-D: Excel-imported range / expansion fields */}
+        <td className="px-3 py-2 font-mono text-xs">{subnet.range_from ?? "—"}</td>
+        <td className="px-3 py-2 font-mono text-xs">{subnet.range_to ?? "—"}</td>
+        <td className="px-3 py-2 font-mono text-xs">
+          {subnet.expansion_ceiling ?? "—"}
+        </td>
         <td className="px-3 py-2 whitespace-nowrap">
           {util ? (
             <span className="flex items-center gap-2">
@@ -208,7 +254,9 @@ function Ipv4SegmentRow({ subnet, vlanLabel }: { subnet: Row; vlanLabel: string 
           )}
         </td>
         <td className="px-3 py-2 text-xs text-slate-600">
-          {util ? `${util.reserved_used}/${util.reserved_count}` : "—"}
+          {util
+            ? `${util.reserved_used}/${util.reserved_count}`
+            : `0/${subnet.reserved_count ?? 0}`}
           <span className="text-slate-400"> · {subnet.reservation_anchor ?? "from_end"}</span>
         </td>
         <td className="px-3 py-2">
@@ -222,7 +270,7 @@ function Ipv4SegmentRow({ subnet, vlanLabel }: { subnet: Row; vlanLabel: string 
       </tr>
       {open && (
         <tr>
-          <td colSpan={6} className="p-0">
+          <td colSpan={IPV4_COLS} className="p-0">
             <ReservationManager subnetId={subnet.id} family="ipv4" />
           </td>
         </tr>
@@ -234,13 +282,31 @@ function Ipv4SegmentRow({ subnet, vlanLabel }: { subnet: Row; vlanLabel: string 
 // ---------------------------------------------------------------------------
 // IPv6 segment row (collapsible reservations)
 // ---------------------------------------------------------------------------
-function Ipv6SegmentRow({ subnet, vlanLabel }: { subnet: Row; vlanLabel: string }) {
+function Ipv6SegmentRow({
+  subnet,
+  vlanLabel,
+  site,
+}: {
+  subnet: Row;
+  vlanLabel: string;
+  site: string;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <>
       <tr className="border-t border-slate-100">
         <td className="px-3 py-2 font-mono text-xs">{subnet.network_cidr ?? "—"}</td>
         <td className="px-3 py-2">{vlanLabel}</td>
+        <td
+          className={`px-3 py-2 text-xs ${
+            subnet.site_id == null ? "text-amber-600 italic" : "text-slate-600"
+          }`}
+        >
+          {site}
+        </td>
+        {/* BUG-D: range fields from the imported data */}
+        <td className="px-3 py-2 font-mono text-xs">{subnet.range_from ?? "—"}</td>
+        <td className="px-3 py-2 font-mono text-xs">{subnet.range_to ?? "—"}</td>
         <td className="px-3 py-2 text-xs text-slate-500">
           {subnet.reserved_count ?? 0} · {subnet.reservation_anchor ?? "from_end"}
         </td>
@@ -256,7 +322,7 @@ function Ipv6SegmentRow({ subnet, vlanLabel }: { subnet: Row; vlanLabel: string 
       </tr>
       {open && (
         <tr>
-          <td colSpan={5} className="p-0">
+          <td colSpan={IPV6_COLS} className="p-0">
             <ReservationManager subnetId={subnet.id} family="ipv6" />
           </td>
         </tr>
@@ -276,8 +342,9 @@ function VlansTab({ siteId }: { siteId: number | null }) {
   const [zone, setZone] = useState("");
   const [err, setErr] = useState<string | null>(null);
 
+  // BUG-B: never hide VLANs whose site is unset — show them in every scope.
   const scoped = useMemo(
-    () => (vlans ?? []).filter((v) => siteId == null || v.site_id === siteId),
+    () => (vlans ?? []).filter((v) => inSiteScope(v, siteId)),
     [vlans, siteId],
   );
 
@@ -372,7 +439,13 @@ function VlansTab({ siteId }: { siteId: number | null }) {
 // ---------------------------------------------------------------------------
 // Segments tab (IPv4 primary + IPv6 collapsible)
 // ---------------------------------------------------------------------------
-function SegmentsTab({ siteId }: { siteId: number | null }) {
+function SegmentsTab({
+  siteId,
+  sites,
+}: {
+  siteId: number | null;
+  sites: Row[];
+}) {
   const { data: v4 } = useQuery({ queryKey: ["subnets-ipv4"], queryFn: () => api.list("subnets-ipv4") });
   const { data: v6 } = useQuery({ queryKey: ["subnets-ipv6"], queryFn: () => api.list("subnets-ipv6") });
   const { data: vlans } = useQuery({ queryKey: ["vlans"], queryFn: () => api.list("vlans") });
@@ -383,8 +456,11 @@ function SegmentsTab({ siteId }: { siteId: number | null }) {
     return v ? `${v.vlan_id ?? ""} ${v.name ?? ""}`.trim() : "—";
   };
 
-  const scoped4 = (v4 ?? []).filter((s) => siteId == null || s.site_id === siteId);
-  const scoped6 = (v6 ?? []).filter((s) => siteId == null || s.site_id === siteId);
+  // BUG-B: unassigned (site_id = NULL) segments stay visible in every scope.
+  const scoped4 = (v4 ?? []).filter((s) => inSiteScope(s, siteId));
+  const scoped6 = (v6 ?? []).filter((s) => inSiteScope(s, siteId));
+  const hidden4 = (v4 ?? []).length - scoped4.length;
+  const hidden6 = (v6 ?? []).length - scoped6.length;
 
   return (
     <div>
@@ -395,6 +471,10 @@ function SegmentsTab({ siteId }: { siteId: number | null }) {
               <th className="text-left px-3 py-2">Network</th>
               <th className="text-left px-3 py-2">Gateway</th>
               <th className="text-left px-3 py-2">VLAN</th>
+              <th className="text-left px-3 py-2">Site</th>
+              <th className="text-left px-3 py-2">Range from</th>
+              <th className="text-left px-3 py-2">Range to</th>
+              <th className="text-left px-3 py-2">Expansion ceiling</th>
               <th className="text-left px-3 py-2">Utilisation</th>
               <th className="text-left px-3 py-2">Reserved (used/ceiling · anchor)</th>
               <th className="text-left px-3 py-2">Reservations</th>
@@ -403,17 +483,30 @@ function SegmentsTab({ siteId }: { siteId: number | null }) {
           <tbody>
             {scoped4.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-3 py-3 text-slate-400 text-sm">
+                <td colSpan={IPV4_COLS} className="px-3 py-3 text-slate-400 text-sm">
                   No IPv4 segments for this site yet.
+                  {hidden4 > 0 &&
+                    ` ${hidden4} segment(s) belong to another site — switch to “All sites” to see them.`}
                 </td>
               </tr>
             )}
             {scoped4.map((s) => (
-              <Ipv4SegmentRow key={s.id} subnet={s} vlanLabel={vlanLabel(s.vlan_id)} />
+              <Ipv4SegmentRow
+                key={s.id}
+                subnet={s}
+                vlanLabel={vlanLabel(s.vlan_id)}
+                site={siteLabel(sites, s.site_id)}
+              />
             ))}
           </tbody>
         </table>
       </div>
+      {scoped4.length > 0 && hidden4 > 0 && (
+        <p className="text-xs text-slate-400 mb-3">
+          {hidden4} IPv4 segment(s) from other sites are hidden — switch to “All
+          sites” to see every segment.
+        </p>
+      )}
 
       <button
         onClick={() => setShowV6((o) => !o)}
@@ -428,6 +521,9 @@ function SegmentsTab({ siteId }: { siteId: number | null }) {
               <tr>
                 <th className="text-left px-3 py-2">Network</th>
                 <th className="text-left px-3 py-2">VLAN</th>
+                <th className="text-left px-3 py-2">Site</th>
+                <th className="text-left px-3 py-2">Range from</th>
+                <th className="text-left px-3 py-2">Range to</th>
                 <th className="text-left px-3 py-2">Reserved · anchor</th>
                 <th className="text-left px-3 py-2">Description</th>
                 <th className="text-left px-3 py-2">Reservations</th>
@@ -436,13 +532,20 @@ function SegmentsTab({ siteId }: { siteId: number | null }) {
             <tbody>
               {scoped6.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-3 py-3 text-slate-400 text-sm">
+                  <td colSpan={IPV6_COLS} className="px-3 py-3 text-slate-400 text-sm">
                     No IPv6 segments for this site yet.
+                    {hidden6 > 0 &&
+                      ` ${hidden6} segment(s) belong to another site — switch to “All sites” to see them.`}
                   </td>
                 </tr>
               )}
               {scoped6.map((s) => (
-                <Ipv6SegmentRow key={s.id} subnet={s} vlanLabel={vlanLabel(s.vlan_id)} />
+                <Ipv6SegmentRow
+                  key={s.id}
+                  subnet={s}
+                  vlanLabel={vlanLabel(s.vlan_id)}
+                  site={siteLabel(sites, s.site_id)}
+                />
               ))}
             </tbody>
           </table>
@@ -457,11 +560,53 @@ function SegmentsTab({ siteId }: { siteId: number | null }) {
 // ---------------------------------------------------------------------------
 export default function IPAM() {
   const { data: sites } = useQuery({ queryKey: ["sites"], queryFn: () => api.list("sites") });
+  const { data: v4 } = useQuery({
+    queryKey: ["subnets-ipv4"],
+    queryFn: () => api.list("subnets-ipv4"),
+  });
+  const { data: v6 } = useQuery({
+    queryKey: ["subnets-ipv6"],
+    queryFn: () => api.list("subnets-ipv6"),
+  });
+  // ``null`` means "All sites". The user's choice always wins once made.
   const [siteId, setSiteId] = useState<number | null>(null);
+  const [siteChosen, setSiteChosen] = useState(false);
   const [tab, setTab] = useState<"vlans" | "segments">("segments");
 
-  // Default to the first site once loaded.
-  const effectiveSite = siteId ?? (sites && sites.length ? sites[0].id : null);
+  const siteList = sites ?? [];
+
+  // How many segments each site owns — used both for the smart default and to
+  // annotate the dropdown so an empty test site is obvious.
+  const segmentCounts = useMemo(() => {
+    const counts = new Map<number, number>();
+    [...(v4 ?? []), ...(v6 ?? [])].forEach((s) => {
+      if (s.site_id != null)
+        counts.set(s.site_id, (counts.get(s.site_id) ?? 0) + 1);
+    });
+    return counts;
+  }, [v4, v6]);
+
+  // BUG-B: default to the site that actually holds the most segments instead
+  // of blindly picking sites[0] (which could be an empty QA artifact). If no
+  // site owns any segment we stay on "All sites" so nothing is hidden.
+  useEffect(() => {
+    if (siteChosen || siteId != null) return;
+    if (segmentCounts.size === 0) return;
+    let best: number | null = null;
+    let bestCount = 0;
+    segmentCounts.forEach((count, id) => {
+      if (count > bestCount) {
+        best = id;
+        bestCount = count;
+      }
+    });
+    if (best != null) setSiteId(best);
+  }, [segmentCounts, siteChosen, siteId]);
+
+  const effectiveSite = siteId;
+  const unassignedSegments = [...(v4 ?? []), ...(v6 ?? [])].filter(
+    (s) => s.site_id == null,
+  ).length;
 
   return (
     <div>
@@ -476,15 +621,25 @@ export default function IPAM() {
         <label className="text-sm text-slate-600">Site</label>
         <select
           value={effectiveSite ?? ""}
-          onChange={(e) => setSiteId(e.target.value ? Number(e.target.value) : null)}
+          onChange={(e) => {
+            setSiteChosen(true);
+            setSiteId(e.target.value ? Number(e.target.value) : null);
+          }}
           className="px-3 py-1.5 border border-slate-300 rounded text-sm bg-white"
         >
-          {(sites ?? []).map((s) => (
+          <option value="">All sites</option>
+          {siteList.map((s) => (
             <option key={s.id} value={s.id}>
-              {s.name ?? s.code ?? `Site #${s.id}`}
+              {lookupLabel(s)} ({segmentCounts.get(s.id) ?? 0} segments)
             </option>
           ))}
         </select>
+        {unassignedSegments > 0 && (
+          <span className="text-xs text-amber-600">
+            {unassignedSegments} segment(s) have no site yet — they are listed in
+            every scope until a site is assigned.
+          </span>
+        )}
 
         <div className="flex gap-2 ml-auto">
           <button
@@ -503,7 +658,7 @@ export default function IPAM() {
       </div>
 
       {tab === "segments" ? (
-        <SegmentsTab siteId={effectiveSite} />
+        <SegmentsTab siteId={effectiveSite} sites={siteList} />
       ) : (
         <VlansTab siteId={effectiveSite} />
       )}

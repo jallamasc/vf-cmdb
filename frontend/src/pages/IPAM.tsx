@@ -1,6 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, Row } from "../api";
+
+// The next-reserved endpoint historically returned the address under different
+// keys; accept either so the UI stays robust.
+function extractNextIp(d: any): string {
+  return (d?.ip ?? d?.next_reserved_ip ?? "") as string;
+}
 
 // ---------------------------------------------------------------------------
 // Small presentational helpers
@@ -36,6 +42,25 @@ function ReservationManager({
     queryFn: () => api.reservations(subnetId, family),
   });
 
+  // Pre-populate the IP field with the suggested next reserved address when the
+  // manager opens. On failure (e.g. subnet has no CIDR) leave the field empty
+  // so the user can type manually — never fall back to a hardcoded IP.
+  useEffect(() => {
+    let active = true;
+    api
+      .nextReserved(subnetId, family)
+      .then((d: any) => {
+        if (active) setAddr((cur) => (cur ? cur : extractNextIp(d)));
+      })
+      .catch(() => {
+        /* no CIDR / no free address — leave the field empty */
+      });
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subnetId, family]);
+
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["reservations", family, subnetId] });
     qc.invalidateQueries({ queryKey: ["utilization", subnetId] });
@@ -62,7 +87,7 @@ function ReservationManager({
   const suggestMut = useMutation({
     mutationFn: () => api.nextReserved(subnetId, family),
     onSuccess: (d: any) => {
-      setAddr(d.next_reserved_ip ?? "");
+      setAddr(extractNextIp(d));
       setErr(null);
     },
     onError: (e: any) => setErr(String(e.message ?? e)),
@@ -124,7 +149,7 @@ function ReservationManager({
         <input
           value={addr}
           onChange={(e) => setAddr(e.target.value)}
-          placeholder={family === "ipv4" ? "192.168.1.254" : "fd00::254"}
+          placeholder={family === "ipv4" ? "IPv4 address" : "IPv6 address"}
           className="px-2 py-1 border border-slate-300 rounded text-sm font-mono w-44"
         />
         <input

@@ -30,6 +30,7 @@ const NAV: { section: string; items: { to: string; label: string }[] }[] = [
     items: [
       { to: "/vlans", label: "VLANs" },
       { to: "/subnets", label: "Subnets (IPAM)" },
+      { to: "/ipam", label: "IPAM by Site" },
       { to: "/ip-assignments", label: "IP Assignments" },
       { to: "/network-devices", label: "Network Devices" },
       { to: "/port-config", label: "Device Port Config" },

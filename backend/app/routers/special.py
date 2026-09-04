@@ -153,13 +153,256 @@ async def subnet_utilization(
     used = await _used_ipv4(session)
     in_net = [u for u in used if ipaddress.ip_address(u) in net]
     total = net.num_addresses - 2 if net.num_addresses > 2 else net.num_addresses
+    # Reservations that fall inside this subnet (includes the locked gateway).
+    res_rows = (
+        await session.execute(
+            select(models.SubnetRoleAssignment.ipv4_address).where(
+                models.SubnetRoleAssignment.subnet_ipv4_id == subnet_id,
+                models.SubnetRoleAssignment.ipv4_address.isnot(None),
+            )
+        )
+    ).scalars().all()
+    reserved_used = len(
+        [r for r in res_rows if r and ipaddress.ip_address(str(r).split("/")[0]) in net]
+    )
     return {
         "subnet_id": subnet_id,
         "network": str(net),
         "total_usable": total,
         "used": len(in_net),
+        "reserved_count": int(subnet.reserved_count or 0),
+        "reserved_used": reserved_used,
+        "reservation_anchor": subnet.reservation_anchor or "from_end",
         "utilization_pct": round(len(in_net) / total * 100, 1) if total else 0,
     }
+
+
+# ---------------------------------------------------------------------------
+# IPAM: reservations (reserved pool management)
+# ---------------------------------------------------------------------------
+def _reservation_dict(r: models.SubnetRoleAssignment) -> dict[str, Any]:
+    return {
+        "id": r.id,
+        "subnet_ipv4_id": r.subnet_ipv4_id,
+        "subnet_ipv6_id": r.subnet_ipv6_id,
+        "role": r.role,
+        "label": r.label,
+        "ipv4_address": str(r.ipv4_address) if r.ipv4_address else None,
+        "ipv6_address": str(r.ipv6_address) if r.ipv6_address else None,
+        "is_locked": bool(r.is_locked),
+        "notes": r.notes,
+    }
+
+
+async def _resolve_subnet(session: AsyncSession, subnet_id: int, family: str):
+    """Return (subnet, family) where family is 'ipv4' or 'ipv6'.
+
+    IPv4 and IPv6 subnets live in separate tables with independent id spaces, so
+    the caller disambiguates with ``family`` (defaults to ipv4).
+    """
+    if family == "ipv6":
+        subnet = await session.get(models.SubnetIpv6, subnet_id)
+        return subnet, "ipv6"
+    subnet = await session.get(models.SubnetIpv4, subnet_id)
+    return subnet, "ipv4"
+
+
+@router.get("/ipam/subnets/{subnet_id}/reservations")
+async def list_reservations(
+    subnet_id: int,
+    family: str = Query("ipv4", pattern="^(ipv4|ipv6)$"),
+    session: AsyncSession = Depends(get_session),
+) -> list[dict[str, Any]]:
+    subnet, fam = await _resolve_subnet(session, subnet_id, family)
+    if subnet is None:
+        raise HTTPException(status_code=404, detail="Subnet not found")
+    id_col = (
+        models.SubnetRoleAssignment.subnet_ipv4_id
+        if fam == "ipv4"
+        else models.SubnetRoleAssignment.subnet_ipv6_id
+    )
+    rows = (
+        await session.execute(
+            select(models.SubnetRoleAssignment)
+            .where(id_col == subnet_id)
+            .order_by(models.SubnetRoleAssignment.id)
+        )
+    ).scalars().all()
+    return [_reservation_dict(r) for r in rows]
+
+
+@router.post("/ipam/subnets/{subnet_id}/reservations")
+async def create_reservation(
+    subnet_id: int,
+    payload: dict[str, Any],
+    family: str = Query("ipv4", pattern="^(ipv4|ipv6)$"),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    subnet, fam = await _resolve_subnet(session, subnet_id, family)
+    if subnet is None:
+        raise HTTPException(status_code=404, detail="Subnet not found")
+
+    addr_key = "ipv4_address" if fam == "ipv4" else "ipv6_address"
+    id_col = (
+        models.SubnetRoleAssignment.subnet_ipv4_id
+        if fam == "ipv4"
+        else models.SubnetRoleAssignment.subnet_ipv6_id
+    )
+    raw_addr = payload.get(addr_key) or payload.get("address")
+    if not raw_addr:
+        raise HTTPException(status_code=422, detail=f"{addr_key} is required")
+    addr = str(raw_addr).split("/")[0]
+
+    # Validate the address is inside the subnet.
+    if subnet.network_cidr:
+        try:
+            net = ipaddress.ip_network(str(subnet.network_cidr), strict=False)
+            ip_obj = ipaddress.ip_address(addr)
+            if ip_obj not in net:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"{addr} is not inside subnet {net}",
+                )
+            if ip_obj == net.network_address or (
+                net.num_addresses > 1 and ip_obj == net.broadcast_address
+            ):
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"{addr} is the network/broadcast address",
+                )
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid CIDR/address")
+
+    existing = (
+        await session.execute(
+            select(models.SubnetRoleAssignment).where(id_col == subnet_id)
+        )
+    ).scalars().all()
+
+    # Duplicate check.
+    for r in existing:
+        cur = getattr(r, addr_key)
+        if cur and str(cur).split("/")[0] == addr:
+            raise HTTPException(
+                status_code=409, detail=f"{addr} is already reserved"
+            )
+
+    # Ceiling: manual (non-locked) reservations may not exceed reserved_count.
+    ceiling = int(subnet.reserved_count or 0)
+    manual = [r for r in existing if not r.is_locked]
+    if len(manual) >= ceiling:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Reservation ceiling reached ({ceiling}). Increase the "
+                "segment's reserved_count to add more reservations."
+            ),
+        )
+
+    reservation = models.SubnetRoleAssignment(
+        role=payload.get("role") or "reserved",
+        label=payload.get("label"),
+        is_locked=bool(payload.get("is_locked", False)),
+        notes=payload.get("notes"),
+    )
+    setattr(reservation, "subnet_ipv4_id" if fam == "ipv4" else "subnet_ipv6_id", subnet_id)
+    setattr(reservation, addr_key, addr)
+    session.add(reservation)
+    await session.flush()
+    await crud._log(
+        session,
+        "subnet_role_assignments",
+        reservation.id,
+        addr_key,
+        None,
+        addr,
+        "web_ui",
+    )
+    await session.commit()
+    await session.refresh(reservation)
+    return _reservation_dict(reservation)
+
+
+@router.delete("/ipam/subnets/{subnet_id}/reservations/{reservation_id}")
+async def delete_reservation(
+    subnet_id: int,
+    reservation_id: int,
+    family: str = Query("ipv4", pattern="^(ipv4|ipv6)$"),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    reservation = await session.get(models.SubnetRoleAssignment, reservation_id)
+    if reservation is None:
+        raise HTTPException(status_code=404, detail="Reservation not found")
+    if reservation.is_locked:
+        raise HTTPException(
+            status_code=409,
+            detail="Locked reservations (e.g. the gateway) cannot be deleted.",
+        )
+    addr = reservation.ipv4_address or reservation.ipv6_address
+    await crud._log(
+        session,
+        "subnet_role_assignments",
+        reservation_id,
+        "__deleted__",
+        str(addr) if addr else None,
+        None,
+        "web_ui",
+    )
+    await session.delete(reservation)
+    await session.commit()
+    return {"deleted": True, "id": reservation_id}
+
+
+@router.get("/ipam/subnets/{subnet_id}/next-reserved")
+async def next_reserved_ip(
+    subnet_id: int,
+    family: str = Query("ipv4", pattern="^(ipv4|ipv6)$"),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Return the next free reservation IP honouring the segment anchor.
+
+    ``from_end`` (default): walk hosts from the top of the subnet downwards
+    (e.g. /24 -> .254, .253, ...), skipping the broadcast address. ``from_start``:
+    walk upwards from the first host. Skips the network/broadcast, the gateway,
+    existing reservations and any already-assigned host addresses (gap-aware).
+    """
+    subnet, fam = await _resolve_subnet(session, subnet_id, family)
+    if subnet is None or not subnet.network_cidr:
+        raise HTTPException(status_code=404, detail="Subnet not found or has no CIDR")
+    try:
+        net = ipaddress.ip_network(str(subnet.network_cidr), strict=False)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid subnet CIDR")
+
+    if fam == "ipv4":
+        used = await _used_ipv4(session)
+    else:
+        used = set()
+        col = models.SubnetRoleAssignment.ipv6_address
+        rows = (await session.execute(select(col).where(col.isnot(None)))).scalars().all()
+        for v in rows:
+            if v:
+                used.add(str(v).split("/")[0])
+        col2 = models.IpAssignment.ipv6_address
+        rows2 = (await session.execute(select(col2).where(col2.isnot(None)))).scalars().all()
+        for v in rows2:
+            if v:
+                used.add(str(v).split("/")[0])
+
+    anchor = (subnet.reservation_anchor or "from_end").lower()
+    hosts = list(net.hosts())
+    if anchor == "from_end":
+        hosts = list(reversed(hosts))
+    for host in hosts:
+        if str(host) not in used:
+            return {
+                "subnet_id": subnet_id,
+                "family": fam,
+                "network": str(net),
+                "anchor": anchor,
+                "next_reserved_ip": str(host),
+            }
+    raise HTTPException(status_code=409, detail="No free reservation IP available")
 
 
 # ---------------------------------------------------------------------------

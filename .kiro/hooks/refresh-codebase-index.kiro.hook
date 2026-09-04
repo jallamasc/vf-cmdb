@@ -1,0 +1,14 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Refresh codebase index on save",
+      "trigger": "PostFileSave",
+      "matcher": "^.*/(backend|frontend)/.*\\.(py|ts|tsx|sql)$",
+      "action": {
+        "type": "command",
+        "command": "cd /Volumes/development/vf-cmdb && ./cbindex build >/dev/null 2>&1 || true"
+      }
+    }
+  ]
+}

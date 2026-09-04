@@ -1,0 +1,13 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Update SESSION_STATE after spec task",
+      "trigger": "PostTaskExec",
+      "action": {
+        "type": "agent",
+        "prompt": "A spec task just completed. Before moving on: (1) verify the change builds (frontend: npm run build / tsc -b; backend: confirm `from app.main import app` imports). (2) Update SESSION_STATE.md with what changed, the current git HEAD, and the next step. (3) Run `./cbindex build` to refresh the semantic index. Keep SESSION_STATE.md concise; move durable decisions to MEMORY_BANK.md. Do not commit unless the user asked."
+      }
+    }
+  ]
+}

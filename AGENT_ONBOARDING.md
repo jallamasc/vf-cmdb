@@ -8,6 +8,10 @@ tools so work continues seamlessly, with fresh (non-rotten) context.
 > agent, or run the **Bootstrap Commands** in a terminal. Everything else here
 > explains what those do and why.
 
+> **Local checkout (this machine):** `/Volumes/development/vf-cmdb` (macOS).
+> Authoritative dev ports: frontend **8080**, backend **8000**, postgres
+> **5432**, pgAdmin **5050**. See `.kiro/steering/tech.md`.
+
 ---
 
 ## The memory system at a glance

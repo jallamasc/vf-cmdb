@@ -1,0 +1,13 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Surface current state at session start",
+      "trigger": "SessionStart",
+      "action": {
+        "type": "agent",
+        "prompt": "This is the Virtualfactor IT CMDB project. Follow the Memory Protocol steering file: read SESSION_STATE.md for current status and open items, and consult MEMORY_BANK.md for hard rules before any architectural change. The codebase index is available via `./cbindex search`. Briefly note the current phase/next step from SESSION_STATE.md so we resume with fresh context."
+      }
+    }
+  ]
+}

@@ -2,10 +2,106 @@
 ## Living Document - Read on Every Interaction
 
 **Last Updated**: 2026-09-04 (Current session)  
-**Project Phase**: Development — Fully Tested, Ready for Proxmox Deployment  
-**Status**: ✅ Phase 2 complete + Full QA test run + 3 bugs fixed (commit `46b3164`)
+**Project Phase**: Phase 3 nearly complete — only FEAT-6 remains  
+**Status**: ✅ Bugs A–D, UX 1–4, FEAT-1/2/3/4/5/7 shipped (HEAD `59fa10a`). FEAT-6 spec authored; Kiro memory infrastructure installed.
 
 ---
+
+## 🆕 (2026-09-04): FEAT-6 spec + Kiro memory infrastructure
+
+**Local working copy** moved to `/Volumes/development/vf-cmdb` (macOS). The old
+`/home/ubuntu/vf_cmdb` path and ports 3001/5433 in these docs are stale — the
+authoritative ports are frontend **8080**, backend **8000**, postgres **5432**,
+pgAdmin **5050** (see `.kiro/steering/tech.md`).
+
+**FEAT-6 spec authored** at `.kiro/specs/rack-back-and-cabling/`
+(requirements.md, design.md, tasks.md — all format-validated). Covers Sprint
+6A dual-face rack view, 6B Visio Café stencils (cache-first + manual upload,
+air-gap safe), 6C port-to-port cabling (polymorphic port ownership migration
+0006, connect panel, auto cable label, cables viewer). Design closes two review
+gaps: (A) device→rack membership = device `rack_id` else `RackUnit`
+(`device_table`,`device_id`); (B) rack→datacenter via
+`datacenter_floor_id`→dc else `room_id`→floor→dc, with same-site / same-rack
+fallback so placed racks never spuriously 404.
+
+**Kiro memory system installed** under `.kiro/`:
+- steering/ — product.md, tech.md, structure.md, memory-protocol.md (all
+  `inclusion: always`) so prose memory + the cbindex workflow load every session.
+- hooks/ — refresh-codebase-index (PostFileSave), update-session-state
+  (PostTaskExec), session-start-memory (SessionStart).
+- skills/ — add-entity, local-test-loop.
+- Codebase index built on this machine: 144 files → 605 chunks.
+
+### FEAT-6 Phase 1 — schema foundation ✅ (code complete, awaiting live DB verify)
+
+Task 1 of `.kiro/specs/rack-back-and-cabling/tasks.md` implemented:
+- `backend/app/models.py`: `stencil_url` (String(500)) added to `NetworkDeviceType`,
+  `ComputeDeviceType`, `StorageDeviceType`; `Cable.label` (String(200)) added
+  (a/b shape preserved); `DeviceInterface.network_device_id` relaxed to nullable
+  and `owner_device_type`/`owner_device_id` polymorphic pair added.
+- `backend/alembic/versions/0006_ports_and_stencils.py`: new head, chains onto
+  `0005_site_redesign`. Additive columns + backfill (`owner_device_type=
+  'network-devices'`, `owner_device_id=network_device_id`) + guarded idempotent
+  style copied from 0005. Safe downgrade (restores NOT NULL only if no NULLs).
+
+**Verified against LIVE PostgreSQL 16** (Podman now installed: `/opt/homebrew/bin/podman`
+6.1.1; machine `podman-machine-default` running). Ran a throwaway `postgres:16`
+container on host port 55432, pointed Alembic at it via POSTGRES_* env vars:
+- Full chain `0001 → 0006` applied cleanly (incl. 0006).
+- Resulting schema confirmed: `device_interfaces.network_device_id` nullable
+  (FK preserved) + `owner_device_type varchar(40)` + `owner_device_id integer`;
+  `cables.label varchar(200)`; `stencil_url` on all three device-type tables.
+- Backfill verified: a seeded legacy row (`network_device_id=5`, NULL owner)
+  became `owner_device_type='network-devices'`, `owner_device_id=5`.
+- Round-trip `upgrade → downgrade → upgrade` clean; safe downgrade restored
+  `network_device_id` to NOT NULL (no NULLs present); second upgrade is a no-op
+  (idempotent). Test container removed afterwards.
+- SQLAlchemy mappers also configure cleanly (backend `.venv`, gitignored).
+
+**How to reproduce the live check** (Podman CLI is at /opt/homebrew/bin, not on
+non-login shells' PATH):
+```
+export PATH=/opt/homebrew/bin:$PATH
+podman machine start                       # if not already running
+podman run -d --name pg -e POSTGRES_USER=vfcmdb -e POSTGRES_PASSWORD=vfcmdb \
+  -e POSTGRES_DB=vfcmdb -p 55432:5432 docker.io/library/postgres:16
+cd backend && POSTGRES_HOST=127.0.0.1 POSTGRES_PORT=55432 POSTGRES_USER=vfcmdb \
+  POSTGRES_PASSWORD=vfcmdb POSTGRES_DB=vfcmdb .venv/bin/alembic upgrade head
+```
+
+### FEAT-6 COMPLETE — running locally for browser testing (2026-09-04)
+
+All 12 implementation tasks done and verified. Backend + frontend are RUNNING:
+- **Frontend (test this): http://localhost:5173** (Vite dev server, proxies /api).
+- Backend: uvicorn on 127.0.0.1:8000 against a Podman `postgres:16` container
+  (`vf_cmdb_dev`, host port 55432), migrated to 0006 and seeded with the real
+  Virtualfactor dataset (1 site, 1 rack, 5 network devices with 28 interfaces,
+  43 VLANs, 46 IPv4 subnets).
+
+What to try in the browser:
+- **Rack View** → Front/Back toggle. Back face shows port connector dots
+  (blue=copper, orange=fiber, yellow=power); hover a dot for its label; click a
+  dot to open the Connect panel and cable it to another port. Device 3 (a switch
+  in rack AA01) has all 28 interfaces.
+- **Cables** page → the auto-generated cable label + From/To columns, filter by
+  rack or device. Cables you create from the Connect panel appear here.
+- **Naming Conventions** → Network/Compute/Storage Device Types now have a
+  "Stencils" panel (paste a URL or upload an SVG) + a Stencil URL column.
+
+Backend files added/changed: naming.py (generate_cable + GENERATORS), crud.py
+(cable validation + MODEL_COMPUTED_FIELDS), stencils.py (new), ports.py (new),
+routers/special.py (/stencils, /ports/candidates), models.py + migration 0006.
+Frontend: api.ts, RackDiagramSVG.tsx, RackView.tsx, ConnectPanel.tsx (new),
+StencilField.tsx (new), Naming.tsx, CablesViewer.tsx (new), App.tsx.
+`npm run build` (tsc -b && vite build) passes clean.
+
+Restart the stack later with the reproduce block below (or `./deploy-podman.sh up`
+for the full container stack). To run the servers manually:
+- backend: `cd backend && POSTGRES_HOST=127.0.0.1 POSTGRES_PORT=55432 POSTGRES_USER=vfcmdb POSTGRES_PASSWORD=vfcmdb POSTGRES_DB=vfcmdb .venv/bin/uvicorn app.main:app --port 8000`
+- frontend: `cd frontend && npm run dev` (serves 5173, proxies /api → 8000)
+
+**Next**: user browser testing. Then optional `*` tasks (pytest + Vitest suites),
+and committing the FEAT-6 work.
 
 ## 🆕 FEAT-7 (2026-09-04): Device Detail Dashboard
 
@@ -145,7 +241,7 @@ local Postgres; INET/CIDR types are Postgres-specific).
 ## 📌 Current State Snapshot
 
 ### Repository Status
-- **Location**: `/home/ubuntu/vf_cmdb/`
+- **Location**: `/Volumes/development/vf-cmdb/`
 - **Remote**: `https://github.com/jallamasc/vf-cmdb`
 - **Branch**: `master`
 - **Last Push**: 2026-09-03 (commit `36c7f5f`)
@@ -577,7 +673,7 @@ Full detail in `docs/PHASE_3_PLAN.md`. Summary:
 
 ### Git Operations
 ```bash
-cd /home/ubuntu/vf_cmdb
+cd /Volumes/development/vf-cmdb
 git status                          # Check for changes
 git diff                            # See what changed
 git log --oneline -5                # Last 5 commits

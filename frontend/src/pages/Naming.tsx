@@ -1,8 +1,16 @@
 import { useMemo, useState } from "react";
 import { useQueries } from "@tanstack/react-query";
 import EntityGrid from "../components/EntityGrid";
+import StencilField from "../components/StencilField";
 import { api } from "../api";
 import { textCol, roCol, numCol } from "../lib/columns";
+
+// FEAT-6 (6B): device-type resources that carry a stencil_url + stencil upload.
+const STENCIL_RESOURCES = new Set([
+  "network-device-types",
+  "compute-device-types",
+  "storage-device-types",
+]);
 
 interface Lookup {
   slug: string;
@@ -78,13 +86,19 @@ const newLookupDefaults = () => ({
   abbreviation: `new-${Math.random().toString(36).slice(2, 6)}`,
 });
 
-const columns = [
+const baseColumns = [
   roCol("id", "ID", 70),
   textCol("full_name", "Full Name", 220),
   textCol("abbreviation", "Abbreviation", 150),
   numCol("max_length", "Max Length"),
   textCol("notes", "Notes", 300),
 ];
+
+// FEAT-6 (6B): device-type grids also expose the stencil_url column.
+const columnsFor = (slug: string) =>
+  STENCIL_RESOURCES.has(slug)
+    ? [...baseColumns, textCol("stencil_url", "Stencil URL", 260)]
+    : baseColumns;
 
 export default function Naming() {
   const [active, setActive] = useState(ALL_LOOKUPS[0].slug);
@@ -201,12 +215,23 @@ export default function Naming() {
         </div>
 
         {/* Active lookup grid */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 flex flex-col">
+          {/* FEAT-6 (6B): stencil manager for device-type dictionaries. */}
+          {STENCIL_RESOURCES.has(active) && (
+            <details className="mb-3 border border-slate-200 rounded-lg" open>
+              <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-slate-700">
+                Stencils — {activeLabel}
+              </summary>
+              <div className="px-3 pb-3">
+                <StencilField resource={active} />
+              </div>
+            </details>
+          )}
           <EntityGrid
             key={active}
             resource={active}
             title={activeLabel}
-            columns={columns}
+            columns={columnsFor(active)}
             // full_name + abbreviation are NOT NULL on every naming lookup and
             // the abbreviation must be globally unique — seed a placeholder so
             // "Add row" always succeeds and the user just renames it.

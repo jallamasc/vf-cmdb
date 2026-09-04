@@ -208,25 +208,42 @@ embedding model during setup while internet is available.
 
 ## ⚠️ Active Issues & Blockers
 
-### 📋 Known Issues (None blocking deployment)
+### 🔴 Phase 3 Bugs (Must Fix Before Deploying)
 
-No known issues at this time.
+| ID | Severity | Component | Description |
+|----|----------|-----------|-------------|
+| BUG-A | Medium | Frontend/Backend | VLANs page add-row errors — `Vlan.site_id NOT NULL` but no site_id FK column in Vlans EntityGrid |
+| BUG-B | Medium | Frontend | IPAM shows no subnets — filter by site_id excludes NULL-site subnets; may default to wrong site (test artifact id=2) |
+| BUG-C | High | Frontend/Backend | "Add row" errors on most views — many models have NOT NULL FK fields not exposed as editable columns in the grid |
+| BUG-D | Low | Frontend | IPAM subnet columns incomplete — missing `range_from`, `range_to`, `expansion_ceiling`, `reserved_count`, `reservation_anchor` |
+
+**Full details and fixes**: `docs/PHASE_3_PLAN.md` → Bug section (BUG-A through BUG-D)
+
+### 🟡 Phase 3 Features (User-Requested after QA)
+Full detail in `docs/PHASE_3_PLAN.md`. Summary:
+- **Sites**: Auto-conform simple_name from hierarchy; separate regions from buildings/floors; themed fun names (Star Wars etc.); VF Short Name is too short
+- **Sites**: Add Colombian + international regions (seed change)  
+- **All grids**: No cell content truncation; dropdown arrows on FK/select cells; name fields in all listings
+- **Physical Hierarchy**: Real-time name preview while creating; datacenter = airport code of city
+- **Rack View**: Dual-face (front + back); Visio Café stencils; port-to-port cable connections with labeled from/to
+- **Device Dashboard**: Click device name → comprehensive tabbed detail page (specs, interfaces, IPs, VMs, cables, changelog, Ansible facts)
 
 ---
 
 ## 🎯 Immediate Next Steps
 
-### For User:
-1. ✅ **DONE**: Repository pushed to GitHub
-2. ✅ **DONE**: Decided on wireless network addressing (192.168.100-115.x)
-3. ⏳ **TODO**: Create Proxmox Ubuntu VM for deployment
-4. ⏳ **TODO**: Install Podman on VM
-5. ⏳ **TODO**: Clone repo and run `./deploy-podman.sh up` or `./deploy-podman.sh quadlet`
+### For Agent (START of next session — do this first):
+1. Read `docs/PHASE_3_PLAN.md` — full bug list and Phase 3 feature specs
+2. Fix BUG-C first (most impactful): audit all models for NOT NULL FKs without grid columns
+3. Fix BUG-A (VLANs EntityGrid missing site_id column)
+4. Fix BUG-B (IPAM site filter excludes NULL-site subnets; also delete test site id=2)
+5. Fix BUG-D (subnet columns incomplete)
+6. Then proceed with Sprint 3A UX improvements (per `docs/PHASE_3_PLAN.md`)
 
-### For Agent (on next interaction):
-1. Check git status for user changes (UI edits)
-2. Assist with deployment to Proxmox VM (if requested)
-3. Help with any runtime issues during first deployment
+### For User:
+1. ⏳ **PENDING**: Proxmox VM deployment (after Phase 3 bugs fixed)
+2. ✅ **DONE**: QA testing session completed
+3. ✅ **DONE**: Phase 3 requirements documented
 
 ---
 

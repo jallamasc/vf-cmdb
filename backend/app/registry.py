@@ -20,9 +20,11 @@ ENTITY_REGISTRY = {
     "cluster-types": models.ClusterType,
     "storage-device-types": models.StorageDeviceType,
     "network-id-types": models.NetworkIdType,
+    "power-device-types": models.PowerDeviceType,
     # reference data (NON-naming lookup lists)
     "site-addresses": models.SiteAddress,
     "rack-types": models.RackType,
+    "stencil-anchors": models.StencilAnchor,
     # physical
     "sites": models.Site,
     "datacenters": models.Datacenter,
@@ -60,6 +62,9 @@ LOOKUP_SLUGS = [
     "floor-sections", "compute-device-types", "brands", "device-roles",
     "network-device-types", "network-subtypes", "os-families", "os-versions",
     "app-types", "cluster-types", "storage-device-types", "network-id-types",
+    # Phase 4 Req 17: power device models, so they get the same "Naming
+    # Conventions" + stencil-panel treatment as the other 3 device types.
+    "power-device-types",
 ]
 
 # Reference / lookup data that is NOT a naming convention. These are plain

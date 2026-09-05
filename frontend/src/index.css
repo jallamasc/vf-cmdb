@@ -50,18 +50,31 @@ body {
   font-style: italic;
 }
 
+/* Phase 4 Req 4 — the chevron must be obviously clickable: at least as big
+   as the cell text, and animated so it can't be missed even at a glance. */
 .vf-dd-caret {
   flex: 0 0 auto;
-  font-size: 8px;
+  font-size: 13px;
   line-height: 1.9;
-  color: #94a3b8;
-  opacity: 0.75;
+  color: #64748b;
+  opacity: 0.85;
   pointer-events: none;
+  display: inline-block;
+  transition: color 0.15s ease, transform 0.15s ease;
+  animation: vf-dd-caret-bob 2.2s ease-in-out infinite;
 }
 
-.ag-theme-quartz .ag-cell:hover .vf-dd-caret {
+@keyframes vf-dd-caret-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(2px); }
+}
+
+.ag-theme-quartz .ag-cell:hover .vf-dd-caret,
+.ag-theme-quartz .ag-cell:focus-within .vf-dd-caret {
   opacity: 1;
   color: #2563eb;
+  transform: scale(1.25);
+  animation: none;
 }
 
 .zone-management { background:#dbeafe; color:#1e40af; }
@@ -75,3 +88,62 @@ body {
 .zone-vpn        { background:#e2e8f0; color:#334155; }
 .zone-public     { background:#fee2e2; color:#991b1b; }
 .zone-private    { background:#d1fae5; color:#065f46; }
+
+/* ---------------------------------------------------------------------------
+   Phase 4 Req 5 — FuzzySelectEditor popup (single-click dropdown + search).
+--------------------------------------------------------------------------- */
+.vf-fuzzy-editor {
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+  max-width: 360px;
+  background: #ffffff;
+  border: 1px solid #94a3b8;
+  border-radius: 6px;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.18);
+  overflow: hidden;
+}
+
+.vf-fuzzy-editor-input {
+  padding: 6px 8px;
+  font-size: 13px;
+  border: none;
+  border-bottom: 1px solid #e2e8f0;
+  outline: none;
+}
+
+.vf-fuzzy-editor-input:focus {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+
+.vf-fuzzy-editor-list {
+  list-style: none;
+  margin: 0;
+  padding: 2px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.vf-fuzzy-editor-option {
+  padding: 5px 8px;
+  font-size: 13px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vf-fuzzy-editor-option.is-highlighted,
+.vf-fuzzy-editor-option:hover {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.vf-fuzzy-editor-empty {
+  padding: 8px;
+  font-size: 12px;
+  color: #94a3b8;
+  font-style: italic;
+}

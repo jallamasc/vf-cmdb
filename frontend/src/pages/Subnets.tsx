@@ -44,6 +44,7 @@ function Ipv4Row({
   });
   return (
     <tr className="border-t border-slate-100">
+      <td className="px-3 py-2 text-sm text-slate-500">{subnet.description ?? "—"}</td>
       <td className="px-3 py-2 font-mono text-sm">{subnet.network_cidr}</td>
       <td className="px-3 py-2 font-mono text-xs">{subnet.gateway ?? "—"}</td>
       <td className="px-3 py-2">{vlanLabel}</td>
@@ -93,7 +94,6 @@ function Ipv4Row({
           <span className="ml-2 font-mono text-sm text-emerald-700">{nextIp}</span>
         )}
       </td>
-      <td className="px-3 py-2 text-sm text-slate-500">{subnet.description}</td>
     </tr>
   );
 }
@@ -142,6 +142,7 @@ export default function Subnets() {
           <table className="w-full text-sm">
             <thead className="bg-slate-100 text-slate-600">
               <tr>
+                <th className="text-left px-3 py-2">Description</th>
                 <th className="text-left px-3 py-2">Network</th>
                 <th className="text-left px-3 py-2">Gateway</th>
                 <th className="text-left px-3 py-2">VLAN</th>
@@ -152,7 +153,6 @@ export default function Subnets() {
                 <th className="text-left px-3 py-2">Reserved · anchor</th>
                 <th className="text-left px-3 py-2">Utilisation</th>
                 <th className="text-left px-3 py-2">IPAM</th>
-                <th className="text-left px-3 py-2">Description</th>
               </tr>
             </thead>
             <tbody>
@@ -170,18 +170,19 @@ export default function Subnets() {
           <table className="w-full text-sm">
             <thead className="bg-slate-100 text-slate-600">
               <tr>
+                <th className="text-left px-3 py-2">Description</th>
                 <th className="text-left px-3 py-2">Network</th>
                 <th className="text-left px-3 py-2">VLAN</th>
                 <th className="text-left px-3 py-2">Site</th>
                 <th className="text-left px-3 py-2">Range from</th>
                 <th className="text-left px-3 py-2">Range to</th>
                 <th className="text-left px-3 py-2">Reserved · anchor</th>
-                <th className="text-left px-3 py-2">Description</th>
               </tr>
             </thead>
             <tbody>
               {(v6 ?? []).map((s) => (
                 <tr key={s.id} className="border-t border-slate-100">
+                  <td className="px-3 py-2 text-slate-500">{s.description ?? "—"}</td>
                   <td className="px-3 py-2 font-mono text-xs">{s.network_cidr}</td>
                   <td className="px-3 py-2">{vlanLabel(s.vlan_id)}</td>
                   <td
@@ -202,7 +203,6 @@ export default function Subnets() {
                       · {s.reservation_anchor ?? "from_end"}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-slate-500">{s.description}</td>
                 </tr>
               ))}
             </tbody>

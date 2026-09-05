@@ -45,8 +45,13 @@ LOOKUPS: dict = {
     # underscores and slashes cannot be stored. The requested ``CO_CTR`` style
     # codes therefore use a hyphen (``CO-CTR``), and ``UK/IE`` becomes
     # ``UK-IE``. Everything else is stored exactly as requested.
+    # Phase 4 Req 8.1: restricted to Colombia's natural regions plus
+    # well-known Americas regions only. The previous broader international
+    # set (EMEA/APAC/UK-IE/etc.) and the legacy demo rows ("Central Colombia
+    # 1"/"EastUS 1") are intentionally NOT re-added here; migration
+    # 0007_region_cleanup removes any pre-existing rows outside this list
+    # that no Site still references.
     models.Region: [
-        ("Central Colombia 1", "cc", 3), ("EastUS 1", "eu1", 3),
         # -- Colombia: natural regions -------------------------------------
         ("Región Central", "CO-CTR", 6),
         ("Región Caribe", "CO-CAR", 6),
@@ -54,21 +59,13 @@ LOOKUPS: dict = {
         ("Región Andina", "CO-AND", 6),
         ("Región Orinoquía", "CO-ORI", 6),
         ("Región Amazonía", "CO-AMZ", 6),
-        # -- International --------------------------------------------------
+        # -- Well-known Americas regions -------------------------------------
         ("North America East", "NAEAST", 6),
         ("North America West", "NAWEST", 6),
-        ("Europe, Middle East and Africa", "EMEA", 4),
-        ("Asia Pacific", "APAC", 4),
+        ("Canada", "CAN", 3),
+        ("Mexico and Central America", "MEX-CA", 6),
+        ("Caribbean", "CAR", 3),
         ("Latin America South", "LATAM-S", 7),
-        ("United Kingdom and Ireland", "UK-IE", 5),
-        ("Central Europe", "C-EU", 4),
-        ("Nordics", "NORD", 4),
-        ("Southeast Asia", "SEA", 3),
-        ("Australia and New Zealand", "ANZ", 3),
-        ("Middle East", "ME", 2),
-        ("Africa Sub-Saharan", "AFSS", 4),
-        ("India", "IND", 3),
-        ("Japan", "JPN", 3),
     ],
     models.Campus: [
         ("Headquarters", "hq", 2), ("Home", "hm", 2),

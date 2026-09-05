@@ -1,8 +1,10 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import type { ICellRendererParams } from "ag-grid-community";
 import EntityGrid from "../components/EntityGrid";
 import SequenceGapHelper from "../components/SequenceGapHelper";
-import { api } from "../api";
+import ThemeNamePicker, { ThemeSelection } from "../components/ThemeNamePicker";
+import { api, Row } from "../api";
 import {
   useLookups,
   textCol,
@@ -24,6 +26,20 @@ const LK = [
 export default function NetworkDevices() {
   const { map, isLoading } = useLookups(LK);
   const qc = useQueryClient();
+  // Phase 4 Req 10 — themed "Simple Name" picker, opened per row.
+  const [pickerRow, setPickerRow] = useState<Row | null>(null);
+  const applyTheme = useMutation({
+    mutationFn: ({ id, selection }: { id: number; selection: ThemeSelection }) =>
+      api.update("network-devices", id, {
+        alternative_name: selection.name,
+        theme_name: selection.name,
+        theme_category: selection.category,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["network-devices"] });
+      setPickerRow(null);
+    },
+  });
   const createMut = useMutation({
     mutationFn: (payload: Record<string, unknown>) =>
       api.create("network-devices", payload),
@@ -35,7 +51,24 @@ export default function NetworkDevices() {
       // FEAT-7: the long name opens the device detail dashboard.
       deviceLinkCol("vf_long_name", "VF Long Name", "network_devices", 240),
       textCol("vf_friendly_name", "Friendly Name", 150),
-      textCol("alternative_name", "Alt Name", 140),
+      // Req 10.2/10.4 — "Simple Name" is still a free-text cell (manual entry
+      // always works) plus a themed-picker button next to it.
+      textCol("alternative_name", "Simple Name", 140),
+      {
+        headerName: "Theme",
+        width: 90,
+        editable: false,
+        cellRenderer: (p: ICellRendererParams) => (
+          <button
+            type="button"
+            onClick={() => setPickerRow(p.data)}
+            title="Pick a networking-themed simple name"
+            className="px-2 py-0.5 text-xs rounded border border-slate-300 bg-white hover:bg-slate-100"
+          >
+            🎭 Pick
+          </button>
+        ),
+      },
       fkCol("site_id", "Site", map["sites"]),
       fkCol("rack_id", "Rack", map["racks"]),
       numCol("rack_unit", "U"),
@@ -68,10 +101,19 @@ export default function NetworkDevices() {
         <EntityGrid
           resource="network-devices"
           title="Network Devices"
-          description="Switches, routers, firewalls and access points. Long name auto-generates from type, brand and sequence. Click a long name to open that device’s dashboard."
+          description="Switches, routers, firewalls and access points. Long name auto-generates from type, brand and sequence. Click a long name to open that device’s dashboard. “Simple Name” can be typed freely or picked from the networking theme."
           columns={columns}
         />
       </div>
+      <ThemeNamePicker
+        open={pickerRow != null}
+        initialCategory="networking"
+        selectedName={pickerRow?.theme_name ?? null}
+        onSelect={(selection) => {
+          if (pickerRow) applyTheme.mutate({ id: pickerRow.id, selection });
+        }}
+        onClose={() => setPickerRow(null)}
+      />
     </div>
   );
 }

@@ -1,6 +1,16 @@
 import { NavLink, Outlet } from "react-router-dom";
 
 const NAV: { section: string; items: { to: string; label: string }[] }[] = [
+  // Phase 4 Req 3.1: Reference sections lead the nav, not trail it.
+  {
+    section: "Reference",
+    items: [
+      { to: "/naming", label: "Naming Conventions" },
+      { to: "/reference-data", label: "Reference Data" },
+      { to: "/ansible", label: "Ansible Inventory" },
+      { to: "/changelog", label: "Changelog" },
+    ],
+  },
   {
     section: "Overview",
     items: [{ to: "/", label: "Dashboard" }],
@@ -12,8 +22,10 @@ const NAV: { section: string; items: { to: string; label: string }[] }[] = [
       { to: "/hierarchy", label: "Physical Hierarchy" },
       { to: "/racks", label: "Rack View" },
       { to: "/racks-list", label: "Racks (list)" },
-      { to: "/patch-panels", label: "Patch Panels" },
-      { to: "/power", label: "Power" },
+      { to: "/patch-panel-view", label: "Patch Panel View" },
+      { to: "/patch-panels", label: "Patch Panels (list)" },
+      { to: "/power-device-view", label: "Power Device View" },
+      { to: "/power", label: "Power (list)" },
       { to: "/cables", label: "Cables" },
     ],
   },
@@ -34,16 +46,8 @@ const NAV: { section: string; items: { to: string; label: string }[] }[] = [
       { to: "/ipam", label: "IPAM by Site" },
       { to: "/ip-assignments", label: "IP Assignments" },
       { to: "/network-devices", label: "Network Devices" },
-      { to: "/port-config", label: "Device Port Config" },
-    ],
-  },
-  {
-    section: "Reference",
-    items: [
-      { to: "/naming", label: "Naming Conventions" },
-      { to: "/reference-data", label: "Reference Data" },
-      { to: "/ansible", label: "Ansible Inventory" },
-      { to: "/changelog", label: "Changelog" },
+      { to: "/port-config-view", label: "Port Configuration View" },
+      { to: "/port-config", label: "Device Port Config (list)" },
     ],
   },
 ];

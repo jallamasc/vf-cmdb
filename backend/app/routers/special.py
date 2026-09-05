@@ -2,14 +2,31 @@
 from __future__ import annotations
 
 import ipaddress
+import shutil
+import tempfile
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
+import httpx
+from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import Response
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .. import abbrev, airports, crud, devices, models, naming, ports, stencils, themes
+from .. import (
+    abbrev,
+    airports,
+    crud,
+    devices,
+    models,
+    naming,
+    ports,
+    stencil_library,
+    stencil_sources,
+    stencils,
+    themes,
+)
 from ..config import settings
 from ..database import get_session
 from ..registry import ENTITY_REGISTRY
@@ -34,6 +51,63 @@ async def _count(session: AsyncSession, model) -> int:
     return int(result.scalar() or 0)
 
 
+async def _breakdown(session: AsyncSession, group_col) -> dict[str, int]:
+    """Count rows grouped by a plain (non-FK) column, e.g. a zone string."""
+    rows = (
+        await session.execute(select(group_col, func.count()).group_by(group_col))
+    ).all()
+    return {(str(key) if key is not None else "(unset)"): int(count) for key, count in rows}
+
+
+async def _breakdown_by_lookup(
+    session: AsyncSession, group_col, lookup_model
+) -> dict[str, int]:
+    """Count rows grouped by a FK id column, keyed by the lookup's abbreviation.
+
+    Two cheap queries (group-by-id, then one lookup fetch) instead of a join,
+    so this stays simple and works with any ``LookupMixin`` table.
+    """
+    rows = (
+        await session.execute(select(group_col, func.count()).group_by(group_col))
+    ).all()
+    ids = [key for key, _ in rows if key is not None]
+    labels: dict[int, str] = {}
+    if ids:
+        lookup_rows = (
+            await session.execute(select(lookup_model).where(lookup_model.id.in_(ids)))
+        ).scalars().all()
+        labels = {r.id: (r.full_name or r.abbreviation or str(r.id)) for r in lookup_rows}
+    out: dict[str, int] = {}
+    for key, count in rows:
+        label = labels.get(key, "(unset)") if key is not None else "(unset)"
+        out[label] = out.get(label, 0) + int(count)
+    return out
+
+
+async def _avg_subnet_utilization(session: AsyncSession) -> float:
+    """Rough average IPv4 subnet utilisation across every subnet with a CIDR."""
+    subnets = (
+        await session.execute(
+            select(models.SubnetIpv4).where(models.SubnetIpv4.network_cidr.isnot(None))
+        )
+    ).scalars().all()
+    if not subnets:
+        return 0.0
+    used = await _used_ipv4(session)
+    pct_values: list[float] = []
+    for s in subnets:
+        try:
+            net = ipaddress.ip_network(str(s.network_cidr), strict=False)
+        except ValueError:
+            continue
+        total = net.num_addresses - 2 if net.num_addresses > 2 else net.num_addresses
+        if total <= 0:
+            continue
+        in_net = len([u for u in used if ipaddress.ip_address(u) in net])
+        pct_values.append(in_net / total * 100)
+    return round(sum(pct_values) / len(pct_values), 1) if pct_values else 0.0
+
+
 @router.get("/dashboard/summary")
 async def dashboard_summary(session: AsyncSession = Depends(get_session)) -> dict[str, Any]:
     counts = {
@@ -53,7 +127,31 @@ async def dashboard_summary(session: AsyncSession = Depends(get_session)) -> dic
         select(models.ChangeLog).order_by(models.ChangeLog.changed_at.desc()).limit(15)
     )
     recent_changes = [crud.to_dict(c) for c in recent.scalars().all()]
-    return {"counts": counts, "recent_changes": recent_changes}
+
+    # Req 2.1: a small per-type breakdown so a Dashboard card is more than a
+    # bare count. Kept intentionally cheap (a handful of grouped counts).
+    since_24h = datetime.now(timezone.utc) - timedelta(hours=24)
+    changes_24h = await session.execute(
+        select(func.count()).select_from(models.ChangeLog).where(
+            models.ChangeLog.changed_at >= since_24h
+        )
+    )
+    breakdowns: dict[str, dict[str, Any]] = {
+        "network_devices": await _breakdown_by_lookup(
+            session, models.NetworkDevice.device_type_id, models.NetworkDeviceType
+        ),
+        "physical_servers": await _breakdown_by_lookup(
+            session, models.PhysicalServer.role_id, models.DeviceRole
+        ),
+        "vlans": await _breakdown(session, models.Vlan.zone),
+        "subnets_ipv4": {
+            "avg utilisation %": await _avg_subnet_utilization(session),
+        },
+        "sites": {
+            "changes (24h)": int(changes_24h.scalar() or 0),
+        },
+    }
+    return {"counts": counts, "recent_changes": recent_changes, "breakdowns": breakdowns}
 
 
 # ---------------------------------------------------------------------------
@@ -767,53 +865,75 @@ STENCIL_RESOURCES = {
     "network-device-types": models.NetworkDeviceType,
     "compute-device-types": models.ComputeDeviceType,
     "storage-device-types": models.StorageDeviceType,
+    # Phase 4 Req 17: power devices get the same stencil treatment.
+    "power-device-types": models.PowerDeviceType,
 }
 
 _SVG_HEADERS = {"Cache-Control": "public, max-age=86400"}
 
 
-async def _stencil_url_for_slug(session: AsyncSession, model_slug: str) -> Optional[str]:
-    """The configured ``stencil_url`` for a device-type identified by slug.
-
-    ``model_slug`` may be either a device-type resource slug (a key of
-    STENCIL_RESOURCES) or ``{resource}-{id}`` naming a specific device-type row.
-    Returns None when no URL is configured or the row is not found.
-    """
-    # Exact resource match with no id -> cannot resolve a specific row.
-    for resource, model in STENCIL_RESOURCES.items():
+def _parse_owner_slug(model_slug: str) -> Optional[tuple[str, int]]:
+    """Split ``{resource}-{id}`` into (resource, id) when resource is a known
+    STENCIL_RESOURCES key. Returns None for a bare resource slug (no id) or an
+    unrecognised resource."""
+    for resource in STENCIL_RESOURCES:
         prefix = f"{resource}-"
         if model_slug.startswith(prefix):
             tail = model_slug[len(prefix):]
             if tail.isdigit():
-                row = await session.get(model, int(tail))
-                return getattr(row, "stencil_url", None) if row else None
+                return resource, int(tail)
     return None
+
+
+async def _stencil_url_for_slug(
+    session: AsyncSession, model_slug: str, face: str = "front"
+) -> Optional[str]:
+    """The configured stencil URL for a device-type identified by slug.
+
+    ``model_slug`` is ``{resource}-{id}`` naming a specific device-type row.
+    ``face`` selects ``stencil_url`` (front) or ``stencil_url_back`` (back).
+    Returns None when no URL is configured or the row is not found.
+    """
+    parsed = _parse_owner_slug(model_slug)
+    if parsed is None:
+        return None
+    resource, row_id = parsed
+    model = STENCIL_RESOURCES[resource]
+    row = await session.get(model, row_id)
+    if row is None:
+        return None
+    attr = "stencil_url_back" if face == "back" else "stencil_url"
+    return getattr(row, attr, None)
 
 
 @router.get("/stencils/{model_slug}")
 async def get_stencil(
     model_slug: str,
+    face: str = Query("front", pattern="^(front|back)$"),
     session: AsyncSession = Depends(get_session),
 ) -> Response:
     """Serve a device model's stencil SVG, cache-first.
 
     1. If the SVG is already cached on disk, serve it (no network — air-gap safe).
-    2. Else, if the device-type row has a ``stencil_url`` and Visio Café is
-       reachable, download it, cache it and serve it.
+    2. Else, if the device-type row has a stencil URL for this face and Visio
+       Café is reachable, download it, cache it and serve it.
     3. Else return 404.
+
+    Phase 4 Req 14: ``face`` selects the front (default) or back stencil —
+    these are cached and served as two independent SVGs per device model.
     """
     try:
         slug = stencils.validate_slug(model_slug)
     except stencils.InvalidSlug as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
-    if stencils.is_cached(slug):
-        data = stencils.cache_path(slug).read_bytes()
+    if stencils.is_cached(slug, face):
+        data = stencils.cache_path(slug, face).read_bytes()
         return Response(content=data, media_type="image/svg+xml", headers=_SVG_HEADERS)
 
-    url = await _stencil_url_for_slug(session, slug)
+    url = await _stencil_url_for_slug(session, slug, face)
     if url:
-        path = stencils.download_and_cache(slug, url)
+        path = stencils.download_and_cache(slug, url, face)
         if path is not None:
             return Response(
                 content=path.read_bytes(),
@@ -827,12 +947,14 @@ async def get_stencil(
 async def upload_stencil(
     model_slug: str,
     file: UploadFile = File(...),
+    face: str = Query("front", pattern="^(front|back)$"),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     """Upload an SVG stencil for a model, overwriting any cached copy.
 
     Works fully offline: the uploaded SVG is stored in the cache and served by
-    the GET endpoint without ever contacting Visio Café.
+    the GET endpoint without ever contacting Visio Café. ``face`` selects
+    which of the two independent slots (front/back, Req 14) is written.
     """
     try:
         slug = stencils.validate_slug(model_slug)
@@ -841,15 +963,162 @@ async def upload_stencil(
 
     data = await file.read()
     try:
-        stencils.store_bytes(slug, data, file.content_type)
+        stencils.store_bytes(slug, data, file.content_type, face)
     except stencils.InvalidStencil as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     return {
         "model_slug": slug,
+        "face": face,
         "stored": True,
         "bytes": len(data),
-        "path": f"{settings.api_prefix}/stencils/{slug}",
+        "path": f"{settings.api_prefix}/stencils/{slug}?face={face}",
     }
+
+
+@router.get("/stencils/{model_slug}/anchors")
+async def list_stencil_anchors(
+    model_slug: str,
+    face: Optional[str] = Query(None, pattern="^(front|back)$"),
+    session: AsyncSession = Depends(get_session),
+) -> list[dict[str, Any]]:
+    """Phase 4 Req 19.3/19.4 — anchors mapped for a stencil owner.
+
+    ``model_slug`` is ``{resource}-{id}`` (the same slug the stencil cache
+    uses). Writes (create/delete) go through the generic ``stencil-anchors``
+    CRUD resource — this endpoint is a read-only convenience for filtering by
+    owner (+ optionally by face), which the generic list endpoint cannot do.
+    """
+    parsed = _parse_owner_slug(model_slug)
+    if parsed is None:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"'{model_slug}' is not a recognised '{{resource}}-{{id}}' stencil "
+                f"owner. Known resources: {', '.join(sorted(STENCIL_RESOURCES))}."
+            ),
+        )
+    resource, owner_id = parsed
+    stmt = select(models.StencilAnchor).where(
+        models.StencilAnchor.owner_resource == resource,
+        models.StencilAnchor.owner_id == owner_id,
+    )
+    if face:
+        stmt = stmt.where(models.StencilAnchor.face == face)
+    rows = (await session.execute(stmt.order_by(models.StencilAnchor.id))).scalars().all()
+    return [crud.to_dict(r) for r in rows]
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 Sub-phase E — Stencil Library Import (Requirement 22)
+# ---------------------------------------------------------------------------
+_STENCIL_FETCH_TIMEOUT = 30.0
+
+
+@router.get("/stencil-library/categories")
+async def stencil_library_categories(
+    source: str = Query(..., pattern="^(github|visiocafe)$"),
+) -> list[dict[str, str]]:
+    """Requirement 22.1 — categories available from a stencil source."""
+    try:
+        return stencil_sources.list_categories(source)
+    except stencil_sources.UnknownSource as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except stencil_sources.SourceUnavailable as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
+@router.get("/stencil-library/categories/{category}/files")
+async def stencil_library_files(
+    category: str,
+    source: str = Query(..., pattern="^(github|visiocafe)$"),
+) -> list[dict[str, Any]]:
+    """Requirement 22.2 — .vss/.vssx files available in a category."""
+    try:
+        files = stencil_sources.list_files(source, category)
+    except stencil_sources.UnknownSource as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except stencil_sources.UnknownCategory as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except stencil_sources.SourceUnavailable as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    return [{"name": f.name, "size": f.size} for f in files]
+
+
+@router.post("/stencil-library/fetch")
+async def stencil_library_fetch(
+    source: str = Body(..., embed=True),
+    category: str = Body(..., embed=True),
+    file: str = Body(..., embed=True),
+) -> dict[str, Any]:
+    """Requirement 22.3/22.5 — fetch a chosen stencil file, convert every
+    shape master it contains into a standalone SVG, and return a preview
+    (thumbnail URL + title) for each. Nothing here touches the permanent
+    per-device-type stencil cache (Task 14) — a failed fetch/convert leaves
+    no trace there; the administrator applies exactly one preview afterward
+    through the EXISTING upload endpoint (POST /stencils/{model_slug}).
+    """
+    try:
+        entry = stencil_sources.resolve_file(source, category, file)
+    except (stencil_sources.UnknownSource, stencil_sources.UnknownCategory, FileNotFoundError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except stencil_sources.SourceUnavailable as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+    download_dir = Path(tempfile.mkdtemp(prefix="stencil_fetch_"))
+    shapes: list[Any] = []
+    try:
+        try:
+            resp = httpx.get(entry.download_url, timeout=_STENCIL_FETCH_TIMEOUT, follow_redirects=True)
+            resp.raise_for_status()
+        except httpx.HTTPError as exc:
+            raise HTTPException(
+                status_code=502, detail=f"Could not download '{entry.name}': {exc}"
+            )
+        raw_path = download_dir / Path(entry.name).name
+        raw_path.write_bytes(resp.content)
+
+        try:
+            shapes = stencil_library.convert_stencil(raw_path)
+        except stencil_library.ConversionUnavailable as exc:
+            raise HTTPException(status_code=503, detail=str(exc))
+        except stencil_library.ConversionFailed as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+
+        token = stencil_library.new_preview_token()
+        saved = stencil_library.save_previews(token, shapes)
+    finally:
+        shutil.rmtree(download_dir, ignore_errors=True)
+        if shapes:
+            shutil.rmtree(shapes[0].svg_path.parent, ignore_errors=True)
+
+    return {
+        "token": token,
+        "source": source,
+        "category": category,
+        "file": entry.name,
+        "shapes": [
+            {
+                "title": s["title"],
+                "preview_url": f"{settings.api_prefix}/stencil-library/previews/{token}/{s['filename']}",
+            }
+            for s in saved
+        ],
+    }
+
+
+@router.get("/stencil-library/previews/{token}/{filename}")
+async def stencil_library_preview(token: str, filename: str) -> Response:
+    """Serves one converted shape preview, ahead of it being applied as a
+    real stencil. Token+filename are validated against a strict charset plus
+    a resolved-path containment check (stencil_library.preview_path) — no
+    path-traversal is possible."""
+    try:
+        path = stencil_library.preview_path(token, filename)
+    except stencil_library.InvalidPreviewRef as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Preview not found")
+    return Response(content=path.read_bytes(), media_type="image/svg+xml", headers=_SVG_HEADERS)
 
 
 # ---------------------------------------------------------------------------
@@ -859,7 +1128,7 @@ async def upload_stencil(
 async def port_candidates(
     source_type: str = Query(..., description="kebab-case device slug of the source port owner"),
     source_id: int = Query(...),
-    source_port_kind: str = Query("interface", pattern="^(interface|outlet)$"),
+    source_port_kind: str = Query("interface", pattern="^(interface|outlet|patch_panel_port)$"),
     source_port_id: int = Query(...),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
@@ -888,6 +1157,32 @@ FACT_TABLES = {
     "containers-apps": models.ContainerApp,
 }
 
+# Phase 4 Req 21.2 — incoming keys that get their OWN typed column in
+# addition to living in the ansible_facts JSONB blob, for fast/typed access
+# without having to reach into JSON on every read.
+PROMOTED_FACT_KEYS = {"cpu_cores", "memory_mb", "os_distribution"}
+
+
+def build_facts_payload(existing_ansible_facts: Optional[dict], facts: dict[str, Any]) -> dict[str, Any]:
+    """Requirement 21.1/21.2/21.3 — split an incoming facts payload into the
+    update dict `ingest_facts` hands to `crud.update_item`.
+
+    Requirement 21.1: EVERY incoming key is merged into the `ansible_facts`
+    blob (a partial payload never erases facts a previous run already
+    recorded — only the keys present in THIS payload are overwritten).
+    Requirement 21.2: promoted keys (PROMOTED_FACT_KEYS) ALSO get written to
+    their own dedicated column, IN ADDITION TO staying in the blob.
+    Requirement 21.3: `last_fact_sync_at` is always stamped to the current
+    time. Pure function, no DB access, so it's directly unit-testable
+    without a session.
+    """
+    merged_blob = dict(existing_ansible_facts or {})
+    merged_blob.update(facts)
+    payload: dict[str, Any] = {k: v for k, v in facts.items() if k in PROMOTED_FACT_KEYS}
+    payload["ansible_facts"] = merged_blob
+    payload["last_fact_sync_at"] = datetime.now(timezone.utc)
+    return payload
+
 
 @router.post("/devices/{device_type}/{device_id}/facts")
 async def ingest_facts(
@@ -899,8 +1194,12 @@ async def ingest_facts(
     model = FACT_TABLES.get(device_type)
     if model is None:
         raise HTTPException(status_code=404, detail="Unknown device type")
+    existing = await session.get(model, device_id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Device not found")
+    payload = build_facts_payload(existing.ansible_facts, facts)
     obj = await crud.update_item(
-        session, model, device_id, facts, source="ansible_callback"
+        session, model, device_id, payload, source="ansible_callback"
     )
     if obj is None:
         raise HTTPException(status_code=404, detail="Device not found")

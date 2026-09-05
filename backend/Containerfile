@@ -9,6 +9,27 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential libpq-dev curl \
     && rm -rf /var/lib/apt/lists/*
 
+# ---------------------------------------------------------------------------
+# Phase 4 Sub-phase E — libvisio2svg (provides vss2svg-conv), used by
+# app/stencil_library.py to convert imported Visio stencils (.vss/.vssx) into
+# one SVG per shape master. No Debian package ships the tool itself, but this
+# base image's Debian release already packages every dependency it needs
+# (librevenge-dev, libvisio-dev, libemf2svg-dev, libwmf-dev), so only
+# libvisio2svg itself is built from source here — verified against this exact
+# base image with `apt-get install --dry-run` before committing to this
+# recipe. `gsfonts` is a RUNTIME dependency of libwmf (rasterizes embedded
+# font glyphs in EMF/WMF blobs); its absence is a documented crash
+# ("libwmf: failed to load *any* font!").
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    cmake pkg-config git ca-certificates \
+    librevenge-dev libvisio-dev libemf2svg-dev libwmf-dev libxml2-dev \
+    gsfonts \
+    && git clone --depth 1 https://github.com/kakwa/libvisio2svg.git /tmp/libvisio2svg \
+    && cd /tmp/libvisio2svg && cmake . -DCMAKE_INSTALL_PREFIX=/usr/ \
+    && make -j"$(nproc)" && make install && cd / \
+    && rm -rf /tmp/libvisio2svg \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 

@@ -316,6 +316,120 @@ async def _autoreserve_gateway(session: AsyncSession, obj) -> None:
     )
 
 
+def _interface_own_label(obj: "models.DeviceInterface") -> str:
+    """The label an interface is identified by on its own end of a Cable —
+    identical fallback chain to ``ports.candidate_ports()``'s ``label`` and
+    what the manual Connect panel writes as ``label_a``/``label_b``."""
+    return obj.description or (f"port {obj.port_number}" if obj.port_number else f"if#{obj.id}")
+
+
+async def _sync_cable_for_interface(
+    session: AsyncSession, obj, prior_label_a: Optional[str] = None
+) -> None:
+    """Cable_Sync_Service (Phase 4 Requirement 20).
+
+    Keeps a Cable row in sync with a DeviceInterface's connected-* fields:
+    set them -> create-or-update an auto-generated Cable; clear them ->
+    delete that Cable, but ONLY if it was auto-generated (20.3 — a manually
+    created cable is never touched, even if it happens to describe the same
+    two ports). Mirrors ``_autoreserve_gateway``'s style (direct session
+    manipulation, no nested commit) rather than calling the public
+    ``create_item``/``update_item``/``delete_item`` wrappers, so this rides
+    the SAME outer transaction as the DeviceInterface write.
+
+    Cable.port_a_id/port_b_id are OWNING-DEVICE ids, not interface ids (every
+    port on a device shares the owner id) — label_a/label_b are what
+    disambiguate the specific port, exactly like the manual Connect panel
+    writes them. This hook finds "the" auto-generated cable for THIS port by
+    (owner, label) since there is no unique constraint on Cable to rely on
+    instead. ``prior_label_a`` is the interface's OWN label as it was BEFORE
+    this update (passed by ``update_item``, which reads it before mutating
+    ``obj``) — without it, changing ``description``/``port_number`` (which
+    changes the computed label) would make the lookup miss the cable it
+    already owns and create an orphaned duplicate instead of updating it.
+    """
+    if not isinstance(obj, models.DeviceInterface):
+        return
+
+    from . import ports as ports_module  # local import: ports.py imports models, not crud
+
+    owner_type, owner_id = ports_module.interface_owner(obj)
+    if not owner_type or owner_id is None:
+        return  # an interface with no resolvable owner can't be cabled
+
+    label_a = _interface_own_label(obj)
+    lookup_label = prior_label_a if prior_label_a is not None else label_a
+
+    existing = (
+        await session.execute(
+            select(models.Cable).where(
+                models.Cable.auto_generated.is_(True),
+                models.Cable.port_a_type == owner_type,
+                models.Cable.port_a_id == owner_id,
+                models.Cable.label_a == lookup_label,
+            )
+        )
+    ).scalars().first()
+
+    is_connected = bool(obj.connected_device_type) and obj.connected_device_id is not None
+
+    if not is_connected:
+        # Requirement 20.2 — cleared connected-* fields delete the Cable,
+        # but only when it's ours.
+        if existing is not None:
+            await _log(session, "cables", existing.id, "__deleted__", "exists", None, "auto_sync")
+            await session.delete(existing)
+        return
+
+    if existing is None:
+        # Requirement 20.1 — create.
+        cable = models.Cable(
+            cable_type="patchcord",
+            auto_generated=True,
+            port_a_type=owner_type,
+            port_a_id=owner_id,
+            port_b_type=obj.connected_device_type,
+            port_b_id=obj.connected_device_id,
+            label_a=label_a,
+            label_b=obj.connected_port,
+        )
+        _validate_cable(cable)
+        session.add(cable)
+        await session.flush()
+        await naming.generate_cable(session, cable)
+        for field, value in (
+            ("cable_type", cable.cable_type),
+            ("auto_generated", cable.auto_generated),
+            ("port_a_type", cable.port_a_type),
+            ("port_a_id", cable.port_a_id),
+            ("port_b_type", cable.port_b_type),
+            ("port_b_id", cable.port_b_id),
+            ("label_a", cable.label_a),
+            ("label_b", cable.label_b),
+        ):
+            await _log(session, "cables", cable.id, field, None, value, "auto_sync")
+        return
+
+    # Requirement 20.1 — update. The far end can change, and so can the near
+    # end's OWN label if description/port_number changed (keep label_a in
+    # sync with the rename rather than leaving it stale).
+    changed = False
+    for field, value in (
+        ("port_b_type", obj.connected_device_type),
+        ("port_b_id", obj.connected_device_id),
+        ("label_b", obj.connected_port),
+        ("label_a", label_a),
+    ):
+        old = getattr(existing, field)
+        if old != value:
+            await _log(session, "cables", existing.id, field, old, value, "auto_sync")
+            setattr(existing, field, value)
+            changed = True
+    if changed:
+        _validate_cable(existing)
+        await naming.generate_cable(session, existing)
+
+
 async def _log(
     session: AsyncSession,
     table: str,
@@ -366,6 +480,7 @@ async def create_item(
     await naming.apply_naming(session, obj)
     await _sync_abbrev(session, obj)
     await _autoreserve_gateway(session, obj)
+    await _sync_cable_for_interface(session, obj)
     await session.flush()
     for field, value in data.items():
         await _log(session, model.__tablename__, obj.id, field, None, value, source)
@@ -380,6 +495,10 @@ async def update_item(
     obj = await session.get(model, item_id)
     if obj is None:
         return None
+    # Snapshot BEFORE any mutation below — the Cable_Sync_Service needs the
+    # interface's own label as it was prior to this update, in case
+    # description/port_number (which the label is derived from) is changing.
+    prior_label_a = _interface_own_label(obj) if isinstance(obj, models.DeviceInterface) else None
     data = sanitize_payload(model, payload)
     changes: list[tuple[str, Any, Any]] = []
     for field, new_value in data.items():
@@ -395,6 +514,7 @@ async def update_item(
         await session.flush()
         await naming.apply_naming(session, obj)
         await _sync_abbrev(session, obj)
+        await _sync_cable_for_interface(session, obj, prior_label_a=prior_label_a)
         await session.flush()
         for field, old, new in changes:
             await _log(session, model.__tablename__, obj.id, field, old, new, source)

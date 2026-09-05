@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, PortCandidate } from "../api";
 import { PORT_TYPE_HEX, RackPort } from "./RackDiagramSVG";
+import { CableRow } from "../lib/connections";
 
 // FEAT-6 (6C): the cable_type set the backend accepts.
 const CABLE_TYPES = ["copper", "fiber", "power", "patchcord", "structured"] as const;
@@ -10,20 +11,29 @@ interface Props {
   /** The back-face port the user clicked. */
   source: RackPort;
   onClose: () => void;
+  /**
+   * Phase 4 Req 20 — when set, this panel is re-cabling `source` away from an
+   * EXISTING connection rather than making a fresh one. Picking a new
+   * destination deletes `editingCable` first, then creates the new cable, so
+   * a cancelled edit leaves the original connection untouched.
+   */
+  editingCable?: CableRow | null;
 }
 
 /**
- * FEAT-6 (6C) — modal for cabling a clicked source port to a destination port.
+ * FEAT-6 (6C) / Phase 4 Req 20 — modal for cabling a clicked source port to a
+ * destination port, or re-cabling it away from an existing connection.
  *
  * Fetches connectable candidates (same rack first, then datacenter/site) from
  * GET /ports/candidates, then creates a Cable through the normal CRUD route so
  * changelog + the auto-generated Cable_Label apply. Source → A end,
- * destination → B end.
+ * destination → B end. In edit mode the previous cable is removed only once
+ * the new destination is confirmed.
  */
-export default function ConnectPanel({ source, onClose }: Props) {
+export default function ConnectPanel({ source, onClose, editingCable = null }: Props) {
   const qc = useQueryClient();
   const [cableType, setCableType] = useState<string>(
-    source.port_type === "power" ? "power" : "copper"
+    editingCable?.cable_type ?? (source.port_type === "power" ? "power" : "copper")
   );
   const [error, setError] = useState<string | null>(null);
 
@@ -46,8 +56,11 @@ export default function ConnectPanel({ source, onClose }: Props) {
   });
 
   const connect = useMutation({
-    mutationFn: (dest: PortCandidate) =>
-      api.create("cables", {
+    mutationFn: async (dest: PortCandidate) => {
+      // Edit mode: drop the previous connection only once a new destination
+      // is actually confirmed, so a cancelled edit changes nothing.
+      if (editingCable) await api.remove("cables", Number(editingCable.id));
+      return api.create("cables", {
         cable_type: cableType,
         port_a_type: source.owner_type,
         port_a_id: source.owner_id,
@@ -55,7 +68,8 @@ export default function ConnectPanel({ source, onClose }: Props) {
         port_b_id: dest.owner_id,
         label_a: source.label,
         label_b: dest.label,
-      }),
+      });
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["cables"] });
       onClose();
@@ -100,12 +114,19 @@ export default function ConnectPanel({ source, onClose }: Props) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-5 py-3 border-b border-slate-200">
-          <h2 className="text-sm font-semibold text-slate-800">Connect port</h2>
+          <h2 className="text-sm font-semibold text-slate-800">
+            {editingCable ? "Edit connection" : "Connect port"}
+          </h2>
           <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-1">
             {swatch(source.port_type)}
             <span className="font-medium">{source.label}</span>
             <span>on {source.owner_type}</span>
           </p>
+          {editingCable && (
+            <p className="text-[11px] text-amber-600 mt-1">
+              Picking a destination below replaces the current connection.
+            </p>
+          )}
         </div>
 
         <div className="px-5 py-3 border-b border-slate-200 flex items-center gap-2">

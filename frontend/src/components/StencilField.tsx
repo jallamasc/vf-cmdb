@@ -1,6 +1,8 @@
 import { useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, Row } from "../api";
+import AnchorEditor from "./AnchorEditor";
+import StencilLibraryPicker from "./StencilLibraryPicker";
 
 interface Props {
   /** Device-type resource slug, e.g. "network-device-types". */
@@ -65,12 +67,74 @@ function StencilRow({
   onChanged: () => void;
 }) {
   const modelSlug = `${resource}-${row.id}`;
-  const [url, setUrl] = useState<string>(row.stencil_url ?? "");
+  const [showAnchors, setShowAnchors] = useState(false);
+
+  const label = row.full_name
+    ? `${row.full_name}${row.abbreviation ? ` (${row.abbreviation})` : ""}`
+    : `#${row.id}`;
+
+  return (
+    <div className="border border-slate-200 rounded px-3 py-2 space-y-2">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-sm font-medium text-slate-700 min-w-[9rem]">
+          {label}
+        </span>
+        <button
+          type="button"
+          onClick={() => setShowAnchors((s) => !s)}
+          className="ml-auto px-2.5 py-1 text-xs rounded border border-slate-300 text-slate-700 hover:bg-slate-50"
+        >
+          {showAnchors ? "Hide anchors" : "Edit anchors"}
+        </button>
+      </div>
+
+      <StencilFaceRow
+        resource={resource}
+        row={row}
+        modelSlug={modelSlug}
+        face="front"
+        onChanged={onChanged}
+      />
+      <StencilFaceRow
+        resource={resource}
+        row={row}
+        modelSlug={modelSlug}
+        face="back"
+        onChanged={onChanged}
+      />
+
+      {showAnchors && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+          <AnchorEditor resource={resource} row={row} face="front" />
+          <AnchorEditor resource={resource} row={row} face="back" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** One URL/upload control for a single face (front or back) of a stencil. */
+function StencilFaceRow({
+  resource,
+  row,
+  modelSlug,
+  face,
+  onChanged,
+}: {
+  resource: string;
+  row: Row;
+  modelSlug: string;
+  face: "front" | "back";
+  onChanged: () => void;
+}) {
+  const urlField = face === "back" ? "stencil_url_back" : "stencil_url";
+  const [url, setUrl] = useState<string>(row[urlField] ?? "");
   const [status, setStatus] = useState<string | null>(null);
+  const [showLibrary, setShowLibrary] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const saveUrl = useMutation({
-    mutationFn: () => api.update(resource, row.id, { stencil_url: url || null }),
+    mutationFn: () => api.update(resource, row.id, { [urlField]: url || null }),
     onSuccess: () => {
       setStatus("URL saved");
       onChanged();
@@ -80,7 +144,7 @@ function StencilRow({
   });
 
   const upload = useMutation({
-    mutationFn: (file: File) => api.uploadStencil(modelSlug, file),
+    mutationFn: (file: File) => api.uploadStencil(modelSlug, file, face),
     onSuccess: () => {
       setStatus("SVG uploaded");
       onChanged();
@@ -89,14 +153,10 @@ function StencilRow({
       setStatus(e instanceof Error ? e.message : "Upload failed"),
   });
 
-  const label = row.full_name
-    ? `${row.full_name}${row.abbreviation ? ` (${row.abbreviation})` : ""}`
-    : `#${row.id}`;
-
   return (
-    <div className="flex items-center gap-2 flex-wrap border border-slate-200 rounded px-3 py-2">
-      <span className="text-sm font-medium text-slate-700 min-w-[9rem]">
-        {label}
+    <div className="flex items-center gap-2 flex-wrap">
+      <span className="text-xs uppercase tracking-wide text-slate-400 w-12">
+        {face}
       </span>
       <input
         value={url}
@@ -131,8 +191,17 @@ function StencilRow({
       >
         Upload SVG
       </button>
+      {/* Phase 4 Task 31 — browse the curated GitHub/VisioCafe library instead
+          of hand-authoring or manually sourcing an SVG. */}
+      <button
+        type="button"
+        onClick={() => setShowLibrary(true)}
+        className="px-2.5 py-1 text-sm rounded border border-slate-300 text-slate-700 hover:bg-slate-50"
+      >
+        Browse stencil library
+      </button>
       <a
-        href={api.stencilUrl(modelSlug)}
+        href={api.stencilUrl(modelSlug, face)}
         target="_blank"
         rel="noreferrer"
         className="text-xs text-blue-600 hover:underline"
@@ -141,6 +210,18 @@ function StencilRow({
         preview
       </a>
       {status && <span className="text-xs text-slate-500">{status}</span>}
+
+      {showLibrary && (
+        <StencilLibraryPicker
+          modelSlug={modelSlug}
+          face={face}
+          onApplied={() => {
+            setStatus("Applied from stencil library");
+            onChanged();
+          }}
+          onClose={() => setShowLibrary(false)}
+        />
+      )}
     </div>
   );
 }

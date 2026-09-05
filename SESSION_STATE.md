@@ -100,8 +100,14 @@ for the full container stack). To run the servers manually:
 - backend: `cd backend && POSTGRES_HOST=127.0.0.1 POSTGRES_PORT=55432 POSTGRES_USER=vfcmdb POSTGRES_PASSWORD=vfcmdb POSTGRES_DB=vfcmdb .venv/bin/uvicorn app.main:app --port 8000`
 - frontend: `cd frontend && npm run dev` (serves 5173, proxies /api → 8000)
 
-**Next**: user browser testing. Then optional `*` tasks (pytest + Vitest suites),
-and committing the FEAT-6 work.
+**Tests added + passing**: 15 backend pytest (backend/tests/, run with
+`POSTGRES_DB=vfcmdb_test`) + 8 frontend Vitest (`npm test`, env=happy-dom).
+`npm run build` clean; backend imports clean.
+
+**Committed**: `df712cd` on `master` (working tree clean, not pushed).
+
+**Next**: user browser testing at http://localhost:5173. Optionally push the
+branch / open a PR.
 
 ## 🆕 FEAT-7 (2026-09-04): Device Detail Dashboard
 

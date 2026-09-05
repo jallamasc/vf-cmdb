@@ -5,11 +5,16 @@ import StencilField from "../components/StencilField";
 import { api } from "../api";
 import { textCol, roCol, numCol } from "../lib/columns";
 
-// FEAT-6 (6B): device-type resources that carry a stencil_url + stencil upload.
+// FEAT-6 (6B) / Phase 4 Task 22: device-type resources that carry a
+// stencil_url + stencil upload. The backend has treated power-device-types
+// identically to the other three since Task 13 (STENCIL_RESOURCES in
+// special.py, stencil_url/stencil_url_back columns via migration 0009) —
+// this set is the only place the frontend hadn't caught up yet.
 const STENCIL_RESOURCES = new Set([
   "network-device-types",
   "compute-device-types",
   "storage-device-types",
+  "power-device-types",
 ]);
 
 interface Lookup {
@@ -71,6 +76,11 @@ const CATEGORIES: { name: string; description: string; lookups: Lookup[] }[] = [
     name: "Storage",
     description: "Storage device categories.",
     lookups: [{ slug: "storage-device-types", label: "Storage Device Types" }],
+  },
+  {
+    name: "Power",
+    description: "UPS/PDU models used when naming power gear.",
+    lookups: [{ slug: "power-device-types", label: "Power Device Types" }],
   },
 ];
 

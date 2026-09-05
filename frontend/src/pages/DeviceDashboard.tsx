@@ -512,70 +512,121 @@ function ChangelogTab({ detail }: { detail: DeviceDetail }) {
 }
 
 // ---------------------------------------------------------------------------
-// Ansible facts
+// Ansible facts (Phase 4 Req 21)
 // ---------------------------------------------------------------------------
+/** Phase 4 Req 21.2 — the columns every fact-collectable device type promotes. */
+const PROMOTED_FACT_FIELDS: { field: string; label: string }[] = [
+  { field: "cpu_cores", label: "CPU Cores" },
+  { field: "memory_mb", label: "Memory (MB)" },
+  { field: "os_distribution", label: "OS Distribution" },
+];
+
 /**
- * Placeholder facts viewer.
- *
- * There is no facts blob column in the schema: ``POST /devices/{slug}/{id}/facts``
- * writes straight into the device's own columns with ``change_source =
- * ansible_callback``. Until a playbook posts something, this tab shows the
- * columns a callback would fill and the exact endpoint to call.
+ * Recursive, dependency-free JSON tree viewer for the `ansible_facts` blob.
+ * Objects/arrays render as a collapsible `<details>`; primitives render as
+ * plain key: value text. Root-level object opens expanded so the blob's
+ * shape is visible at a glance without extra clicks.
  */
-function AnsibleFactsTab({ detail }: { detail: DeviceDetail }) {
-  const FACT_COLUMNS = [
-    "model",
-    "serial_number",
-    "part_number",
-    "os_version",
-    "os_family_id",
-    "os_version_id",
-    "management_ipv4",
-    "management_ipv6",
-    "management_fqdn",
-    "bios_settings",
-  ];
-  const present = FACT_COLUMNS.filter((c) => c in detail.record);
-  const snapshot = Object.fromEntries(present.map((c) => [c, detail.record[c]]));
-  const anyValue = present.some((c) => detail.record[c] != null);
+export function JsonTree({ data, defaultOpen = false }: { data: unknown; defaultOpen?: boolean }) {
+  if (data === null || data === undefined) {
+    return <span className="text-slate-400 italic">null</span>;
+  }
+  if (typeof data !== "object") {
+    return <span className="text-slate-700">{String(data)}</span>;
+  }
+  const entries = Array.isArray(data)
+    ? data.map((v, i) => [String(i), v] as const)
+    : Object.entries(data as Record<string, unknown>);
+  if (entries.length === 0) {
+    return <span className="text-slate-400 italic">{Array.isArray(data) ? "[]" : "{}"}</span>;
+  }
+  return (
+    <details open={defaultOpen} className="ml-2">
+      <summary className="cursor-pointer text-slate-500 select-none">
+        {Array.isArray(data) ? `Array(${entries.length})` : `Object(${entries.length})`}
+      </summary>
+      <div className="ml-3 border-l border-slate-200 pl-3">
+        {entries.map(([key, value]) => (
+          <div key={key} className="text-xs py-0.5">
+            <span className="font-mono text-slate-500">{key}: </span>
+            {typeof value === "object" && value !== null ? (
+              <JsonTree data={value} />
+            ) : (
+              <span className="text-slate-800">{JSON.stringify(value)}</span>
+            )}
+          </div>
+        ))}
+      </div>
+    </details>
+  );
+}
+
+/**
+ * Requirement 21.4 — promoted fact columns + a collapsible view of the full
+ * `ansible_facts` blob. Facts arrive via an EXTERNAL Ansible callback
+ * (`POST /devices/{slug}/{id}/facts`) — this tab is read-only, matching
+ * every other read-mostly dashboard tab; it does not trigger ingestion.
+ */
+export function AnsibleFactsTab({ detail }: { detail: DeviceDetail }) {
+  const record = detail.record;
+  const blob = record.ansible_facts as Record<string, unknown> | null | undefined;
+  const lastSync = record.last_fact_sync_at as string | null | undefined;
+  const anyPromoted = PROMOTED_FACT_FIELDS.some((f) => record[f.field] != null);
 
   return (
     <div className="space-y-4">
       <div>
         <h2 className="text-lg font-semibold">Ansible Facts</h2>
         <p className="text-sm text-slate-500">
-          Connect Ansible to populate device facts.
+          {lastSync
+            ? `Last synced ${new Date(lastSync).toLocaleString()}.`
+            : "No fact collection has run against this record yet."}
         </p>
       </div>
 
+      <div>
+        <h3 className="text-sm font-semibold text-slate-700 mb-2">Promoted fields</h3>
+        {anyPromoted ? (
+          <dl className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {PROMOTED_FACT_FIELDS.map((f) => (
+              <div key={f.field} className="bg-slate-50 border border-slate-200 rounded p-2">
+                <dt className="text-[11px] uppercase tracking-wide text-slate-400">
+                  {f.label}
+                </dt>
+                <dd className="text-sm text-slate-800 font-medium">
+                  {record[f.field] ?? <span className="text-slate-400 italic">—</span>}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        ) : (
+          <p className="text-sm text-slate-400 italic">Nothing collected yet.</p>
+        )}
+      </div>
+
+      <div>
+        <h3 className="text-sm font-semibold text-slate-700 mb-2">Full facts blob</h3>
+        {blob && Object.keys(blob).length > 0 ? (
+          <div className="bg-white border border-slate-200 rounded p-3 max-h-96 overflow-auto">
+            <JsonTree data={blob} defaultOpen />
+          </div>
+        ) : (
+          <p className="text-sm text-slate-400 italic">No raw facts recorded yet.</p>
+        )}
+      </div>
+
       <div className="border border-dashed border-slate-300 rounded-lg p-4 bg-slate-50">
-        <p className="text-sm text-slate-600">
-          No fact collection has run against this record yet. The CMDB does not
-          keep a raw facts blob — a callback writes the values it gathers into
-          the device&apos;s own columns, and each write is recorded in the
-          changelog with source <code>ansible_callback</code>.
-        </p>
-        <p className="text-sm text-slate-600 mt-2">Point a playbook at:</p>
+        <p className="text-sm text-slate-600">Point a playbook at:</p>
         <pre className="mt-1 text-xs bg-slate-900 text-slate-100 rounded p-3 overflow-auto">
           {`POST /api/v1/devices/${detail.resource}/${detail.id}/facts
 Content-Type: application/json
 
-{ "model": "...", "serial_number": "...", "os_version": "..." }`}
+{ "cpu_cores": 8, "memory_mb": 16384, "os_distribution": "Ubuntu 22.04", "...": "..." }`}
         </pre>
-      </div>
-
-      <div>
-        <h3 className="text-sm font-semibold text-slate-700 mb-1">
-          Current values of the fact-backed columns
-        </h3>
-        <p className="text-xs text-slate-400 mb-2">
-          {anyValue
-            ? "Read from this device now — a fact run would overwrite these."
-            : "All empty — nothing has been collected or entered yet."}
+        <p className="text-xs text-slate-400 mt-2">
+          Promoted keys (cpu_cores, memory_mb, os_distribution) get their own column;
+          every key — promoted or not — is also kept in the full facts blob above.
         </p>
-        <pre className="text-xs bg-white border border-slate-200 rounded p-3 overflow-auto max-h-96 text-slate-700">
-          {JSON.stringify(snapshot, null, 2)}
-        </pre>
       </div>
     </div>
   );

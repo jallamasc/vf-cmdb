@@ -76,6 +76,54 @@ async def test_orphan_source_raises(session):
 
 
 @pytest.mark.asyncio
+async def test_patch_panel_port_candidates(session):
+    """Phase 4 Task 21 — patch_panel_port resolves via PatchPanel.rack_id,
+    is scoped/excluded like the other port kinds, and reports the PANEL (not
+    the individual port) as the owner."""
+    ids = await _topology(session)
+    panel = models.PatchPanel(rack_id=(await session.get(models.NetworkDevice, ids["nd"])).rack_id, panel_id_label="PP-A")
+    session.add(panel)
+    await session.flush()
+    p1 = models.PatchPanelPort(patch_panel_id=panel.id, port_number=1, label="P1")
+    p2 = models.PatchPanelPort(patch_panel_id=panel.id, port_number=2, label="P2")
+    session.add_all([p1, p2])
+    await session.commit()
+
+    res = await ports.candidate_ports(session, "network-devices", ids["nd"], "interface", ids["src"])
+    cand = {(c["port_kind"], c["port_id"]): c for c in res["candidates"]}
+    assert ("patch_panel_port", p1.id) in cand
+    assert ("patch_panel_port", p2.id) in cand
+    c1 = cand[("patch_panel_port", p1.id)]
+    assert c1["owner_type"] == "patch-panels"
+    assert c1["owner_id"] == panel.id  # owner is the PANEL, not the port
+    assert c1["owner_name"] == "PP-A"
+    assert c1["label"] == "P1"
+    assert c1["same_rack"] is True
+
+    # Excluding the source itself when the source IS a patch_panel_port.
+    res2 = await ports.candidate_ports(session, "patch-panels", panel.id, "patch_panel_port", p1.id)
+    cand2 = {(c["port_kind"], c["port_id"]) for c in res2["candidates"]}
+    assert ("patch_panel_port", p1.id) not in cand2
+    assert ("patch_panel_port", p2.id) in cand2
+
+
+@pytest.mark.asyncio
+async def test_patch_panel_port_unmounted_panel_excluded(session):
+    """A patch panel with no rack_id (unmounted) never appears as a candidate."""
+    ids = await _topology(session)
+    panel = models.PatchPanel(rack_id=None, panel_id_label="PP-unmounted")
+    session.add(panel)
+    await session.flush()
+    port = models.PatchPanelPort(patch_panel_id=panel.id, port_number=1)
+    session.add(port)
+    await session.commit()
+
+    res = await ports.candidate_ports(session, "network-devices", ids["nd"], "interface", ids["src"])
+    cand = {(c["port_kind"], c["port_id"]) for c in res["candidates"]}
+    assert ("patch_panel_port", port.id) not in cand
+
+
+@pytest.mark.asyncio
 async def test_interface_owner_resolution(session):
     """Property 3: owner pair wins, else network_device_id."""
     a = models.DeviceInterface(owner_device_type="physical-servers", owner_device_id=7)

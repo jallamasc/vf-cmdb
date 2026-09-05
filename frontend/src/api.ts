@@ -149,9 +149,9 @@ export interface DeviceRelated {
   port_type?: string;
 }
 
-/** FEAT-6 (6C) — a port that a source port may be cabled to. */
+/** FEAT-6 (6C) / Phase 4 Task 21 — a port that a source port may be cabled to. */
 export interface PortCandidate {
-  port_kind: "interface" | "outlet";
+  port_kind: "interface" | "outlet" | "patch_panel_port";
   port_id: number;
   owner_type: string;
   owner_id: number | null;
@@ -179,11 +179,41 @@ export interface PortCandidatesResult {
   candidates: PortCandidate[];
 }
 
-/** FEAT-6 (6C) — a source port handed to the Connect panel. */
+/** Phase 4 Req 22 — a curated stencil source. */
+export type StencilLibrarySource = "github" | "visiocafe";
+
+/** Phase 4 Req 22 — one category from GET /stencil-library/categories. */
+export interface StencilLibraryCategory {
+  key: string;
+  label: string;
+}
+
+/** Phase 4 Req 22 — one .vss/.vssx file from GET .../categories/{cat}/files. */
+export interface StencilLibraryFile {
+  name: string;
+  size: number | null;
+}
+
+/** Phase 4 Req 22 — one converted shape preview from POST .../fetch. */
+export interface StencilLibraryShape {
+  title: string;
+  preview_url: string;
+}
+
+/** Phase 4 Req 22 — result of POST /stencil-library/fetch. */
+export interface StencilLibraryFetchResult {
+  token: string;
+  source: string;
+  category: string;
+  file: string;
+  shapes: StencilLibraryShape[];
+}
+
+/** FEAT-6 (6C) / Phase 4 Task 21 — a source port handed to the Connect panel. */
 export interface SourcePort {
   source_type: string;
   source_id: number;
-  source_port_kind: "interface" | "outlet";
+  source_port_kind: "interface" | "outlet" | "patch_panel_port";
   source_port_id: number;
 }
 
@@ -359,21 +389,58 @@ export const api = {
   /**
    * FEAT-6 (6B) — URL of a device model's stencil SVG, for embedding in an
    * <image href>. The GET endpoint serves cache-first (air-gap safe) and 404s
-   * when no stencil is available.
+   * when no stencil is available. Phase 4 Req 14: `face` selects front
+   * (default) or back — the two are cached and served independently.
    */
-  stencilUrl: (modelSlug: string): string => `${BASE}/stencils/${modelSlug}`,
+  stencilUrl: (modelSlug: string, face: "front" | "back" = "front"): string =>
+    `${BASE}/stencils/${modelSlug}${face === "back" ? "?face=back" : ""}`,
   /**
    * FEAT-6 (6B) — upload an SVG stencil for a device model. Works offline; the
    * uploaded file is cached and served without contacting Visio Café.
    */
-  uploadStencil: (modelSlug: string, file: File): Promise<Row> => {
+  uploadStencil: (
+    modelSlug: string,
+    file: File,
+    face: "front" | "back" = "front",
+  ): Promise<Row> => {
     const form = new FormData();
     form.append("file", file);
-    return fetch(`${BASE}/stencils/${modelSlug}`, {
+    return fetch(`${BASE}/stencils/${modelSlug}?face=${face}`, {
       method: "POST",
       body: form,
     }).then(handle);
   },
+  /** Phase 4 Req 19 — anchors mapped for a stencil owner (+ optional face). */
+  stencilAnchors: (modelSlug: string, face?: "front" | "back"): Promise<Row[]> =>
+    fetch(
+      `${BASE}/stencils/${modelSlug}/anchors${face ? `?face=${face}` : ""}`,
+    ).then(handle),
+  /** Phase 4 Req 22 — stencil library: categories available from a source. */
+  stencilLibraryCategories: (source: StencilLibrarySource): Promise<StencilLibraryCategory[]> =>
+    fetch(`${BASE}/stencil-library/categories?source=${source}`).then(handle),
+  /** Phase 4 Req 22 — .vss/.vssx files available in a category. */
+  stencilLibraryFiles: (
+    source: StencilLibrarySource,
+    category: string,
+  ): Promise<StencilLibraryFile[]> =>
+    fetch(
+      `${BASE}/stencil-library/categories/${encodeURIComponent(category)}/files?source=${source}`,
+    ).then(handle),
+  /**
+   * Phase 4 Req 22 — fetch + convert a chosen stencil file into per-shape
+   * SVG previews. Nothing is applied as a real stencil yet — the caller
+   * picks exactly one preview and uploads it via `uploadStencil()`.
+   */
+  stencilLibraryFetch: (
+    source: StencilLibrarySource,
+    category: string,
+    file: string,
+  ): Promise<StencilLibraryFetchResult> =>
+    fetch(`${BASE}/stencil-library/fetch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source, category, file }),
+    }).then(handle),
   /**
    * FEAT-6 (6C) — connectable destination ports for a source port. Scoped to
    * the same rack, else datacenter, else site (fallback).

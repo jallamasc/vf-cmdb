@@ -30,7 +30,9 @@ function siteLabel(sites: Row[], id: number | null | undefined): string {
 
 // Column counts of the segment tables (kept next to the headers so the
 // expandable reservation rows always span the full width).
-const IPV4_COLS = 10;
+// Req 7.1: Description is now the first column in both tables — IPv4 gains a
+// Description column it did not show before, so its count grows by one.
+const IPV4_COLS = 11;
 const IPV6_COLS = 8;
 
 // ---------------------------------------------------------------------------
@@ -225,6 +227,7 @@ function Ipv4SegmentRow({
   return (
     <>
       <tr className="border-t border-slate-100">
+        <td className="px-3 py-2 text-slate-500 text-sm">{subnet.description ?? "—"}</td>
         <td className="px-3 py-2 font-mono text-sm">{subnet.network_cidr ?? "—"}</td>
         <td className="px-3 py-2 font-mono text-xs">{subnet.gateway ?? "—"}</td>
         <td className="px-3 py-2">{vlanLabel}</td>
@@ -295,6 +298,7 @@ function Ipv6SegmentRow({
   return (
     <>
       <tr className="border-t border-slate-100">
+        <td className="px-3 py-2 text-slate-500 text-sm">{subnet.description ?? "—"}</td>
         <td className="px-3 py-2 font-mono text-xs">{subnet.network_cidr ?? "—"}</td>
         <td className="px-3 py-2">{vlanLabel}</td>
         <td
@@ -310,7 +314,6 @@ function Ipv6SegmentRow({
         <td className="px-3 py-2 text-xs text-slate-500">
           {subnet.reserved_count ?? 0} · {subnet.reservation_anchor ?? "from_end"}
         </td>
-        <td className="px-3 py-2 text-slate-500 text-sm">{subnet.description}</td>
         <td className="px-3 py-2">
           <button
             onClick={() => setOpen((o) => !o)}
@@ -468,6 +471,7 @@ function SegmentsTab({
         <table className="w-full text-sm">
           <thead className="bg-slate-100 text-slate-600">
             <tr>
+              <th className="text-left px-3 py-2">Description</th>
               <th className="text-left px-3 py-2">Network</th>
               <th className="text-left px-3 py-2">Gateway</th>
               <th className="text-left px-3 py-2">VLAN</th>
@@ -519,13 +523,13 @@ function SegmentsTab({
           <table className="w-full text-sm">
             <thead className="bg-slate-100 text-slate-600">
               <tr>
+                <th className="text-left px-3 py-2">Description</th>
                 <th className="text-left px-3 py-2">Network</th>
                 <th className="text-left px-3 py-2">VLAN</th>
                 <th className="text-left px-3 py-2">Site</th>
                 <th className="text-left px-3 py-2">Range from</th>
                 <th className="text-left px-3 py-2">Range to</th>
                 <th className="text-left px-3 py-2">Reserved · anchor</th>
-                <th className="text-left px-3 py-2">Description</th>
                 <th className="text-left px-3 py-2">Reservations</th>
               </tr>
             </thead>

@@ -1,8 +1,13 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api, Row } from "../api";
 import RackDiagramSVG, { PORT_TYPE_HEX, RackPort } from "../components/RackDiagramSVG";
 import ConnectPanel from "../components/ConnectPanel";
+import ConnectionInfoPanel from "../components/ConnectionInfoPanel";
+import BreadcrumbNav, { ALL, BreadcrumbFilter } from "../components/BreadcrumbNav";
+import RackSlotEditor from "../components/RackSlotEditor";
+import { CableRow, ConnectionResolution, interfacePortType } from "../lib/connections";
 
 // Device resources whose ports we resolve into the back-face view. Maps the
 // kebab-case slug (as stored in owner_device_type / rack_units.device_table) to
@@ -12,14 +17,6 @@ const PORT_OWNER_RESOURCES = [
   "physical-servers",
   "workstations",
 ] as const;
-
-// copper vs fiber from an interface speed string (mirrors the backend rule).
-function interfacePortType(iface: Row): string {
-  const speed = String(iface.speed ?? "").toLowerCase();
-  if (["sfp", "fiber", "fibre", "lc", "sr", "lr", "optical"].some((t) => speed.includes(t)))
-    return "fiber";
-  return "copper";
-}
 
 // Tailwind classes for the legend swatches (kept in sync with TYPE_HEX).
 const TYPE_COLORS: Record<string, string> = {
@@ -33,8 +30,7 @@ const TYPE_COLORS: Record<string, string> = {
   storage: "bg-cyan-200 border-cyan-400",
 };
 
-const ALL = "all" as const;
-type Filter = number | typeof ALL;
+type Filter = BreadcrumbFilter;
 
 function nameOf(row: Row | undefined, fallback: string) {
   if (!row) return fallback;
@@ -44,43 +40,6 @@ function nameOf(row: Row | undefined, fallback: string) {
     row.vf_long_name ||
     row.code ||
     `${fallback} ${row.id}`
-  );
-}
-
-function Dropdown({
-  label,
-  value,
-  onChange,
-  options,
-  allLabel,
-  disabled,
-}: {
-  label: string;
-  value: Filter;
-  onChange: (v: Filter) => void;
-  options: { id: number; label: string }[];
-  allLabel: string;
-  disabled?: boolean;
-}) {
-  return (
-    <label className="flex flex-col gap-1 text-xs text-slate-500">
-      <span className="font-medium uppercase tracking-wide">{label}</span>
-      <select
-        value={value}
-        disabled={disabled}
-        onChange={(e) =>
-          onChange(e.target.value === ALL ? ALL : Number(e.target.value))
-        }
-        className="border border-slate-300 rounded px-2 py-1.5 text-sm text-slate-700 min-w-[10rem] disabled:opacity-50 disabled:bg-slate-50"
-      >
-        <option value={ALL}>{allLabel}</option>
-        {options.map((o) => (
-          <option key={o.id} value={o.id}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </label>
   );
 }
 
@@ -126,24 +85,81 @@ export default function RackView() {
     queryKey: ["workstations"],
     queryFn: () => api.list("workstations"),
   });
+  // Req 14 — resolving a per-unit stencil needs the owning power device (for
+  // its device_type_id) and the three device-type lookups' stencil columns.
+  const { data: powerDevices } = useQuery({
+    queryKey: ["power-devices"],
+    queryFn: () => api.list("power-devices"),
+  });
+  const { data: networkDeviceTypes } = useQuery({
+    queryKey: ["network-device-types"],
+    queryFn: () => api.list("network-device-types"),
+  });
+  const { data: computeDeviceTypes } = useQuery({
+    queryKey: ["compute-device-types"],
+    queryFn: () => api.list("compute-device-types"),
+  });
+  const { data: powerDeviceTypes } = useQuery({
+    queryKey: ["power-device-types"],
+    queryFn: () => api.list("power-device-types"),
+  });
+  // Phase 4 Req 20 — every cable, so back-face dots can resolve connection
+  // state and the info panel can show/edit/remove the specific cable.
+  const { data: cables } = useQuery({
+    queryKey: ["cables"],
+    queryFn: () => api.list("cables"),
+  });
 
   const [site, setSite] = useState<Filter>(ALL);
   const [dc, setDc] = useState<Filter>(ALL);
   const [floor, setFloor] = useState<Filter>(ALL);
   const [rack, setRack] = useState<Filter>(ALL);
   const [face, setFace] = useState<"front" | "back">("front");
-  // FEAT-6 (6C): the source port the Connect panel is open for.
-  const [connectSource, setConnectSource] = useState<RackPort | null>(null);
+  // FEAT-6 (6C) / Phase 4 Req 20 — the source port the Connect panel is open
+  // for, and the cable it's re-cabling away from when editing an existing
+  // connection (null for a fresh connection).
+  const [connectSource, setConnectSource] = useState<{
+    port: RackPort;
+    editingCable?: CableRow | null;
+  } | null>(null);
+  // Phase 4 Req 20 — the connected port the info panel (view/edit/remove) is
+  // open for.
+  const [connectInfo, setConnectInfo] = useState<{
+    port: RackPort;
+    resolution: ConnectionResolution;
+  } | null>(null);
+  // Req 13: the front-face slot RackSlotEditor is open for.
+  const [slotEditor, setSlotEditor] = useState<{
+    rackId: number;
+    unitNumber: number;
+    unit: Row | null;
+  } | null>(null);
+
+  // Req 11.3 — deep link: `?rackId=` pre-selects that rack's full breadcrumb
+  // path (site > datacenter > floor > rack) once the hierarchy data is in.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const appliedDeepLink = useRef(false);
 
   // Owner lookup: slug -> Map(id -> owner row) for rack/U resolution (rule A).
+  // Phase 4 Req 20 also needs "power-devices" here, since a far end of a
+  // connection can be a PDU/UPS outlet owner, not just an interface owner.
   const ownerById = useMemo(() => {
     const m: Record<string, Map<number, Row>> = {
       "network-devices": new Map((networkDevices ?? []).map((d) => [d.id, d])),
       "physical-servers": new Map((physicalServers ?? []).map((d) => [d.id, d])),
       workstations: new Map((workstations ?? []).map((d) => [d.id, d])),
+      "power-devices": new Map((powerDevices ?? []).map((d) => [d.id, d])),
     };
     return m;
-  }, [networkDevices, physicalServers, workstations]);
+  }, [networkDevices, physicalServers, workstations, powerDevices]);
+
+  // Phase 4 Req 20 — display name + rack id for a resolved far end, so the
+  // ConnectionInfoPanel can show who it's connected to and jump there.
+  const describeOwner = (ref: { type: string | null | undefined; id: number | null | undefined }) => {
+    if (!ref.type || ref.id == null) return { name: "Unknown device", rackId: null as number | null };
+    const row = ownerById[ref.type]?.get(ref.id);
+    return { name: nameOf(row, ref.type), rackId: row?.rack_id ?? null };
+  };
 
   // Resolve an interface's owner (owner pair wins, else network_device_id).
   const interfaceOwner = (iface: Row): { slug: string; id: number } | null => {
@@ -199,6 +215,65 @@ export default function RackView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [interfaces, powerOutlets, ownerById]);
 
+  // Req 14 — one stencil href per mounted `rack_units` row, resolved to the
+  // SPECIFIC device-type row the mounted device actually uses (not the
+  // coarse device_type string), for whichever face is currently showing.
+  const stencilHrefByUnit = useMemo(() => {
+    const powerDevicesById = new Map((powerDevices ?? []).map((d) => [d.id, d]));
+    const networkDeviceTypesById = new Map((networkDeviceTypes ?? []).map((t) => [t.id, t]));
+    const computeDeviceTypesById = new Map((computeDeviceTypes ?? []).map((t) => [t.id, t]));
+    const powerDeviceTypesById = new Map((powerDeviceTypes ?? []).map((t) => [t.id, t]));
+
+    const resolveOwnerAndTypeMap = (
+      deviceTable: string | null | undefined,
+      deviceId: number | null | undefined
+    ): { resource: string; typeRow: Row | undefined } | null => {
+      if (deviceId == null) return null;
+      switch (deviceTable) {
+        case "network-devices":
+          return {
+            resource: "network-device-types",
+            typeRow: networkDeviceTypesById.get(
+              ownerById["network-devices"]?.get(deviceId)?.device_type_id
+            ),
+          };
+        case "physical-servers":
+          return {
+            resource: "compute-device-types",
+            typeRow: computeDeviceTypesById.get(
+              ownerById["physical-servers"]?.get(deviceId)?.device_type_id
+            ),
+          };
+        case "workstations":
+          return {
+            resource: "compute-device-types",
+            typeRow: computeDeviceTypesById.get(
+              ownerById["workstations"]?.get(deviceId)?.device_type_id
+            ),
+          };
+        case "power-devices":
+          return {
+            resource: "power-device-types",
+            typeRow: powerDeviceTypesById.get(
+              powerDevicesById.get(deviceId)?.device_type_id
+            ),
+          };
+        default:
+          return null; // e.g. patch-panels: no device-type/stencil concept
+      }
+    };
+
+    const map: Record<number, string> = {};
+    (allUnits ?? []).forEach((u) => {
+      const resolved = resolveOwnerAndTypeMap(u.device_table, u.device_id);
+      if (!resolved?.typeRow) return;
+      const url = face === "back" ? resolved.typeRow.stencil_url_back : resolved.typeRow.stencil_url;
+      if (!url) return;
+      map[u.id] = api.stencilUrl(`${resolved.resource}-${resolved.typeRow.id}`, face);
+    });
+    return map;
+  }, [allUnits, ownerById, powerDevices, networkDeviceTypes, computeDeviceTypes, powerDeviceTypes, face]);
+
   // Lookup maps for labelling rack cards with their DC/Floor/Rack breadcrumb.
   const dcById = useMemo(
     () => new Map((datacenters ?? []).map((d) => [d.id, d])),
@@ -212,6 +287,35 @@ export default function RackView() {
     () => new Map((sites ?? []).map((s) => [s.id, s])),
     [sites]
   );
+
+  // Req 11.3 — resolve `?rackId=` to its full ancestry, once, as soon as
+  // racks + floors + datacenters have all loaded.
+  useEffect(() => {
+    if (appliedDeepLink.current) return;
+    const rackIdParam = searchParams.get("rackId");
+    if (!rackIdParam) return;
+    if (!racks || !floors || !datacenters) return;
+    const targetRack = racks.find((r) => r.id === Number(rackIdParam));
+    if (!targetRack) return;
+    appliedDeepLink.current = true;
+    setRack(targetRack.id);
+    const fl = floorById.get(targetRack.datacenter_floor_id);
+    const dcParent = fl ? dcById.get(fl.datacenter_id) : undefined;
+    if (fl) setFloor(fl.id);
+    if (dcParent) setDc(dcParent.id);
+    const resolvedSite = targetRack.site_id ?? dcParent?.site_id;
+    if (resolvedSite != null) setSite(resolvedSite);
+  }, [searchParams, racks, floors, datacenters, floorById, dcById]);
+
+  // Keep the URL shareable: reflect the selected rack (if any) in `?rackId=`.
+  useEffect(() => {
+    if (!appliedDeepLink.current && rack === ALL) return; // avoid clobbering on first paint
+    const next = new URLSearchParams(searchParams);
+    if (rack === ALL) next.delete("rackId");
+    else next.set("rackId", String(rack));
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rack]);
 
   // Cascading option lists — each level filtered by the parent selection.
   const dcOptions = useMemo(
@@ -304,76 +408,89 @@ export default function RackView() {
               : "Back of rack. Coloured dots are ports (blue=copper, orange=fiber, yellow=power). Click a port to connect it."}
           </p>
         </div>
-        {/* FEAT-6 (6A): Front/Back face toggle */}
-        <div className="inline-flex rounded-lg border border-slate-300 overflow-hidden text-sm">
-          {(["front", "back"] as const).map((f) => (
-            <button
-              key={f}
-              type="button"
-              onClick={() => setFace(f)}
-              className={
-                "px-4 py-1.5 capitalize " +
-                (face === f
-                  ? "bg-slate-800 text-white"
-                  : "bg-white text-slate-600 hover:bg-slate-50")
-              }
-            >
-              {f}
-            </button>
-          ))}
+        {/* Req 12 — the face toggle must be unmissable, not a subtle control. */}
+        <div className="flex flex-col items-end gap-1">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            Viewing
+          </span>
+          <div className="inline-flex rounded-lg border-2 border-slate-800 overflow-hidden text-sm shadow-sm">
+            {(["front", "back"] as const).map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setFace(f)}
+                title={`Show the ${f} of each rack`}
+                className={
+                  "px-5 py-2 capitalize font-semibold flex items-center gap-1.5 transition-colors " +
+                  (face === f
+                    ? "bg-slate-800 text-white"
+                    : "bg-white text-slate-600 hover:bg-slate-100")
+                }
+              >
+                <span aria-hidden="true">{f === "front" ? "▣" : "▤"}</span>
+                {f}
+              </button>
+            ))}
+          </div>
+          <span className="text-[11px] text-slate-400">
+            Click to flip — the back shows ports &amp; cabling
+          </span>
         </div>
       </div>
 
-      {/* Cascading hierarchy filters */}
-      <div className="flex flex-wrap gap-4 mb-5 items-end bg-slate-50 border border-slate-200 rounded-lg p-4">
-        <Dropdown
-          label="Site"
-          value={site}
-          allLabel="All Sites"
-          options={(sites ?? []).map((s) => ({
-            id: s.id,
-            label: nameOf(s, "Site"),
-          }))}
-          onChange={(v) => {
-            setSite(v);
-            setDc(ALL);
-            setFloor(ALL);
-            setRack(ALL);
-          }}
-        />
-        <Dropdown
-          label="Datacenter"
-          value={dc}
-          allLabel="All Datacenters"
-          options={dcOptions}
-          onChange={(v) => {
-            setDc(v);
-            setFloor(ALL);
-            setRack(ALL);
-          }}
-        />
-        <Dropdown
-          label="Floor"
-          value={floor}
-          allLabel="All Floors"
-          options={floorOptions}
-          onChange={(v) => {
-            setFloor(v);
-            setRack(ALL);
-          }}
-        />
-        <Dropdown
-          label="Rack"
-          value={rack}
-          allLabel="All Racks"
-          options={rackOptions}
-          onChange={setRack}
-        />
-        <div className="text-xs text-slate-500 pb-2">
-          Showing <span className="font-semibold">{shown.length}</span> rack
-          {shown.length === 1 ? "" : "s"}
-        </div>
-      </div>
+      {/* Req 11: breadcrumb navigation, Site › Datacenter › Floor › Rack */}
+      <BreadcrumbNav
+        levels={[
+          {
+            key: "site",
+            label: "Site",
+            value: site,
+            allLabel: "All Sites",
+            options: (sites ?? []).map((s) => ({ id: s.id, label: nameOf(s, "Site") })),
+            onChange: (v) => {
+              setSite(v);
+              setDc(ALL);
+              setFloor(ALL);
+              setRack(ALL);
+            },
+          },
+          {
+            key: "datacenter",
+            label: "Datacenter",
+            value: dc,
+            allLabel: "All Datacenters",
+            options: dcOptions,
+            onChange: (v) => {
+              setDc(v);
+              setFloor(ALL);
+              setRack(ALL);
+            },
+          },
+          {
+            key: "floor",
+            label: "Floor",
+            value: floor,
+            allLabel: "All Floors",
+            options: floorOptions,
+            onChange: (v) => {
+              setFloor(v);
+              setRack(ALL);
+            },
+          },
+          {
+            key: "rack",
+            label: "Rack",
+            value: rack,
+            allLabel: "All Racks",
+            options: rackOptions,
+            onChange: setRack,
+          },
+        ]}
+      />
+      <p className="text-xs text-slate-500 -mt-3 mb-4">
+        Showing <span className="font-semibold">{shown.length}</span> rack
+        {shown.length === 1 ? "" : "s"}
+      </p>
 
       {/* Legend — device types (front) or port types (back) */}
       <div className="flex flex-wrap gap-3 mb-5 text-xs">
@@ -422,18 +539,67 @@ export default function RackView() {
                 units={(allUnits ?? []).filter((u) => u.rack_id === r.id)}
                 face={face}
                 ports={face === "back" ? portsByRack.get(r.id) ?? [] : []}
-                onPortClick={face === "back" ? setConnectSource : undefined}
+                cables={(cables ?? []) as CableRow[]}
+                stencilHrefByUnit={stencilHrefByUnit}
+                onPortClick={
+                  face === "back"
+                    ? (port, resolution) =>
+                        resolution.connected
+                          ? setConnectInfo({ port, resolution })
+                          : setConnectSource({ port })
+                    : undefined
+                }
+                onSlotClick={
+                  face === "front"
+                    ? (info) => setSlotEditor({ rackId: r.id, ...info })
+                    : undefined
+                }
               />
             </div>
           ))}
         </div>
       )}
 
-      {/* FEAT-6 (6C): connect a clicked back-face port to a destination */}
+      {/* FEAT-6 (6C) / Phase 4 Req 20: connect a clicked back-face port to a
+          destination, or re-cable it away from an existing connection. */}
       {connectSource && (
         <ConnectPanel
-          source={connectSource}
+          source={connectSource.port}
+          editingCable={connectSource.editingCable}
           onClose={() => setConnectSource(null)}
+        />
+      )}
+
+      {/* Phase 4 Req 20: view/edit/remove an existing connection. */}
+      {connectInfo && (
+        <ConnectionInfoPanel
+          source={connectInfo.port}
+          resolution={connectInfo.resolution}
+          farEndOwnerName={describeOwner(connectInfo.resolution.farEnd ?? {
+            type: null,
+            id: null,
+          }).name}
+          farEndRackId={
+            describeOwner(connectInfo.resolution.farEnd ?? { type: null, id: null }).rackId
+          }
+          onClose={() => setConnectInfo(null)}
+          onEdit={() => {
+            setConnectSource({
+              port: connectInfo.port,
+              editingCable: connectInfo.resolution.cable,
+            });
+            setConnectInfo(null);
+          }}
+        />
+      )}
+
+      {/* Req 13: add/edit/remove equipment for a clicked front-face U slot */}
+      {slotEditor && (
+        <RackSlotEditor
+          rackId={slotEditor.rackId}
+          unitNumber={slotEditor.unitNumber}
+          unit={slotEditor.unit}
+          onClose={() => setSlotEditor(null)}
         />
       )}
     </div>

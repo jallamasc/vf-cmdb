@@ -4,6 +4,9 @@ import Dashboard from "./pages/Dashboard";
 import Sites from "./pages/Sites";
 import Hierarchy from "./pages/Hierarchy";
 import RackView from "./pages/RackView";
+import PatchPanelView from "./pages/PatchPanelView";
+import PowerDeviceView from "./pages/PowerDeviceView";
+import PortConfigView from "./pages/PortConfigView";
 import PhysicalServers from "./pages/PhysicalServers";
 import VirtualMachines from "./pages/VirtualMachines";
 import ContainersApps from "./pages/ContainersApps";
@@ -31,7 +34,9 @@ export default function App() {
         <Route path="hierarchy" element={<Hierarchy />} />
         <Route path="racks" element={<RackView />} />
         <Route path="racks-list" element={<SimpleGridPage kind="racks" />} />
+        <Route path="patch-panel-view" element={<PatchPanelView />} />
         <Route path="patch-panels" element={<SimpleGridPage kind="patch-panels" />} />
+        <Route path="power-device-view" element={<PowerDeviceView />} />
         <Route path="power" element={<SimpleGridPage kind="power" />} />
         <Route path="cables" element={<CablesViewer />} />
         <Route path="physical-servers" element={<PhysicalServers />} />
@@ -43,6 +48,7 @@ export default function App() {
         <Route path="ipam" element={<IPAM />} />
         <Route path="ip-assignments" element={<IpAssignments />} />
         <Route path="network-devices" element={<NetworkDevices />} />
+        <Route path="port-config-view" element={<PortConfigView />} />
         <Route path="port-config" element={<PortConfig />} />
         <Route path="naming" element={<Naming />} />
         <Route path="reference-data" element={<ReferenceData />} />

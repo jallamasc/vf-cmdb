@@ -42,16 +42,27 @@ _TABLES = [
     "network_device_types",
     "compute_device_types",
     "storage_device_types",
+    "power_device_types",
+    "stencil_anchors",
+    "sites",
+    "regions",
     "change_log",
 ]
 
 
 @pytest_asyncio.fixture
 async def db_engine():
-    """A fresh NullPool engine bound to the current test's event loop."""
+    """A fresh NullPool engine bound to the current test's event loop.
+
+    Schema is DROPPED and rebuilt from the current ORM metadata every test.
+    ``create_all`` alone is NOT enough once a model gains a new column on an
+    already-existing table (it only creates missing tables, never ALTERs an
+    existing one) — drop+create guarantees the test DB always matches the
+    current models, even across schema-changing commits within a session.
+    """
     engine = create_async_engine(settings.database_url, poolclass=NullPool)
-    # Build the schema (idempotent create_all — the same path revision 0001 uses).
     async with engine.begin() as conn:
+        await conn.run_sync(models.Base.metadata.drop_all)
         await conn.run_sync(models.Base.metadata.create_all)
     yield engine
     await engine.dispose()

@@ -132,12 +132,50 @@ SPACE_MISSIONS = [
     "Redstone", "Vulcan", "Electron", "Neutron", "New Shepard", "New Glenn",
 ]
 
+# ---------------------------------------------------------------------------
+# Phase 4 Req 10 — Networking: pioneers, landmark projects/networks, and
+# early network hardware/standards bodies, so a network device can carry a
+# name that is recognisably "networking-flavored" the way the other
+# categories are recognisably Star Wars / Greek myth / etc.
+# ---------------------------------------------------------------------------
+NETWORKING = [
+    # -- Pioneers --------------------------------------------------------
+    "Vint Cerf", "Bob Kahn", "Paul Baran", "Donald Davies", "Leonard Kleinrock",
+    "Tim Berners-Lee", "Jon Postel", "Radia Perlman", "Robert Metcalfe",
+    "Van Jacobson", "David Clark", "Danny Cohen", "Steve Crocker",
+    "Elizabeth Feinler", "Doug Engelbart", "Ray Tomlinson", "Larry Roberts",
+    "Charley Kline", "Bill Joy", "Dennis Ritchie", "Ken Thompson",
+    "Marc Andreessen", "Eric Bina", "Whitfield Diffie", "Martin Hellman",
+    "Phil Zimmermann", "Jean Armour Polly", "Brewster Kahle",
+    "Ward Cunningham", "Craig Newmark", "Linus Torvalds", "Richard Stevens",
+    "Bob Metcalfe", "Sandy Lerner", "Leonard Bosack", "Werner Zorn",
+    "Peter Kirstein", "Louis Pouzin", "Hubert Zimmermann", "Jake Feinler",
+    "Kees Neggers", "Geoff Huston", "Scott Bradner", "Noel Chiappa",
+    # -- Landmark networks & projects -------------------------------------
+    "Arpanet", "NSFNET", "CSNET", "Bitnet", "Janet", "Minitel", "Usenet",
+    "Ethernet", "Token Ring", "Fidonet", "CompuServe", "Prodigy", "GEnie",
+    "Plan 9", "Multics", "Internet2", "6Bone", "Abilene", "vBNS", "Milnet",
+    "Darpa", "Plato", "Alohanet", "Cyclades", "Merit", "Cerfnet", "Uunet",
+    "Netnews", "Decnet", "Appletalk", "Novell", "Netware", "Xerox Parc",
+    "Interop", "Renater", "Surfnet", "Dante", "Geant", "Internet Exchange",
+    "Mae East", "Mae West", "Equinix", "Any2", "Linx", "Amsix",
+    # -- Standards, protocols & early hardware (proper-noun style) --------
+    "Tcp", "Ip", "Bgp", "Ospf", "Rip", "Dns", "Smtp", "Http", "Ftp", "Telnet",
+    "Gopher", "Archie", "Veronica", "Finger", "Whois", "Ping", "Traceroute",
+    "Imp", "Tip", "Csnet Relay", "X25", "Frame Relay", "Atm Forum",
+    "Ansnet", "Nsi", "Es Net", "Hep Net", "Bearnet", "Sura Net", "Nysernet",
+    "Jvnc Net", "Westnet", "Nor Dunet", "Sesqui Net", "Pacific Net",
+    "Ricenet", "Cix", "Psi Net", "Netcom", "Delphi", "Well", "Echo Ny",
+    "Freenet", "Bbn", "Sri International", "Ucla Nmc", "Xerox Alto",
+]
+
 # Public catalogue: category slug -> ordered list of names.
 THEMES: dict[str, list[str]] = {
     "star_wars": STAR_WARS,
     "greek_mythology": GREEK_MYTHOLOGY,
     "mountain_peaks": MOUNTAIN_PEAKS,
     "space_missions": SPACE_MISSIONS,
+    "networking": NETWORKING,
 }
 
 # Human-readable labels for the UI tabs.
@@ -146,6 +184,7 @@ CATEGORY_LABELS: dict[str, str] = {
     "greek_mythology": "Greek Mythology",
     "mountain_peaks": "Mountain Peaks",
     "space_missions": "Space Missions",
+    "networking": "Networking",
 }
 
 

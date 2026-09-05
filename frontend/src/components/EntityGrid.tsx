@@ -6,6 +6,7 @@ import type { ColDef, CellValueChangedEvent } from "ag-grid-community";
 import "ag-grid-community/styles/ag-grid.css";
 import "ag-grid-community/styles/ag-theme-quartz.css";
 import { api, Row } from "../api";
+import { fuzzyMatchesAny } from "../lib/fuzzy";
 
 /**
  * A column the backend declares ``nullable=False`` on. EntityGrid uses these
@@ -196,6 +197,8 @@ export default function EntityGrid({
   const qc = useQueryClient();
   const gridRef = useRef<AgGridReact>(null);
   const [toast, setToast] = useState<Toast | null>(null);
+  // Req 6 — per-section fuzzy search, applied as an AG Grid external filter.
+  const [search, setSearch] = useState("");
 
   const notify = (kind: ToastKind, message: string) =>
     setToast({ kind, message });
@@ -315,6 +318,11 @@ export default function EntityGrid({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
+  // Req 6.2/6.3 — re-run the external (fuzzy) filter whenever the query changes.
+  useEffect(() => {
+    gridRef.current?.api?.onFilterChanged();
+  }, [search]);
+
   const onCellValueChanged = (e: CellValueChangedEvent) => {
     setToast(null);
     const field = e.colDef.field;
@@ -405,6 +413,14 @@ export default function EntityGrid({
           {description && <p className="text-sm text-slate-500">{description}</p>}
         </div>
         <div className="flex gap-2">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Fuzzy search…"
+            aria-label="Fuzzy search this table"
+            className="px-3 py-1.5 border border-slate-300 rounded text-sm w-48 focus:outline-none focus:ring-2 focus:ring-blue-400"
+          />
           {toolbarExtra}
           <button
             onClick={handleAutoFit}
@@ -484,10 +500,17 @@ export default function EntityGrid({
             getRowId={(p) => String(p.data.id)}
             rowSelection="multiple"
             stopEditingWhenCellsLoseFocus
+            // Req 5.1 — a dropdown cell opens its picker on the first click.
+            singleClickEdit
             animateRows
             pagination
             paginationPageSize={50}
             tooltipShowDelay={400}
+            // Req 6.2/6.3 — fuzzy search across every column value.
+            isExternalFilterPresent={() => search.trim() !== ""}
+            doesExternalFilterPass={(node) =>
+              fuzzyMatchesAny(search, Object.values(node.data ?? {}))
+            }
           />
         </div>
       )}

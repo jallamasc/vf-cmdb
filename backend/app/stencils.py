@@ -57,13 +57,20 @@ def validate_slug(model_slug: str) -> str:
     return slug
 
 
-def cache_path(model_slug: str) -> Path:
-    """Filesystem path of the cached SVG for a validated slug."""
-    return CACHE_DIR / f"{validate_slug(model_slug)}.svg"
+def cache_path(model_slug: str, face: str = "front") -> Path:
+    """Filesystem path of the cached SVG for a validated slug + face.
+
+    ``front`` keeps the original (FEAT-6) filename for backward compatibility
+    with any already-cached front stencils; ``back`` (Phase 4 Req 14) gets a
+    distinct suffixed filename so a device can carry two different graphics.
+    """
+    slug = validate_slug(model_slug)
+    suffix = "" if face == "front" else f"-{face}"
+    return CACHE_DIR / f"{slug}{suffix}.svg"
 
 
-def is_cached(model_slug: str) -> bool:
-    return cache_path(model_slug).is_file()
+def is_cached(model_slug: str, face: str = "front") -> bool:
+    return cache_path(model_slug, face).is_file()
 
 
 def _looks_like_svg(data: bytes, content_type: Optional[str]) -> bool:
@@ -77,19 +84,21 @@ def _looks_like_svg(data: bytes, content_type: Optional[str]) -> bool:
     return "<svg" in text
 
 
-def store_bytes(model_slug: str, data: bytes, content_type: Optional[str] = None) -> Path:
+def store_bytes(
+    model_slug: str, data: bytes, content_type: Optional[str] = None, face: str = "front"
+) -> Path:
     """Validate SVG content and write it into the cache, overwriting any copy."""
     if not _looks_like_svg(data, content_type):
         raise InvalidStencil(
             "Uploaded file is not an SVG (expected image/svg+xml or an <svg> root)."
         )
     ensure_cache_dir()
-    path = cache_path(model_slug)
+    path = cache_path(model_slug, face)
     path.write_bytes(data)
     return path
 
 
-def download_and_cache(model_slug: str, url: str) -> Optional[Path]:
+def download_and_cache(model_slug: str, url: str, face: str = "front") -> Optional[Path]:
     """Download an SVG from ``url`` into the cache; return the path or None.
 
     Any network/HTTP error (unreachable Visio Café, timeout, 404, non-SVG body)
@@ -107,6 +116,6 @@ def download_and_cache(model_slug: str, url: str) -> Optional[Path]:
     if not _looks_like_svg(data, resp.headers.get("content-type")):
         return None
     ensure_cache_dir()
-    path = cache_path(model_slug)
+    path = cache_path(model_slug, face)
     path.write_bytes(data)
     return path

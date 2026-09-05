@@ -3,7 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, Row } from "../api";
 import AbbrevField, { CASE_MODES } from "../components/AbbrevField";
 import CityAirportField from "../components/CityAirportField";
-import { lookupLabel } from "../lib/columns";
+import EntityGrid from "../components/EntityGrid";
+import { lookupLabel, roCol, textCol, airportCol } from "../lib/columns";
 import { useNamePreview } from "../lib/useNamePreview";
 
 // ---------------------------------------------------------------------------
@@ -169,6 +170,16 @@ function SimpleList({ rows, render }: { rows: Row[]; render: (r: Row) => string 
   );
 }
 
+// Req 9: airportCol gives the IATA cell an in-cell search/select editor.
+const DATACENTER_COLUMNS = [
+  roCol("id", "ID", 60),
+  textCol("name", "Name", 160),
+  textCol("code", "Code", 100),
+  textCol("city", "City", 140),
+  airportCol("iata_code", "Airport (IATA)"),
+  roCol("vf_long_name", "VF Long Name", 220),
+];
+
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
@@ -232,16 +243,19 @@ export default function Hierarchy() {
       {/* ---- Datacenter ---- */}
       <LevelCard
         title="Datacenters"
-        subtitle="A datacenter belongs to a site. Its city resolves to an airport (IATA) code, which is appended to the site name to form the VF long name."
+        subtitle="A datacenter belongs to a site. Its city resolves to an airport (IATA) code, which is appended to the site name to form the VF long name. Click the Airport cell to search — you don't need to remember the code."
         count={datacenters.data?.length ?? 0}
         list={
-          <SimpleList
-            rows={datacenters.data ?? []}
-            render={(r) =>
-              `${r.name}${r.code ? ` (${r.code})` : ""}` +
-              (r.iata_code ? ` · ${r.iata_code}` : "") +
-              (r.vf_long_name ? ` · ${r.vf_long_name}` : "")
-            }
+          // Req 9: an editable grid (not a read-only list) so an existing
+          // datacenter's IATA code can be fixed after creation, searched
+          // in-cell instead of typed from memory.
+          <EntityGrid
+            resource="datacenters"
+            title=""
+            columns={DATACENTER_COLUMNS}
+            allowAdd={false}
+            minHeight={220}
+            footerHint={null}
           />
         }
         renderForm={(onDone) => (

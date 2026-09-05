@@ -43,3 +43,6 @@ vf-cmdb-backups/
 
 # FEAT-6: runtime stencil cache (keep the dir, ignore downloaded SVGs)
 backend/static/stencils/*.svg
+# Phase 4 Sub-phase E: stencil library preview cache (keep the dir, ignore
+# the per-fetch token subdirectories it accumulates at runtime)
+backend/static/stencil_previews/*/

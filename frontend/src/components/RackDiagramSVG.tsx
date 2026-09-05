@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import { Row } from "../api";
+import ConnectionDot from "./ConnectionDot";
+import { CableRow, ConnectionResolution, resolveConnection } from "../lib/connections";
 
 // Hex colour map for SVG fills, keyed by device type. Mirrors the Tailwind
 // TYPE_COLORS used elsewhere in the app but expressed as concrete hex codes so
@@ -23,7 +25,9 @@ export const PORT_TYPE_HEX: Record<string, string> = {
   power: "#eab308", // yellow-500
 };
 
-function portColor(portType?: string | null): string {
+// Phase 4 Req 20: shared by ConnectionDot so every graphical view (rack,
+// patch panel, power) colours its port dots identically.
+export function portColor(portType?: string | null): string {
   return PORT_TYPE_HEX[(portType ?? "").toLowerCase()] ?? "#94a3b8"; // slate-400 fallback
 }
 
@@ -46,8 +50,11 @@ function truncate(label: string, max: number) {
 }
 
 // A port drawn on the back face, already resolved to the rack + its owner U.
+// Phase 4 Task 21: "patch_panel_port" widens this beyond rack-mounted device
+// ports so ConnectPanel/ConnectionInfoPanel/api.portCandidates stay generic
+// across every graphical view (rack, patch panel, ...).
 export interface RackPort {
-  port_kind: "interface" | "outlet";
+  port_kind: "interface" | "outlet" | "patch_panel_port";
   port_id: number;
   owner_type: string | null;
   owner_id: number | null;
@@ -64,10 +71,34 @@ interface Props {
   face?: "front" | "back";
   /** FEAT-6 (6A/6C): ports owned by devices in THIS rack, for the back face. */
   ports?: RackPort[];
-  /** FEAT-6 (6B): device_type value -> resolved stencil href (front face). */
-  stencilHrefByType?: Record<string, string>;
-  /** FEAT-6 (6C): clicking a back-face port dot. */
-  onPortClick?: (port: RackPort) => void;
+  /**
+   * Phase 4 Req 20 — every cable in scope (the caller may pass all cables;
+   * only the ones touching a port drawn here matter), so each back-face dot
+   * can resolve whether it's connected and, if so, to what.
+   */
+  cables?: CableRow[];
+  /**
+   * FEAT-6 (6B) / Phase 4 Req 14 — `rack_units.id` -> resolved stencil href
+   * for the CURRENT face. Keyed per mounted unit (not by the coarse
+   * `device_type` string) because two devices sharing the same coarse type
+   * ("switch") can be different models with different stencils. The caller
+   * (RackView) resolves each unit's actual device-type row and rebuilds this
+   * map when the face toggles.
+   */
+  stencilHrefByUnit?: Record<number, string>;
+  /**
+   * FEAT-6 (6C) / Phase 4 Req 20 — clicking a back-face port dot. `resolution`
+   * is that port's `resolveConnection` result, so the caller can decide
+   * whether to open the Connect panel (unconnected) or the connection info
+   * panel (connected) without recomputing it.
+   */
+  onPortClick?: (port: RackPort, resolution: ConnectionResolution) => void;
+  /**
+   * Phase 4 Req 13 — clicking a front-face U slot, empty or occupied. `unit`
+   * is the owning `rack_units` row for an occupied slot's BASE U, or null for
+   * an empty slot (opens RackSlotEditor to add/edit/remove equipment there).
+   */
+  onSlotClick?: (info: { unitNumber: number; unit: Row | null }) => void;
 }
 
 /**
@@ -87,8 +118,10 @@ export default function RackDiagramSVG({
   units,
   face = "front",
   ports = [],
-  stencilHrefByType = {},
+  cables = [],
+  stencilHrefByUnit = {},
   onPortClick,
+  onSlotClick,
 }: Props) {
   const total: number = rack.total_units || 42;
   const height = total * U_HEIGHT + TOP_PAD + BOTTOM_PAD;
@@ -115,6 +148,7 @@ export default function RackDiagramSVG({
     const y = yForU(u);
     if (!occupancy.get(u)) {
       const c = TYPE_HEX.empty;
+      const clickableEmpty = !isBack && onSlotClick;
       emptyRows.push(
         <rect
           key={`empty-${u}`}
@@ -125,7 +159,13 @@ export default function RackDiagramSVG({
           fill={c.fill}
           stroke={c.stroke}
           strokeWidth={0.5}
-        />
+          style={clickableEmpty ? { cursor: "pointer" } : undefined}
+          onClick={
+            clickableEmpty ? () => onSlotClick?.({ unitNumber: u, unit: null }) : undefined
+          }
+        >
+          {clickableEmpty && <title>{`Add equipment at U${u}`}</title>}
+        </rect>
       );
     }
     // U number label on the left, right-aligned to the rail.
@@ -159,11 +199,23 @@ export default function RackDiagramSVG({
     const c = typeColors(u.device_type);
     const rawLabel = u.label || u.device_table || u.device_type || "device";
     const label = truncate(String(rawLabel), 26);
-    const stencil = stencilHrefByType[String(u.device_type ?? "")];
+    // Phase 4 Req 14: the caller resolves this per-unit href for whichever
+    // face is currently showing (front stencil_url / back stencil_url_back),
+    // so the same lookup works unchanged on either face.
+    const stencil = stencilHrefByUnit[u.id];
+    const clickableSlot = !isBack && onSlotClick;
     deviceRects.push(
-      <g key={`dev-${u.id}`} opacity={isBack ? 0.55 : 1}>
-        {stencil && !isBack ? (
-          // FEAT-6 (6B): realistic per-model graphic on the front face.
+      <g
+        key={`dev-${u.id}`}
+        opacity={isBack && !stencil ? 0.55 : 1}
+        style={clickableSlot ? { cursor: "pointer" } : undefined}
+        onClick={
+          clickableSlot ? () => onSlotClick?.({ unitNumber: baseU, unit: u }) : undefined
+        }
+      >
+        {clickableSlot && <title>{`Edit or remove ${label}`}</title>}
+        {stencil ? (
+          // FEAT-6 (6B) / Req 14: realistic per-model graphic, either face.
           <image
             href={stencil}
             x={RAIL_X}
@@ -184,7 +236,7 @@ export default function RackDiagramSVG({
             rx={2}
           />
         )}
-        {(!stencil || isBack) && (
+        {!stencil && (
           <text
             x={RAIL_X + DEVICE_W / 2}
             y={y + rectH / 2 + 3}
@@ -203,6 +255,11 @@ export default function RackDiagramSVG({
 
   // FEAT-6 (6A/6C): connector dots on the back face, laid out left-to-right
   // within the owning device's base-U row.
+  // Phase 4 Req 20: is this port cabled, and to what? Label disambiguates
+  // ports that share an owner (e.g. two interfaces on the same switch).
+  const connectionFor = (p: RackPort): ConnectionResolution =>
+    resolveConnection({ type: p.owner_type, id: p.owner_id, label: p.label }, cables);
+
   const portDots: JSX.Element[] = [];
   if (isBack && ports.length) {
     const byUnit = new Map<number, RackPort[]>();
@@ -217,35 +274,44 @@ export default function RackDiagramSVG({
       list.forEach((p, i) => {
         const cx = RAIL_X + 12 + i * (DOT_R * 2 + 4);
         if (cx > RAIL_X + DEVICE_W - 6) return; // don't overflow the device
+        const conn = connectionFor(p);
         portDots.push(
-          <circle
+          <ConnectionDot
             key={`port-${p.port_kind}-${p.port_id}`}
             cx={cx}
             cy={y}
             r={DOT_R}
-            fill={portColor(p.port_type)}
-            stroke="#1e293b"
-            strokeWidth={0.5}
-            style={{ cursor: onPortClick ? "pointer" : "default" }}
+            portType={p.port_type}
+            connected={conn.connected}
+            title={
+              conn.connected
+                ? `${p.label} (${p.port_type}) → ${conn.farLabel ?? "connected"}`
+                : `${p.label} (${p.port_type})`
+            }
             onMouseEnter={() => setHovered(p)}
             onMouseLeave={() => setHovered((h) => (h === p ? null : h))}
-            onClick={() => onPortClick?.(p)}
-          >
-            <title>{`${p.label} (${p.port_type})`}</title>
-          </circle>
+            onClick={onPortClick ? () => onPortClick(p, conn) : undefined}
+          />
         );
       });
     });
   }
 
-  // Floating hover label for the currently-hovered port.
+  // Floating hover label for the currently-hovered port. Shows the far end
+  // too when the port is already connected (Phase 4 Req 20).
+  const hoverText = hovered
+    ? (() => {
+        const conn = connectionFor(hovered);
+        return conn.connected ? `${hovered.label} → ${conn.farLabel ?? "connected"}` : hovered.label;
+      })()
+    : "";
   const hoverLabel =
     isBack && hovered ? (
       <g pointerEvents="none">
         <rect
           x={RAIL_X + 8}
           y={yForU(hovered.unit_number ?? 1) - 12}
-          width={Math.min(DEVICE_W - 8, hovered.label.length * 6 + 12)}
+          width={Math.min(DEVICE_W - 8, hoverText.length * 6 + 12)}
           height={14}
           rx={3}
           fill="#0f172a"
@@ -258,7 +324,7 @@ export default function RackDiagramSVG({
           fill="#f8fafc"
           fontFamily="sans-serif"
         >
-          {hovered.label}
+          {hoverText}
         </text>
       </g>
     ) : null;

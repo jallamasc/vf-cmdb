@@ -148,6 +148,8 @@ class ComputeDeviceType(LookupMixin, Base):
     # FEAT-6 (6B): optional Visio Café stencil for this device model. When set,
     # the rack diagram embeds the cached SVG instead of a plain rectangle.
     stencil_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    # Phase 4 Req 14: a separate stencil for the back face.
+    stencil_url_back: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
 
 class Brand(LookupMixin, Base):
@@ -163,6 +165,8 @@ class NetworkDeviceType(LookupMixin, Base):
 
     # FEAT-6 (6B): optional Visio Café stencil for this device model.
     stencil_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    # Phase 4 Req 14: a separate stencil for the back face.
+    stencil_url_back: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
 
 class NetworkSubtype(LookupMixin, Base):
@@ -190,6 +194,22 @@ class StorageDeviceType(LookupMixin, Base):
 
     # FEAT-6 (6B): optional Visio Café stencil for this device model.
     stencil_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    # Phase 4 Req 14: a separate stencil for the back face.
+    stencil_url_back: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+
+
+class PowerDeviceType(LookupMixin, Base):
+    """Phase 4 Req 17 — UPS/PDU models, so power devices can carry a stencil.
+
+    Mirrors NetworkDeviceType/ComputeDeviceType/StorageDeviceType exactly:
+    ``LookupMixin`` gives it full_name/abbreviation, and it carries the same
+    front/back stencil pair.
+    """
+
+    __tablename__ = "power_device_types"
+
+    stencil_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    stencil_url_back: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
 
 class NetworkIdType(LookupMixin, Base):
@@ -388,6 +408,9 @@ class PowerDevice(Base):
     site_id: Mapped[Optional[int]] = mapped_column(ForeignKey("sites.id"))
     rack_id: Mapped[Optional[int]] = mapped_column(ForeignKey("racks.id"))
     device_type: Mapped[str] = mapped_column(String(10), default="pdu")  # ups/pdu
+    # Phase 4 Req 17: optional link to a PowerDeviceType lookup row, so a
+    # power device can carry a stencil. Additive — brand/model stay free text.
+    device_type_id: Mapped[Optional[int]] = mapped_column(ForeignKey("power_device_types.id"))
     device_number: Mapped[Optional[int]] = mapped_column(Integer)
     brand: Mapped[Optional[str]] = mapped_column(String(80))
     model: Mapped[Optional[str]] = mapped_column(String(120))
@@ -448,7 +471,43 @@ class Cable(Base):
     # FEAT-6 (6C): auto-generated Cable_Label ({from}-{a}->{to}-{b}), produced
     # by naming.generate_cable. Additive — the a/b shape above is preserved.
     label: Mapped[Optional[str]] = mapped_column(String(200))
+    # Phase 4 Req 20 — true when this row was created/maintained by the
+    # Cable_Sync_Service from a DeviceInterface's connected-* fields, rather
+    # than by an operator through the Connect panel or a direct cable CRUD
+    # call. Only auto-generated rows are ever auto-updated/auto-deleted.
+    auto_generated: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
     notes: Mapped[Optional[str]] = mapped_column(Text)
+
+
+class StencilAnchor(Base):
+    """Phase 4 Req 19 — a precise port/U join point mapped onto a stencil.
+
+    ``owner_resource``/``owner_id`` identify the device-type lookup row the
+    stencil belongs to (the same ``{resource}-{id}`` pair the stencil cache
+    already keys on). ``x``/``y`` are normalized 0..1 fractions of the
+    rendered stencil box, so one mapping works at any render scale. When no
+    matching row exists for a (owner, face, port_key), rendering falls back to
+    the computed Convention_Layout — mapping is optional per port.
+    """
+
+    __tablename__ = "stencil_anchors"
+    __table_args__ = (
+        UniqueConstraint(
+            "owner_resource", "owner_id", "face", "port_key",
+            name="uq_stencil_anchor_owner_face_port",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    owner_resource: Mapped[str] = mapped_column(String(40), nullable=False)
+    owner_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    face: Mapped[str] = mapped_column(String(10), nullable=False, default="front")
+    port_key: Mapped[str] = mapped_column(String(80), nullable=False)
+    x: Mapped[float] = mapped_column(nullable=False)
+    y: Mapped[float] = mapped_column(nullable=False)
+    label: Mapped[Optional[str]] = mapped_column(String(120))
 
 
 # ---------------------------------------------------------------------------
@@ -561,9 +620,21 @@ class NetworkDevice(Base):
     default_ip: Mapped[Optional[str]] = mapped_column(String(60))
     bitwarden_collection_ref: Mapped[Optional[str]] = mapped_column(String(120))
     vf_long_name: Mapped[Optional[str]] = mapped_column(String(200))
+    # Phase 4 Req 10: the "Simple Name" shown in the UI. Free text, or set from
+    # the networking-themed picker (theme_name/theme_category record which
+    # catalogue entry was chosen, mirroring the FEAT-3 columns on sites).
     alternative_name: Mapped[Optional[str]] = mapped_column(String(120))
+    theme_name: Mapped[Optional[str]] = mapped_column(String(120))
+    theme_category: Mapped[Optional[str]] = mapped_column(String(40))
     vf_friendly_name: Mapped[Optional[str]] = mapped_column(String(120))
     notes: Mapped[Optional[str]] = mapped_column(Text)
+    # Phase 4 Req 21 — Ansible-depth facts (see PhysicalServer for the
+    # rationale; identical shape on every fact-collectable device type).
+    ansible_facts: Mapped[Optional[dict]] = mapped_column(JSONB)
+    cpu_cores: Mapped[Optional[int]] = mapped_column(Integer)
+    memory_mb: Mapped[Optional[int]] = mapped_column(Integer)
+    os_distribution: Mapped[Optional[str]] = mapped_column(String(80))
+    last_fact_sync_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
 
 class DeviceInterface(Base):
@@ -643,6 +714,14 @@ class PhysicalServer(Base):
     domain: Mapped[Optional[str]] = mapped_column(String(120))
     bios_settings: Mapped[Optional[dict]] = mapped_column(JSONB)
     notes: Mapped[Optional[str]] = mapped_column(Text)
+    # Phase 4 Req 21 — Ansible-depth facts. `ansible_facts` is the catch-all
+    # blob for whatever a fact-gathering run reports; a handful of common
+    # keys are ALSO promoted to their own column for fast, typed access.
+    ansible_facts: Mapped[Optional[dict]] = mapped_column(JSONB)
+    cpu_cores: Mapped[Optional[int]] = mapped_column(Integer)
+    memory_mb: Mapped[Optional[int]] = mapped_column(Integer)
+    os_distribution: Mapped[Optional[str]] = mapped_column(String(80))
+    last_fact_sync_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
 
 class VirtualMachine(Base):
@@ -666,6 +745,13 @@ class VirtualMachine(Base):
     management_ipv6: Mapped[Optional[str]] = mapped_column(INET)
     management_fqdn: Mapped[Optional[str]] = mapped_column(String(200))
     notes: Mapped[Optional[str]] = mapped_column(Text)
+    # Phase 4 Req 21 — Ansible-depth facts (see PhysicalServer for the
+    # rationale; identical shape on every fact-collectable device type).
+    ansible_facts: Mapped[Optional[dict]] = mapped_column(JSONB)
+    cpu_cores: Mapped[Optional[int]] = mapped_column(Integer)
+    memory_mb: Mapped[Optional[int]] = mapped_column(Integer)
+    os_distribution: Mapped[Optional[str]] = mapped_column(String(80))
+    last_fact_sync_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
 
 class ContainerApp(Base):
@@ -689,6 +775,13 @@ class ContainerApp(Base):
     ipv4_address: Mapped[Optional[str]] = mapped_column(INET)
     ipv6_address: Mapped[Optional[str]] = mapped_column(INET)
     notes: Mapped[Optional[str]] = mapped_column(Text)
+    # Phase 4 Req 21 — Ansible-depth facts (see PhysicalServer for the
+    # rationale; identical shape on every fact-collectable device type).
+    ansible_facts: Mapped[Optional[dict]] = mapped_column(JSONB)
+    cpu_cores: Mapped[Optional[int]] = mapped_column(Integer)
+    memory_mb: Mapped[Optional[int]] = mapped_column(Integer)
+    os_distribution: Mapped[Optional[str]] = mapped_column(String(80))
+    last_fact_sync_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
 
 class Workstation(Base):
@@ -713,6 +806,13 @@ class Workstation(Base):
     management_fqdn: Mapped[Optional[str]] = mapped_column(String(200))
     bitwarden_collection_ref: Mapped[Optional[str]] = mapped_column(String(120))
     notes: Mapped[Optional[str]] = mapped_column(Text)
+    # Phase 4 Req 21 — Ansible-depth facts (see PhysicalServer for the
+    # rationale; identical shape on every fact-collectable device type).
+    ansible_facts: Mapped[Optional[dict]] = mapped_column(JSONB)
+    cpu_cores: Mapped[Optional[int]] = mapped_column(Integer)
+    memory_mb: Mapped[Optional[int]] = mapped_column(Integer)
+    os_distribution: Mapped[Optional[str]] = mapped_column(String(80))
+    last_fact_sync_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
 
 # ---------------------------------------------------------------------------

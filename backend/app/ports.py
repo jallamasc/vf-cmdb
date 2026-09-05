@@ -244,6 +244,42 @@ async def candidate_ports(
             }
         )
 
+    # 3. PatchPanelPorts. Unlike interfaces/outlets, PatchPanelPort has no
+    # rack_id of its own and no polymorphic owner columns — it always belongs
+    # to exactly one PatchPanel via the plain patch_panel_id FK, and THAT
+    # panel carries the rack_id, so resolution goes patch_panel_id ->
+    # PatchPanel.rack_id (parallel to how a PowerOutlet's own rack_id already
+    # resolves today). The owner reported on a candidate/cable end is the
+    # PANEL, not the individual port (same as PowerDevice/PowerOutlet above),
+    # so label disambiguation on the Cable end is what identifies the
+    # specific port. PatchPanelPort also has no media-type column (no
+    # copper/fiber distinction in the schema), so port_type is hardcoded to
+    # "copper" here — the same simplification the PowerOutlet loop makes by
+    # hardcoding "power".
+    panels_by_id = {
+        p.id: p for p in (await session.execute(select(models.PatchPanel))).scalars().all()
+    }
+    pports = (await session.execute(select(models.PatchPanelPort))).scalars().all()
+    for pport in pports:
+        if source_port_kind == "patch_panel_port" and pport.id == source_port_id:
+            continue
+        panel = panels_by_id.get(pport.patch_panel_id)
+        if panel is None or panel.rack_id is None or panel.rack_id not in rack_ids:
+            continue
+        candidates.append(
+            {
+                "port_kind": "patch_panel_port",
+                "port_id": pport.id,
+                "owner_type": "patch-panels",
+                "owner_id": panel.id,
+                "owner_name": panel.panel_id_label or f"patch-panels#{panel.id}",
+                "label": pport.label or f"port {pport.port_number}",
+                "port_type": "copper",
+                "rack_id": panel.rack_id,
+                "same_rack": panel.rack_id == src_rack,
+            }
+        )
+
     # Same-rack candidates first, then the rest.
     candidates.sort(key=lambda c: (not c["same_rack"], c["owner_name"], c["label"]))
     return {

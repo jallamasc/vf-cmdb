@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import type { ColDef, ICellRendererParams } from "ag-grid-community";
 import { api, Row } from "../api";
 import type { DeviceTypeKey } from "../api";
+import FuzzySelectEditor from "../components/FuzzySelectEditor";
+import AirportCellEditor from "../components/AirportCellEditor";
 
 // Load several lookup resources at once and return a map slug -> rows
 export function useLookups(slugs: string[]) {
@@ -139,7 +141,9 @@ export const numCol = (field: string, headerName?: string): ColDef => ({
   width: 110,
 });
 
-// A foreign-key column rendered as a dropdown of "Full Name - abbreviation"
+// A foreign-key column rendered as a dropdown of "Full Name - abbreviation".
+// Phase 4 Req 5: uses FuzzySelectEditor (single click + fuzzy search) instead
+// of a native <select>.
 export function fkCol(
   field: string,
   headerName: string,
@@ -154,8 +158,9 @@ export function fkCol(
     field,
     headerName,
     editable: true,
-    cellEditor: "agSelectCellEditor",
-    cellEditorParams: { values: [null, ...(options ?? []).map((o) => o.id)] },
+    cellEditor: FuzzySelectEditor,
+    cellEditorParams: { values: [null, ...(options ?? []).map((o) => o.id)], formatOption: format },
+    cellEditorPopup: true,
     valueFormatter: (p) => format(p.value),
     // UX-2: show a ▼ so the cell reads as a picker, not as plain text.
     cellRenderer: DropdownCellRenderer,
@@ -184,13 +189,31 @@ export function selectCol(
     field,
     headerName,
     editable: true,
-    cellEditor: "agSelectCellEditor",
+    cellEditor: FuzzySelectEditor,
     cellEditorParams: { values },
+    cellEditorPopup: true,
     valueFormatter: (p) =>
       p.value == null || p.value === "" ? "" : String(p.value),
     cellRenderer: DropdownCellRenderer,
     width: 140,
     ...extra,
+  };
+}
+
+/**
+ * Phase 4 Req 9 — an IATA airport-code column with an in-cell search/select
+ * editor (AirportCellEditor), instead of a plain typed text cell.
+ */
+export function airportCol(field: string, headerName: string, width = 130): ColDef {
+  return {
+    field,
+    headerName,
+    editable: true,
+    width,
+    cellEditor: AirportCellEditor,
+    cellEditorPopup: true,
+    cellRenderer: DropdownCellRenderer,
+    valueFormatter: (p) => (p.value == null ? "" : String(p.value)),
   };
 }
 
@@ -263,12 +286,14 @@ export function customCol(def: CustomColumnDef, refRows: Row[] = []): ColDef {
   if (def.type === "reference") {
     const idToLabel = new Map<number, string>();
     refRows.forEach((o) => idToLabel.set(o.id, lookupLabel(o)));
+    const format = (v: unknown) =>
+      v == null ? "" : idToLabel.get(Number(v)) ?? String(v);
     return {
       ...base,
-      cellEditor: "agSelectCellEditor",
-      cellEditorParams: { values: [null, ...refRows.map((o) => o.id)] },
-      valueFormatter: (p) =>
-        p.value == null ? "" : idToLabel.get(Number(p.value)) ?? String(p.value),
+      cellEditor: FuzzySelectEditor,
+      cellEditorParams: { values: [null, ...refRows.map((o) => o.id)], formatOption: format },
+      cellEditorPopup: true,
+      valueFormatter: (p) => format(p.value),
       // UX-2: user-defined reference columns are dropdowns too.
       cellRenderer: DropdownCellRenderer,
       valueSetter: (p) => {

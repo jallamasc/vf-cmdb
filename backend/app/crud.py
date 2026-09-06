@@ -301,12 +301,27 @@ def _validate_entity_type_def(obj) -> None:
         )
 
 
+def _validate_generic_entity(obj) -> None:
+    """Phase 5 Task 18 — `attributes` must be a JSON object (dict), since it
+    is keyed by EntityFieldDef.key. Per-field/required-field validation
+    against the owning Entity_Type_Def's fields belongs to the generic form
+    layer (Task 20), not this app-wide CRUD layer."""
+    from fastapi import HTTPException
+
+    if obj.attributes is not None and not isinstance(obj.attributes, dict):
+        raise HTTPException(
+            status_code=422, detail="'Attributes' must be an object of field key/value pairs."
+        )
+
+
 async def _validate_model(session: AsyncSession, obj, entity_id) -> None:
     """Model-specific validation dispatch (beyond abbrev + IPAM)."""
     if isinstance(obj, models.Cable):
         _validate_cable(obj)
     elif isinstance(obj, models.EntityTypeDef):
         _validate_entity_type_def(obj)
+    elif isinstance(obj, models.GenericEntity):
+        _validate_generic_entity(obj)
 
 
 async def _autoreserve_gateway(session: AsyncSession, obj) -> None:

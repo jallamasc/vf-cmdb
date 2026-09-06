@@ -1034,3 +1034,47 @@ class EntityFieldDef(Base):
         Integer, nullable=False, default=0, server_default="0"
     )
     reference_target_type: Mapped[Optional[str]] = mapped_column(String(60))
+
+
+class GenericEntity(Base):
+    """Phase 5 Task 18 — a record of an admin-defined Entity_Type_Def.
+
+    ``attributes`` is a JSONB object holding this record's custom field
+    values, keyed by each EntityFieldDef's ``key`` (validated as a JSON
+    object, not e.g. a list, at the application layer — see
+    ``crud._validate_generic_entity``; per-field/required-field validation
+    against the type's EntityFieldDefs belongs to the generic form layer,
+    Task 20). GIN-indexed for efficient containment queries (``@>``).
+
+    The handful of plain columns below back specific capability
+    integrations that need real relational columns elsewhere in the app
+    (rack elevation, stencil rendering) instead of being read out of JSONB:
+    ``rack_id``/``rack_unit`` (``rack_placement`` capability), ``photo_url``
+    (``photo``), ``stencil_url``/``stencil_url_back`` (``stencil_diagram``).
+    """
+
+    __tablename__ = "generic_entities"
+    __table_args__ = (
+        Index(
+            "ix_generic_entities_attributes_gin",
+            "attributes",
+            postgresql_using="gin",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    entity_type_id: Mapped[int] = mapped_column(
+        ForeignKey("entity_type_defs.id"), nullable=False
+    )
+    attributes: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, default=dict, server_default="{}"
+    )
+    # rack_placement capability hook — same relational shape hardcoded
+    # device types (NetworkDevice, PhysicalServer, ...) use.
+    rack_id: Mapped[Optional[int]] = mapped_column(ForeignKey("racks.id"))
+    rack_unit: Mapped[Optional[int]] = mapped_column(Integer)
+    # photo capability hook.
+    photo_url: Mapped[Optional[str]] = mapped_column(String(500))
+    # stencil_diagram capability hook.
+    stencil_url: Mapped[Optional[str]] = mapped_column(String(500))
+    stencil_url_back: Mapped[Optional[str]] = mapped_column(String(500))

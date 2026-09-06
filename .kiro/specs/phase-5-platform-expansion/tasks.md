@@ -109,11 +109,11 @@ capability patterns rather than reinventing them.
     - _Requirements: 13.1, 13.2_
   - [x]* 17.2 pytest CRUD + ordering
 
-- [ ] 18. `generic_entities` table
-  - [ ] 18.1 Model (`attributes` JSONB + GIN index + capability relational
+- [x] 18. `generic_entities` table
+  - [x] 18.1 Model (`attributes` JSONB + GIN index + capability relational
         hooks) + migration + registry entry
     - _Requirements: 14.1, 14.2_
-  - [ ]* 18.2 pytest CRUD + attribute round-trip
+  - [x]* 18.2 pytest CRUD + attribute round-trip
 
 - [ ] 19. Entity Type Builder UI
   - [ ] 19.1 `frontend/src/pages/EntityTypeBuilder.tsx` tying 14–18 together:

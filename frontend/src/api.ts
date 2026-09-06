@@ -329,11 +329,21 @@ export const api = {
   /**
    * FEAT-5 — resolve a city to the IATA code of its main airport, with
    * ``matches`` for autocomplete and ``alternatives`` for multi-airport cities.
+   *
+   * Phase 5 Task 30 (Req 25.2) — an optional ``country`` scopes ``matches``
+   * (and the resolved best match) to that country only.
    */
-  airportCode: (city: string, limit = 25): Promise<AirportCodeResult> =>
+  airportCode: (city: string, limit = 25, country = ""): Promise<AirportCodeResult> =>
     fetch(
-      `${BASE}/naming/airport-code?city=${encodeURIComponent(city)}&limit=${limit}`,
+      `${BASE}/naming/airport-code?city=${encodeURIComponent(city)}&limit=${limit}` +
+        (country ? `&country=${encodeURIComponent(country)}` : ""),
     ).then(handle),
+  /**
+   * Phase 5 Task 30 (Req 25.1) — every country in the built-in airport
+   * catalogue, for the "Country" selector the City field now requires.
+   */
+  airportCountries: (): Promise<{ countries: string[] }> =>
+    fetch(`${BASE}/naming/airport-countries`).then(handle),
   // Abbreviation preview: derive a short code from a full name by trim mode.
   previewAbbrev: (
     fullName: string,

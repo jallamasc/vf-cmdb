@@ -313,22 +313,39 @@ def _normalize(value: str) -> str:
     return stripped.casefold().strip()
 
 
-def search(q: str = "", limit: int = 25) -> list[dict]:
+def countries() -> list[str]:
+    """Sorted, de-duplicated list of every country in the catalogue.
+
+    Phase 5 Task 30 (Req 25.1) — powers the "Country" selector that the City
+    field now requires before it accepts any input.
+    """
+    return sorted({a["country"] for a in AIRPORTS})
+
+
+def search(q: str = "", limit: int = 25, country: str = "") -> list[dict]:
     """Airports whose city, IATA code, country or name matches *q*.
 
     Ranking: exact IATA match first, then city prefix matches, then any other
     substring match. An empty query returns the head of the catalogue so the
     autocomplete can show suggestions before the user types.
+
+    Phase 5 Task 30 (Req 25.2) — an optional *country* narrows the catalogue
+    to that country (case/accent-insensitive exact match) before ranking, so
+    the City field only ever offers cities that actually belong there.
     """
     needle = _normalize(q)
     capped = max(1, min(int(limit or 25), 200))
+    pool = AIRPORTS
+    if country:
+        needle_country = _normalize(country)
+        pool = [a for a in AIRPORTS if _normalize(a["country"]) == needle_country]
     if not needle:
-        return AIRPORTS[:capped]
+        return pool[:capped]
 
     exact: list[dict] = []
     prefix: list[dict] = []
     other: list[dict] = []
-    for airport in AIRPORTS:
+    for airport in pool:
         city = _normalize(airport["city"])
         iata = airport["iata"].casefold()
         if iata == needle:
@@ -345,15 +362,18 @@ def search(q: str = "", limit: int = 25) -> list[dict]:
     return (exact + prefix + other)[:capped]
 
 
-def lookup_city(city: str) -> dict:
+def lookup_city(city: str, country: str = "") -> dict:
     """Resolve a city name to its primary IATA code.
 
     Returns ``{"city", "iata_code", "airport", "country", "alternatives"}``.
     ``iata_code`` is ``None`` when nothing matched. ``alternatives`` lists the
     other candidate airports (a city like Tokyo or London has several) so the
     caller can offer a choice instead of silently picking one.
+
+    Phase 5 Task 30 (Req 25.2) — an optional *country* is forwarded to
+    :func:`search` to scope the match.
     """
-    matches = search(city, limit=200)
+    matches = search(city, limit=200, country=country)
     if not matches:
         return {
             "city": city,

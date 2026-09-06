@@ -187,12 +187,12 @@ capability patterns rather than reinventing them.
     - _Requirements: 24.1, 24.2_
   - [x]* 29.2 Vitest for the expand-row stencil editing flow
 
-- [ ] 30. Hard city/airport validation
-  - [ ] 30.1 Extend `CityAirportField.tsx`/`AirportCellEditor.tsx`: require
+- [x] 30. Hard city/airport validation
+  - [x] 30.1 Extend `CityAirportField.tsx`/`AirportCellEditor.tsx`: require
         Country first, filter by country, block non-matching city unless an
         explicit override checkbox is checked
     - _Requirements: 25.1, 25.2, 25.3_
-  - [ ]* 30.2 Vitest: country filters suggestions; non-match blocked; override
+  - [x]* 30.2 Vitest: country filters suggestions; non-match blocked; override
         allows it through
 
 - [ ] 31. Checkpoint D — build + test verification.

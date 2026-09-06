@@ -121,11 +121,11 @@ capability patterns rather than reinventing them.
     - _Requirements: 15.1_
   - [x]* 19.2 Vitest for the create-type-with-fields flow
 
-- [ ] 20. Generic dynamic grid + form
-  - [ ] 20.1 `frontend/src/pages/GenericEntityView.tsx` + `lib/genericColumns.tsx`
+- [x] 20. Generic dynamic grid + form
+  - [x] 20.1 `frontend/src/pages/GenericEntityView.tsx` + `lib/genericColumns.tsx`
         mapping `storage_kind` -> column/editor; route `/entities/:typeSlug`
     - _Requirements: 16.1, 16.2_
-  - [ ]* 20.2 Vitest against a synthetic type definition (columns, edit, save)
+  - [x]* 20.2 Vitest against a synthetic type definition (columns, edit, save)
 
 - [ ] 21. Capability integration — rack/power/network ports + cabling
   - [ ] 21.1 Extend `ports.py`'s polymorphic resolution with a

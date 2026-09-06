@@ -1,4 +1,6 @@
 import { useCallback, useState } from "react";
+import { Link } from "react-router-dom";
+import type { ICellRendererParams } from "ag-grid-community";
 import EntityGrid from "../components/EntityGrid";
 import EntityTypeDetailPanel from "../components/EntityTypeDetailPanel";
 import { roCol, textCol } from "../lib/columns";
@@ -17,12 +19,36 @@ import { Row } from "../api";
  * way `SiteCodePanel` is driven from the Sites grid's selection.
  */
 
+// Phase 5 Task 20 — link into the operator-facing generic-entity CRUD grid
+// for this type (`/entities/:typeSlug`), the same "read-only + Link"
+// idiom `deviceLinkCol` (lib/columns.tsx) uses for the device dashboard.
+function recordsLinkCol() {
+  return {
+    colId: "records_link",
+    headerName: "Records",
+    editable: false,
+    sortable: false,
+    filter: false,
+    width: 110,
+    cellRenderer: (p: ICellRendererParams) => {
+      const slug = p.data?.slug;
+      if (!slug) return null;
+      return (
+        <Link to={`/entities/${slug}`} className="text-blue-600 hover:text-blue-800 hover:underline">
+          View records →
+        </Link>
+      );
+    },
+  };
+}
+
 const columns = [
   roCol("id", "ID", 60),
   textCol("slug", "Slug", 170),
   textCol("label", "Label", 200),
   textCol("icon", "Icon (lucide name)", 180),
   textCol("notes", "Notes"),
+  recordsLinkCol(),
 ];
 
 // slug/label are NOT NULL — seed a placeholder so "+ Add row" always

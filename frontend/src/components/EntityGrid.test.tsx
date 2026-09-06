@@ -115,6 +115,31 @@ describe("EntityGrid — grid edit integrity (Req 1)", () => {
     );
   });
 
+  it("ANDs externalFilter with the fuzzy search box (Req 9.2)", async () => {
+    (api.list as any).mockResolvedValue([
+      { id: 1, rack_id: "A", panel_id_label: "keep" },
+      { id: 2, rack_id: "B", panel_id_label: "drop" },
+    ]);
+
+    wrap(
+      <EntityGrid
+        resource="patch-panels"
+        title="Patch Panels"
+        columns={COLUMNS}
+        externalFilter={(row) => row.rack_id === "A"}
+      />
+    );
+    await waitFor(() => expect(latestGridProps?.rowData?.length).toBe(2));
+
+    expect(latestGridProps.isExternalFilterPresent()).toBe(true);
+    expect(
+      latestGridProps.doesExternalFilterPass({ data: { id: 1, rack_id: "A" } })
+    ).toBe(true);
+    expect(
+      latestGridProps.doesExternalFilterPass({ data: { id: 2, rack_id: "B" } })
+    ).toBe(false);
+  });
+
   it("syncs immediately when no cell is being edited", async () => {
     (api.list as any).mockResolvedValue([
       { id: 1, rack_id: null, panel_id_label: null },

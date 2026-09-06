@@ -218,6 +218,9 @@ export default function PatchPanelView() {
     );
 
   const shown = panels.filter(panelMatchesHierarchy);
+  // Req 5 — don't render every patch panel in the organization by default;
+  // require the breadcrumb to reach at least Rack level first.
+  const hasDrillDownSelection = rack !== ALL || panel !== ALL;
 
   const breadcrumbFor = (p: Row) => {
     const r = p.rack_id != null ? rackById.get(p.rack_id) : undefined;
@@ -306,12 +309,18 @@ export default function PatchPanelView() {
           },
         ]}
       />
-      <p className="text-xs text-slate-500 -mt-3 mb-4">
-        Showing <span className="font-semibold">{shown.length}</span> patch panel
-        {shown.length === 1 ? "" : "s"}
-      </p>
+      {hasDrillDownSelection && (
+        <p className="text-xs text-slate-500 -mt-3 mb-4">
+          Showing <span className="font-semibold">{shown.length}</span> patch panel
+          {shown.length === 1 ? "" : "s"}
+        </p>
+      )}
 
-      {shown.length === 0 ? (
+      {!hasDrillDownSelection ? (
+        <p className="text-slate-500">
+          Select a rack (or a specific patch panel) above to view its diagram.
+        </p>
+      ) : shown.length === 0 ? (
         <p className="text-slate-500">No patch panels match the selected filters.</p>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

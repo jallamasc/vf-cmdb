@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api, Airport } from "../api";
+import CountryFlag from "../lib/countryFlags";
 
 /**
  * FEAT-5 — city autocomplete that resolves to an IATA airport code.
@@ -111,6 +112,7 @@ export default function CityAirportField({
                   onClick={() => pick(m)}
                   className="w-full px-2 py-1.5 text-left text-sm hover:bg-blue-50"
                 >
+                  <CountryFlag country={m.country} className="mr-1" />
                   <span className="font-mono font-semibold text-slate-800">
                     {m.iata}
                   </span>{" "}

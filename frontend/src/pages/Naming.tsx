@@ -1,9 +1,11 @@
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import { useQueries } from "@tanstack/react-query";
 import EntityGrid from "../components/EntityGrid";
 import StencilField from "../components/StencilField";
-import { api } from "../api";
-import { textCol, roCol, numCol } from "../lib/columns";
+import { api, Row } from "../api";
+import { textCol, roCol, numCol, selectCol, flagCol } from "../lib/columns";
+import { DEVICE_TYPE_ICON_NAMES } from "../lib/deviceIcons";
+import { regionAbbreviationsForCountry, countriesForRegion } from "../lib/regionGeo";
 
 // FEAT-6 (6B) / Phase 4 Task 22: device-type resources that carry a
 // stencil_url + stencil upload. The backend has treated power-device-types
@@ -86,6 +88,11 @@ const CATEGORIES: { name: string; description: string; lookups: Lookup[] }[] = [
 
 const ALL_LOOKUPS = CATEGORIES.flatMap((c) => c.lookups);
 
+// Phase 5 Task 11 — code-split: `world-atlas`'s bundled topojson is ~100KB,
+// so it (and react-simple-maps/d3) only load when the operator actually
+// opens the "regions" lookup, not on every page load.
+const RegionMap = lazy(() => import("../components/RegionMap"));
+
 /**
  * Defaults for a brand-new lookup row. ``full_name`` and ``abbreviation`` are
  * NOT NULL and the abbreviation is globally unique (case-insensitive), so a
@@ -105,15 +112,36 @@ const baseColumns = [
 ];
 
 // FEAT-6 (6B): device-type grids also expose the stencil_url column.
-const columnsFor = (slug: string) =>
-  STENCIL_RESOURCES.has(slug)
-    ? [...baseColumns, textCol("stencil_url", "Stencil URL", 260)]
-    : baseColumns;
+// Phase 5 Task 9: ...and an "Icon" picker (Req 6.2) constrained to the
+// lucide-react names `deviceTypeIconCol` (lib/columns.tsx) knows how to
+// render, so a typo can never silently produce a missing icon elsewhere.
+// Phase 5 Task 12 (Req 10): the regions lookup gets a flag column, derived
+// from its abbreviation via `regionGeo`'s country mapping (see Task 11's
+// documented country-level-only approximation).
+const columnsFor = (slug: string) => {
+  if (STENCIL_RESOURCES.has(slug)) {
+    return [
+      ...baseColumns,
+      textCol("stencil_url", "Stencil URL", 260),
+      selectCol("icon", "Icon", [null, ...DEVICE_TYPE_ICON_NAMES]),
+    ];
+  }
+  if (slug === "regions") {
+    return [
+      flagCol("abbreviation", "🏳", (row) => countriesForRegion(String(row.abbreviation ?? ""))[0]),
+      ...baseColumns,
+    ];
+  }
+  return baseColumns;
+};
 
 export default function Naming() {
   const [active, setActive] = useState(ALL_LOOKUPS[0].slug);
   const [search, setSearch] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  // Phase 5 Task 11 (Req 9) — RegionMap-driven narrowing, only relevant on
+  // the "regions" lookup; cleared whenever the operator switches away.
+  const [mapCountry, setMapCountry] = useState<string | null>(null);
 
   // Fetch every lookup once to show per-category / per-lookup entry counts.
   // Shares the react-query cache with the grid below (same query keys).
@@ -193,7 +221,10 @@ export default function Naming() {
                     {visible.map((l) => (
                       <button
                         key={l.slug}
-                        onClick={() => setActive(l.slug)}
+                        onClick={() => {
+                          setActive(l.slug);
+                          setMapCountry(null);
+                        }}
                         className={`w-full flex items-center justify-between pl-6 pr-2 py-1.5 rounded text-sm ${
                           active === l.slug
                             ? "bg-blue-600 text-white"
@@ -237,6 +268,18 @@ export default function Naming() {
               </div>
             </details>
           )}
+          {/* Phase 5 Task 11 (Req 9) — region map, only on the regions lookup. */}
+          {active === "regions" && (
+            <Suspense
+              fallback={<div className="text-sm text-slate-400 mb-3">Loading map…</div>}
+            >
+              <RegionMap
+                regions={(results[ALL_LOOKUPS.findIndex((l) => l.slug === "regions")]?.data as Row[]) ?? []}
+                selectedCountry={mapCountry}
+                onSelectCountry={setMapCountry}
+              />
+            </Suspense>
+          )}
           <EntityGrid
             key={active}
             resource={active}
@@ -254,6 +297,13 @@ export default function Naming() {
                 hint: "Abbreviations are globally unique (case-insensitive).",
               },
             ]}
+            externalFilter={
+              active === "regions" && mapCountry
+                ? (row) =>
+                    regionAbbreviationsForCountry(mapCountry, [String(row.abbreviation ?? "")])
+                      .length > 0
+                : undefined
+            }
           />
         </div>
       </div>

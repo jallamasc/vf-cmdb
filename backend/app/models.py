@@ -150,6 +150,10 @@ class ComputeDeviceType(LookupMixin, Base):
     stencil_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     # Phase 4 Req 14: a separate stencil for the back face.
     stencil_url_back: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    # Phase 5 Req 6.2/7.1: a lucide-react icon name, rendered per row in the
+    # owning device's grid (e.g. "Server"). Free text, not FK-constrained —
+    # the frontend falls back to a generic icon for an unrecognised name.
+    icon: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
 
 
 class Brand(LookupMixin, Base):
@@ -167,6 +171,8 @@ class NetworkDeviceType(LookupMixin, Base):
     stencil_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     # Phase 4 Req 14: a separate stencil for the back face.
     stencil_url_back: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    # Phase 5 Req 6.2/7.1: lucide-react icon name rendered per device row.
+    icon: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
 
 
 class NetworkSubtype(LookupMixin, Base):
@@ -196,6 +202,8 @@ class StorageDeviceType(LookupMixin, Base):
     stencil_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     # Phase 4 Req 14: a separate stencil for the back face.
     stencil_url_back: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    # Phase 5 Req 6.2/7.1: lucide-react icon name rendered per device row.
+    icon: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
 
 
 class PowerDeviceType(LookupMixin, Base):
@@ -210,6 +218,8 @@ class PowerDeviceType(LookupMixin, Base):
 
     stencil_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     stencil_url_back: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    # Phase 5 Req 6.2/7.1: lucide-react icon name rendered per device row.
+    icon: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
 
 
 class NetworkIdType(LookupMixin, Base):

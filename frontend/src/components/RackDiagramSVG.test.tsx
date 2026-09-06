@@ -176,4 +176,52 @@ describe("RackDiagramSVG", () => {
     const group = rect?.closest("g");
     expect(group?.getAttribute("opacity")).toBe("0.55");
   });
+
+  // Phase 5 Task 10 — visual overhaul: every slot (occupied or empty), on
+  // either face, gets a hover tooltip; empty slots read as visually
+  // distinct ("available") via a dashed border.
+  describe("hover tooltips + occupied/empty styling (Req 8.1, 8.2)", () => {
+    it("shows the device name in a tooltip on the back face even when not clickable", () => {
+      const { container } = render(
+        <RackDiagramSVG rack={rack} units={units} face="back" />
+      );
+      const titles = Array.from(container.querySelectorAll("title")).map(
+        (t) => t.textContent
+      );
+      expect(titles).toContain("SW1");
+    });
+
+    it("shows an 'Empty' tooltip on a non-clickable empty slot", () => {
+      const { container } = render(
+        <RackDiagramSVG rack={rack} units={units} face="back" />
+      );
+      const titles = Array.from(container.querySelectorAll("title")).map(
+        (t) => t.textContent
+      );
+      expect(titles.some((t) => t?.startsWith("Empty — U"))).toBe(true);
+    });
+
+    it("shows the click-hint tooltip on a clickable empty slot", () => {
+      const { container } = render(
+        <RackDiagramSVG rack={rack} units={units} face="front" onSlotClick={vi.fn()} />
+      );
+      const titles = Array.from(container.querySelectorAll("title")).map(
+        (t) => t.textContent
+      );
+      expect(titles.some((t) => t?.startsWith("Add equipment at U"))).toBe(true);
+    });
+
+    it("gives empty slots a dashed border, distinct from occupied devices' solid border", () => {
+      const { container } = render(
+        <RackDiagramSVG rack={rack} units={units} face="front" />
+      );
+      const emptyRects = Array.from(container.querySelectorAll("rect")).filter(
+        (r) => r.getAttribute("stroke-dasharray")
+      );
+      expect(emptyRects.length).toBeGreaterThan(0);
+      // The occupied device's own rect has no dash pattern.
+      const deviceRect = container.querySelector("g rect");
+      expect(deviceRect?.getAttribute("stroke-dasharray")).toBeNull();
+    });
+  });
 });

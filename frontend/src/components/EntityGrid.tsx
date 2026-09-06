@@ -79,6 +79,16 @@ interface Props {
   minHeight?: number;
   /** FEAT-7 — replace the footer hint (or hide it with ``null``). */
   footerHint?: ReactNode;
+  /**
+   * Phase 5 Req 9.2 — an exact (non-fuzzy) predicate a caller can supply to
+   * narrow the grid programmatically (e.g. clicking a country on
+   * `RegionMap`). Combined with the fuzzy search box via AND: a row must
+   * pass both to be shown. `fuzzyMatchesAny` is a subsequence match, too
+   * permissive for driving from a short external trigger like a country
+   * name, so this is a separate, precise mechanism rather than reusing the
+   * search box.
+   */
+  externalFilter?: (row: Row) => boolean;
 }
 
 type ToastKind = "error" | "info";
@@ -193,6 +203,7 @@ export default function EntityGrid({
   allowDelete = true,
   minHeight = 480,
   footerHint,
+  externalFilter,
 }: Props) {
   const qc = useQueryClient();
   const gridRef = useRef<AgGridReact>(null);
@@ -363,10 +374,11 @@ export default function EntityGrid({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
-  // Req 6.2/6.3 — re-run the external (fuzzy) filter whenever the query changes.
+  // Req 6.2/6.3/9.2 — re-run the external filter whenever the fuzzy query or
+  // the externally-supplied predicate changes.
   useEffect(() => {
     gridRef.current?.api?.onFilterChanged();
-  }, [search]);
+  }, [search, externalFilter]);
 
   const onCellValueChanged = (e: CellValueChangedEvent) => {
     setToast(null);
@@ -552,10 +564,13 @@ export default function EntityGrid({
             pagination
             paginationPageSize={50}
             tooltipShowDelay={400}
-            // Req 6.2/6.3 — fuzzy search across every column value.
-            isExternalFilterPresent={() => search.trim() !== ""}
+            // Req 6.2/6.3 — fuzzy search across every column value, ANDed
+            // with the exact `externalFilter` predicate when one is supplied
+            // (Req 9.2).
+            isExternalFilterPresent={() => search.trim() !== "" || externalFilter != null}
             doesExternalFilterPass={(node) =>
-              fuzzyMatchesAny(search, Object.values(node.data ?? {}))
+              fuzzyMatchesAny(search, Object.values(node.data ?? {})) &&
+              (externalFilter ? externalFilter(node.data as Row) : true)
             }
           />
         </div>

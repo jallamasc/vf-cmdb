@@ -159,12 +159,16 @@ export default function RackDiagramSVG({
           fill={c.fill}
           stroke={c.stroke}
           strokeWidth={0.5}
+          // Req 8.1 — a dashed border reads as "available" at a glance,
+          // distinct from every occupied device's solid-bordered rectangle.
+          strokeDasharray="3,2"
           style={clickableEmpty ? { cursor: "pointer" } : undefined}
           onClick={
             clickableEmpty ? () => onSlotClick?.({ unitNumber: u, unit: null }) : undefined
           }
         >
-          {clickableEmpty && <title>{`Add equipment at U${u}`}</title>}
+          {/* Req 8.2 — every slot gets a hover tooltip, not just clickable ones. */}
+          <title>{clickableEmpty ? `Add equipment at U${u}` : `Empty — U${u}`}</title>
         </rect>
       );
     }
@@ -213,7 +217,14 @@ export default function RackDiagramSVG({
           clickableSlot ? () => onSlotClick?.({ unitNumber: baseU, unit: u }) : undefined
         }
       >
-        {clickableSlot && <title>{`Edit or remove ${label}`}</title>}
+        {/* Req 8.2 — every occupied slot gets a hover tooltip with the
+            device's name, on both faces, not just the front-face clickable
+            case. */}
+        <title>
+          {clickableSlot
+            ? `Edit or remove ${label}`
+            : `${label}${h > 1 ? ` (${h}U)` : ""}`}
+        </title>
         {stencil ? (
           // FEAT-6 (6B) / Req 14: realistic per-model graphic, either face.
           <image

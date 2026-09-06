@@ -1,7 +1,7 @@
 import { useState } from "react";
 import EntityGrid from "../components/EntityGrid";
 import type { RequiredField } from "../components/EntityGrid";
-import { textCol, roCol } from "../lib/columns";
+import { textCol, roCol, flagCol } from "../lib/columns";
 
 interface RefTable {
   slug: string;
@@ -30,6 +30,7 @@ const TABLES: RefTable[] = [
       textCol("state_region", "State / Region", 160),
       textCol("postal_code", "Postal Code", 130),
       textCol("country", "Country", 140),
+      flagCol("country", "🏳", undefined, 50),
       textCol("notes", "Notes", 240),
     ],
     newRowDefaults: { label: "New address" },

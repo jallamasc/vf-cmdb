@@ -75,6 +75,22 @@ describe("PowerDiagramSVG", () => {
     expect(solid.length).toBe(1);
   });
 
+  // Phase 5 Task 10 — visual overhaul: the device box itself shows a hover
+  // tooltip, in both the fallback and stencil paths.
+  it("shows the device name as a tooltip on the fallback box", () => {
+    const { container } = render(<PowerDiagramSVG device={device} outlets={outlets} />);
+    const title = container.querySelector("rect title");
+    expect(title?.textContent).toBe("PDU-A");
+  });
+
+  it("shows the device name as a tooltip on the stencil image", () => {
+    const { container } = render(
+      <PowerDiagramSVG device={device} outlets={outlets} stencilHref="/x.svg" />
+    );
+    const title = container.querySelector("image title");
+    expect(title?.textContent).toBe("PDU-A");
+  });
+
   it("passes an outlet-shaped RackPort + resolution to onPortClick", () => {
     const onPortClick = vi.fn();
     const { container } = render(

@@ -46,44 +46,44 @@ capability patterns rather than reinventing them.
 
 ### Sub-phase B — Navigation Defaults & Visual System
 
-- [ ] 7. Require drill-down before graphical views render
-  - [ ] 7.1 Gate diagram rendering behind a selection check in
+- [x] 7. Require drill-down before graphical views render
+  - [x] 7.1 Gate diagram rendering behind a selection check in
         `PowerDeviceView.tsx`/`PatchPanelView.tsx`/`PortConfigView.tsx`; show
         an empty-state prompt otherwise
     - _Requirements: 5.1, 5.2_
-  - [ ]* 7.2 Vitest asserting no diagrams render pre-selection
+  - [x]* 7.2 Vitest asserting no diagrams render pre-selection
 
-- [ ] 8. Install Lucide + navigation icons
-  - [ ] 8.1 `npm install lucide-react`; per-entry icons in `Layout.tsx`'s `NAV`
+- [x] 8. Install Lucide + navigation icons
+  - [x] 8.1 `npm install lucide-react`; per-entry icons in `Layout.tsx`'s `NAV`
     - _Requirements: 6.1_
-  - [ ]* 8.2 Vitest confirming icon rendering per nav entry
+  - [x]* 8.2 Vitest confirming icon rendering per nav entry
 
-- [ ] 9. Device-type icons + animated active-status glyph
-  - [ ] 9.1 Icon metadata on existing device-type lookups; CSS pulse
+- [x] 9. Device-type icons + animated active-status glyph
+  - [x] 9.1 Icon metadata on existing device-type lookups; CSS pulse
         animation class for active devices
     - _Requirements: 6.2, 7.1_
-  - [ ]* 9.2 Vitest for icon/animation resolution
+  - [x]* 9.2 Vitest for icon/animation resolution
 
-- [ ] 10. Rack/Power diagram visual overhaul
-  - [ ] 10.1 Revise `RackDiagramSVG.tsx`/`PowerDiagramSVG.tsx` styling
+- [x] 10. Rack/Power diagram visual overhaul
+  - [x] 10.1 Revise `RackDiagramSVG.tsx`/`PowerDiagramSVG.tsx` styling
         (consistent scale, occupied/empty coloring, hover tooltips, label
         alignment)
     - _Requirements: 8.1, 8.2_
-  - [ ]* 10.2 Vitest asserting tooltip content and styling hooks
+  - [x]* 10.2 Vitest asserting tooltip content and styling hooks
 
-- [ ] 11. Region map
-  - [ ] 11.1 `npm install react-simple-maps`; new `RegionMap.tsx` embedded in
+- [x] 11. Region map
+  - [x] 11.1 `npm install react-simple-maps`; new `RegionMap.tsx` embedded in
         `ReferenceData.tsx`'s Regions panel, click-to-filter into the grid
     - _Requirements: 9.1, 9.2_
-  - [ ]* 11.2 Vitest for render + filter interaction
+  - [x]* 11.2 Vitest for render + filter interaction
 
-- [ ] 12. Country/region flags
-  - [ ] 12.1 `npm install flag-icons`; `CountryFlag.tsx` helper applied
+- [x] 12. Country/region flags
+  - [x] 12.1 `npm install flag-icons`; `CountryFlag.tsx` helper applied
         wherever a country/region code is rendered
     - _Requirements: 10.1_
-  - [ ]* 12.2 Vitest for code-to-class mapping
+  - [x]* 12.2 Vitest for code-to-class mapping
 
-- [ ] 13. Checkpoint B — build + test verification, present visual changes
+- [x] 13. Checkpoint B — build + test verification, present visual changes
       for browser confirmation.
 
 ### Sub-phase C — Generic Entity Framework

@@ -115,10 +115,14 @@ async def auto_site_code(
 
 
 async def generate_site(session: AsyncSession, site: models.Site) -> None:
-    long_name = await site_long_name(session, site)
-    site.vf_long_name = long_name
-    site.vf_short_name = await site_short_name(session, site)
-    site.tia606b_name = long_name
+    # Phase 5 Task 28 (Req 23.2) — `naming_mode` gates ONLY these three
+    # fields. `site_code_type` below is a separate, older, orthogonal mode
+    # axis for `simple_name` alone (FEAT-1) and is never touched by this.
+    if _is_auto(site):
+        long_name = await site_long_name(session, site)
+        site.vf_long_name = long_name
+        site.vf_short_name = await site_short_name(session, site)
+        site.tia606b_name = long_name
 
     # FEAT-1: simple_name is tri-mode. Only "auto" and "theme" are engine
     # driven; "custom" keeps whatever the user typed, untouched.
@@ -146,6 +150,10 @@ async def generate_datacenter(session: AsyncSession, dc: models.Datacenter) -> N
     the industry-standard convention (``…BOG…``) and keeps the identifier both
     short and globally unambiguous.
     """
+    # Phase 5 Task 28 (Req 23.2) — `naming_mode` gates this record's only
+    # computed field, `vf_long_name`.
+    if not _is_auto(dc):
+        return
     base = ""
     if dc.site_id:
         site = await session.get(models.Site, dc.site_id)
@@ -157,6 +165,10 @@ async def generate_datacenter(session: AsyncSession, dc: models.Datacenter) -> N
 
 
 async def generate_rack(session: AsyncSession, rack: models.Rack) -> None:
+    # Phase 5 Task 28 (Req 23.2) — `naming_mode` gates this record's only
+    # computed field, `vf_long_name`.
+    if not _is_auto(rack):
+        return
     base = ""
     if rack.site_id:
         site = await session.get(models.Site, rack.site_id)
@@ -248,7 +260,12 @@ async def generate_patch_panel(session: AsyncSession, panel: models.PatchPanel) 
     number (``rack_unit`` when the panel is already mounted, otherwise the
     next free sequence among that rack's other patch panels, so multiple
     unplaced panels still get distinct identifiers).
+
+    Phase 5 Task 28 (Req 23.2) — `naming_mode` gates this record's only
+    computed field, `panel_id_label`.
     """
+    if not _is_auto(panel):
+        return
     base = ""
     if panel.rack_id:
         rack = await session.get(models.Rack, panel.rack_id)
@@ -279,7 +296,12 @@ async def generate_power_device(session: AsyncSession, dev: models.PowerDevice) 
     coordinates (when racked) + the device type (``ups``/``pdu``) + a
     sequence number (``device_number`` when set, otherwise the next free
     sequence scoped to the same rack, or the same site when unracked).
+
+    Phase 5 Task 28 (Req 23.2) — `naming_mode` gates this record's only
+    computed field, `vf_long_name`.
     """
+    if not _is_auto(dev):
+        return
     base = ""
     if dev.site_id:
         site = await session.get(models.Site, dev.site_id)
@@ -377,6 +399,14 @@ GENERATORS = {
     models.PatchPanel: generate_patch_panel,
     models.PowerDevice: generate_power_device,
 }
+
+
+def _is_auto(obj) -> bool:
+    """Phase 5 Task 28 (Req 23.1/23.2/23.3) — True unless *obj*'s
+    `naming_mode` is explicitly "manual". Models with no `naming_mode`
+    column (`getattr` falls back to None) are always auto, which preserves
+    every pre-Task-28 generator's unconditional behavior unchanged."""
+    return (getattr(obj, "naming_mode", None) or "auto") != "manual"
 
 
 async def apply_naming(session: AsyncSession, obj) -> None:

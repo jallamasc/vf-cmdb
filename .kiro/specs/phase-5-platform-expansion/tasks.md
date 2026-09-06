@@ -173,12 +173,12 @@ capability patterns rather than reinventing them.
     - _Requirements: 22.1, 22.2, 22.3_
   - [x]* 27.2 pytest for Section CRUD + exactly-one-parent enforcement
 
-- [ ] 28. Code Mode toggle for naming-engine fields
-  - [ ] 28.1 `naming_mode` column (auto/manual, default auto) on every
+- [x] 28. Code Mode toggle for naming-engine fields
+  - [x] 28.1 `naming_mode` column (auto/manual, default auto) on every
         naming-engine-backed table; `crud.py`'s naming dispatch only
         overwrites when `auto`; frontend toggle control
     - _Requirements: 23.1, 23.2, 23.3_
-  - [ ]* 28.2 pytest: manual mode preserves a hand-typed value across an
+  - [x]* 28.2 pytest: manual mode preserves a hand-typed value across an
         unrelated update
 
 - [ ] 29. Fold stencils into device lists

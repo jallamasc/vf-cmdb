@@ -104,10 +104,10 @@ capability patterns rather than reinventing them.
     - _Requirements: 12.1, 12.2_
   - [x]* 16.2 pytest CRUD + capability round-trip
 
-- [ ] 17. `entity_field_defs` table
-  - [ ] 17.1 Model + migration + registry entry; ordering by `sort_order`
+- [x] 17. `entity_field_defs` table
+  - [x] 17.1 Model + migration + registry entry; ordering by `sort_order`
     - _Requirements: 13.1, 13.2_
-  - [ ]* 17.2 pytest CRUD + ordering
+  - [x]* 17.2 pytest CRUD + ordering
 
 - [ ] 18. `generic_entities` table
   - [ ] 18.1 Model (`attributes` JSONB + GIN index + capability relational

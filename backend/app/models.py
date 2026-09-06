@@ -995,3 +995,42 @@ class EntityTypeDef(Base):
         JSONB, nullable=False, default=list, server_default="[]"
     )
     notes: Mapped[Optional[str]] = mapped_column(Text)
+
+
+class EntityFieldDef(Base):
+    """Phase 5 Task 17 — a custom field on an Entity_Type_Def.
+
+    ``field_type_id`` names which Field_Type_Def (and therefore storage
+    kind) backs this field's values inside a Generic_Entity's ``attributes``
+    JSONB (Task 18). ``reference_target_type`` only applies when the field
+    type's storage_kind is "reference" — it names the entity-registry slug
+    the value points at (kept nullable/free here; not enforced at the DB
+    layer, same rationale as EntityTypeDef.capabilities).
+
+    ``sort_order`` drives display order in the generic dynamic form/grid
+    (Task 20) — administrators can reorder fields without changing `key`.
+    """
+
+    __tablename__ = "entity_field_defs"
+    __table_args__ = (
+        UniqueConstraint(
+            "entity_type_id", "key", name="uq_entity_field_defs_entity_type_key"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    entity_type_id: Mapped[int] = mapped_column(
+        ForeignKey("entity_type_defs.id"), nullable=False
+    )
+    key: Mapped[str] = mapped_column(String(60), nullable=False)
+    label: Mapped[str] = mapped_column(String(120), nullable=False)
+    field_type_id: Mapped[int] = mapped_column(
+        ForeignKey("field_type_defs.id"), nullable=False
+    )
+    required: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    sort_order: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    reference_target_type: Mapped[Optional[str]] = mapped_column(String(60))

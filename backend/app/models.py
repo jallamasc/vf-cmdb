@@ -469,6 +469,9 @@ class PowerDevice(Base):
     model: Mapped[Optional[str]] = mapped_column(String(120))
     serial_number: Mapped[Optional[str]] = mapped_column(String(120))
     vf_long_name: Mapped[Optional[str]] = mapped_column(String(200))
+    # Phase 5 Task 23 (Req 19.1) — an uploaded photo of this specific unit,
+    # set by POST /photos/power-devices/{id} (backend/app/photos.py).
+    photo_url: Mapped[Optional[str]] = mapped_column(String(500))
     notes: Mapped[Optional[str]] = mapped_column(Text)
 
 
@@ -495,6 +498,8 @@ class PatchPanel(Base):
     port_count: Mapped[int] = mapped_column(Integer, default=24)
     panel_id_label: Mapped[Optional[str]] = mapped_column(String(40))
     side: Mapped[str] = mapped_column(String(10), default="front")
+    # Phase 5 Task 23 (Req 19.1) — an uploaded photo of this specific panel.
+    photo_url: Mapped[Optional[str]] = mapped_column(String(500))
     notes: Mapped[Optional[str]] = mapped_column(Text)
 
 
@@ -680,6 +685,8 @@ class NetworkDevice(Base):
     theme_name: Mapped[Optional[str]] = mapped_column(String(120))
     theme_category: Mapped[Optional[str]] = mapped_column(String(40))
     vf_friendly_name: Mapped[Optional[str]] = mapped_column(String(120))
+    # Phase 5 Task 23 (Req 19.1) — an uploaded photo of this specific device.
+    photo_url: Mapped[Optional[str]] = mapped_column(String(500))
     notes: Mapped[Optional[str]] = mapped_column(Text)
     # Phase 4 Req 21 — Ansible-depth facts (see PhysicalServer for the
     # rationale; identical shape on every fact-collectable device type).
@@ -766,6 +773,8 @@ class PhysicalServer(Base):
     bitwarden_collection_ref: Mapped[Optional[str]] = mapped_column(String(120))
     domain: Mapped[Optional[str]] = mapped_column(String(120))
     bios_settings: Mapped[Optional[dict]] = mapped_column(JSONB)
+    # Phase 5 Task 23 (Req 19.1) — an uploaded photo of this specific server.
+    photo_url: Mapped[Optional[str]] = mapped_column(String(500))
     notes: Mapped[Optional[str]] = mapped_column(Text)
     # Phase 4 Req 21 — Ansible-depth facts. `ansible_facts` is the catch-all
     # blob for whatever a fact-gathering run reports; a handful of common
@@ -858,6 +867,8 @@ class Workstation(Base):
     management_ipv4: Mapped[Optional[str]] = mapped_column(INET)
     management_fqdn: Mapped[Optional[str]] = mapped_column(String(200))
     bitwarden_collection_ref: Mapped[Optional[str]] = mapped_column(String(120))
+    # Phase 5 Task 23 (Req 19.1) — an uploaded photo of this specific unit.
+    photo_url: Mapped[Optional[str]] = mapped_column(String(500))
     notes: Mapped[Optional[str]] = mapped_column(Text)
     # Phase 4 Req 21 — Ansible-depth facts (see PhysicalServer for the
     # rationale; identical shape on every fact-collectable device type).

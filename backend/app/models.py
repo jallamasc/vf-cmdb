@@ -1047,6 +1047,37 @@ class EntityFieldDef(Base):
     reference_target_type: Mapped[Optional[str]] = mapped_column(String(60))
 
 
+class FieldVisibilityOverride(Base):
+    """Phase 5 Task 24 — administrator control over whether a named field
+    (column) appears on a named hardcoded entity's grid, without a code
+    change (Req 20.1/20.2).
+
+    The absence of a row for an (``entity_slug``, ``field_key``) pair means
+    "visible" (the field's normal/default state); a row only needs to exist
+    when an administrator wants to deviate from that default. ``entity_slug``
+    is an ``ENTITY_REGISTRY`` slug (e.g. ``"network-devices"``), ``field_key``
+    a model field/column name (e.g. ``"serial_number"``) — neither is FK/
+    enum-constrained, since the set of valid (slug, field) pairs spans every
+    registered resource's columns and would be expensive to enumerate and
+    keep in sync here; the frontend grid simply ignores an override that
+    doesn't name one of its own columns.
+    """
+
+    __tablename__ = "field_visibility_overrides"
+    __table_args__ = (
+        UniqueConstraint(
+            "entity_slug", "field_key", name="uq_field_visibility_overrides_entity_field"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    entity_slug: Mapped[str] = mapped_column(String(60), nullable=False)
+    field_key: Mapped[str] = mapped_column(String(80), nullable=False)
+    visible: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+
+
 class GenericEntity(Base):
     """Phase 5 Task 18 — a record of an admin-defined Entity_Type_Def.
 

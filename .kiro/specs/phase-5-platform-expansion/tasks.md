@@ -147,11 +147,11 @@ capability patterns rather than reinventing them.
     - _Requirements: 19.1_
   - [x]* 23.2 pytest column + upload; Vitest field usage
 
-- [ ] 24. Registry-driven field visibility
-  - [ ] 24.1 `field_visibility_overrides` table + Reference Data panel;
+- [x] 24. Registry-driven field visibility
+  - [x] 24.1 `field_visibility_overrides` table + Reference Data panel;
         hardcoded grids consult overrides when building `ColDef[]`
     - _Requirements: 20.1, 20.2_
-  - [ ]* 24.2 pytest CRUD; Vitest confirming a hidden override removes a
+  - [x]* 24.2 pytest CRUD; Vitest confirming a hidden override removes a
         column live (e.g. NetworkDevices)
 
 - [ ] 25. Checkpoint C — full build + test verification, present for browser

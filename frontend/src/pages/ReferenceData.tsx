@@ -1,7 +1,7 @@
 import { useState } from "react";
 import EntityGrid from "../components/EntityGrid";
 import type { RequiredField } from "../components/EntityGrid";
-import { textCol, roCol, flagCol, selectCol } from "../lib/columns";
+import { textCol, roCol, flagCol, selectCol, boolCol } from "../lib/columns";
 import { STORAGE_KIND_VALUES } from "../lib/fieldTypes";
 
 interface RefTable {
@@ -80,6 +80,29 @@ const TABLES: RefTable[] = [
       { field: "slug", label: "Slug", hint: "Slugs are globally unique." },
       { field: "label", label: "Label" },
       { field: "storage_kind", label: "Storage Kind" },
+    ],
+  },
+  {
+    // Phase 5 Task 24 (Req 20.1/20.2) — hide (or explicitly re-show) a
+    // named field/column on a named hardcoded entity's grid, without a
+    // code change. Absence of a row means "visible" — only add one to
+    // deviate from that default. `entity_slug`/`field_key` are free text
+    // (not FK/enum-constrained — see the model docstring for why), so a
+    // typo just has no effect rather than erroring.
+    slug: "field-visibility-overrides",
+    label: "Field Visibility",
+    description:
+      "Hide (or explicitly re-show) a named column on a named entity's grid. Use the exact resource slug (e.g. \"network-devices\") and field/column name (e.g. \"serial_number\") — a typo has no effect, it just won't match any real column.",
+    columns: [
+      roCol("id", "ID", 70),
+      textCol("entity_slug", "Entity Slug", 180),
+      textCol("field_key", "Field Key", 180),
+      boolCol("visible", "Visible"),
+    ],
+    newRowDefaults: { entity_slug: "network-devices", field_key: "", visible: false },
+    requiredFields: [
+      { field: "entity_slug", label: "Entity Slug" },
+      { field: "field_key", label: "Field Key" },
     ],
   },
 ];

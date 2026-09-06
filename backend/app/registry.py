@@ -30,6 +30,8 @@ ENTITY_REGISTRY = {
     "entity-type-defs": models.EntityTypeDef,
     "entity-field-defs": models.EntityFieldDef,
     "generic-entities": models.GenericEntity,
+    # Phase 5 Task 24 — registry-driven field visibility overrides.
+    "field-visibility-overrides": models.FieldVisibilityOverride,
     # physical
     "sites": models.Site,
     "datacenters": models.Datacenter,
@@ -81,4 +83,6 @@ REFERENCE_SLUGS = [
     # Phase 5 Task 14/15 — managed from Reference Data, not a naming
     # convention dictionary.
     "field-type-defs",
+    # Phase 5 Task 24 — same rationale: administered from Reference Data.
+    "field-visibility-overrides",
 ]

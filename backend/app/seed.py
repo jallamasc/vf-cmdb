@@ -247,7 +247,14 @@ async def seed() -> None:
         # "simple_name: Korriban -> None" changelog artifact (BUG-03).
         site = models.Site(
             description="Bogota, Home, 1st Floor Datacenter",
-            organization_id=ORG["vf"], cloud_id=CLOUD["vs"], region_id=REGION["cc"],
+            # Phase 5 fix: "cc" (Central Colombia) was the pre-Phase-4-cleanup
+            # region abbreviation; Task 9's region cleanup pruned the seed
+            # list down to Colombia's natural regions + well-known Americas
+            # regions (see backend/app/seed.py's Region list) without
+            # updating this reference, which left a fresh/empty database
+            # unable to seed at all (KeyError: 'cc'). Bogota/Cundinamarca
+            # sits in Colombia's Andean natural region.
+            organization_id=ORG["vf"], cloud_id=CLOUD["vs"], region_id=REGION["CO-AND"],
             campus_id=CAMPUS["hm"], building_id=BUILDING["M1"], floor_section_id=FS["F1S1"],
             site_address_id=home_address.id,
         )

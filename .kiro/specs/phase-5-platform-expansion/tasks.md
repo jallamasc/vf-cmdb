@@ -88,21 +88,21 @@ capability patterns rather than reinventing them.
 
 ### Sub-phase C — Generic Entity Framework
 
-- [ ] 14. `field_type_defs` table + seed
-  - [ ] 14.1 Model + migration + seed of 6 builtin storage kinds; registry entry
+- [x] 14. `field_type_defs` table + seed
+  - [x] 14.1 Model + migration + seed of 6 builtin storage kinds; registry entry
     - _Requirements: 11.1_
-  - [ ]* 14.2 pytest for seed presence + uniqueness
+  - [x]* 14.2 pytest for seed presence + uniqueness
 
-- [ ] 15. Field type admin UI
-  - [ ] 15.1 Reference Data panel for `field-type-defs` CRUD via `EntityGrid`
+- [x] 15. Field type admin UI
+  - [x] 15.1 Reference Data panel for `field-type-defs` CRUD via `EntityGrid`
     - _Requirements: 11.2_
-  - [ ]* 15.2 Vitest for the grid
+  - [x]* 15.2 Vitest for the grid
 
-- [ ] 16. `entity_type_defs` table + capability model
-  - [ ] 16.1 Model (`slug`, `label`, `icon`, `capabilities` JSONB) + migration
+- [x] 16. `entity_type_defs` table + capability model
+  - [x] 16.1 Model (`slug`, `label`, `icon`, `capabilities` JSONB) + migration
         + registry entry
     - _Requirements: 12.1, 12.2_
-  - [ ]* 16.2 pytest CRUD + capability round-trip
+  - [x]* 16.2 pytest CRUD + capability round-trip
 
 - [ ] 17. `entity_field_defs` table
   - [ ] 17.1 Model + migration + registry entry; ordering by `sort_order`

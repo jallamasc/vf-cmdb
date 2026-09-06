@@ -277,10 +277,36 @@ def _validate_cable(obj: "models.Cable") -> None:
             )
 
 
+def _validate_entity_type_def(obj) -> None:
+    """Phase 5 Task 16 — every capability must be one of the fixed,
+    code-known CAPABILITY_VALUES (unlike field/entity type slugs, this list
+    isn't itself user-definable, since each one gates real integration
+    code)."""
+    from fastapi import HTTPException
+
+    caps = obj.capabilities or []
+    if not isinstance(caps, list):
+        raise HTTPException(
+            status_code=422, detail="'Capabilities' must be a list of capability names."
+        )
+    unknown = sorted(set(caps) - set(models.CAPABILITY_VALUES))
+    if unknown:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Unknown capability/ies: {', '.join(unknown)}. Allowed values: "
+                + ", ".join(models.CAPABILITY_VALUES)
+                + "."
+            ),
+        )
+
+
 async def _validate_model(session: AsyncSession, obj, entity_id) -> None:
     """Model-specific validation dispatch (beyond abbrev + IPAM)."""
     if isinstance(obj, models.Cable):
         _validate_cable(obj)
+    elif isinstance(obj, models.EntityTypeDef):
+        _validate_entity_type_def(obj)
 
 
 async def _autoreserve_gateway(session: AsyncSession, obj) -> None:
@@ -529,6 +555,17 @@ async def delete_item(
     obj = await session.get(model, item_id)
     if obj is None:
         return False
+    # Phase 5 Task 15 — a builtin FieldTypeDef (one of the 6 seeded storage
+    # kinds) can never be deleted: entity_field_defs (Task 17) will reference
+    # these by id, and the generic form/grid layer assumes all 6 storage
+    # kinds always exist.
+    if isinstance(obj, models.FieldTypeDef) and obj.builtin:
+        from fastapi import HTTPException
+
+        raise HTTPException(
+            status_code=400,
+            detail=f"'{obj.label}' is a built-in field type and cannot be deleted.",
+        )
     await _log(session, model.__tablename__, item_id, "__deleted__", "exists", None, source)
     if type(obj) in abbrev.ABBR_FIELDS:
         await abbrev.remove_registry(session, obj.__tablename__, obj.id)

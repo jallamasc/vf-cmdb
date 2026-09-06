@@ -410,6 +410,33 @@ export const api = {
       body: form,
     }).then(handle);
   },
+  /**
+   * Phase 5 Task 22/23 — URL of a record's uploaded photo, for embedding in
+   * an <img src>. Unlike `stencilUrl`, this is exactly the value stored in
+   * that record's own `photo_url` column (the upload endpoint sets it to
+   * this same URL) — pass it straight through rather than reconstructing it
+   * from `resource`/`id` here, so it keeps working if a record's photo_url
+   * was set by hand (e.g. pasted) instead of via `uploadPhoto`.
+   */
+  photoUrl: (resource: string, id: number): string => `${BASE}/photos/${resource}-${id}`,
+  /**
+   * Phase 5 Task 22/23 — upload a photo for one record. Resource-agnostic:
+   * works for any resource whose model has a `photo_url` column (currently
+   * generic-entities; Task 23 adds it to the hardcoded device tables too).
+   * Sets that record's `photo_url` server-side and returns it.
+   */
+  uploadPhoto: (
+    resource: string,
+    id: number,
+    file: File,
+  ): Promise<{ resource: string; id: number; photo_url: string }> => {
+    const form = new FormData();
+    form.append("file", file);
+    return fetch(`${BASE}/photos/${resource}/${id}`, {
+      method: "POST",
+      body: form,
+    }).then(handle);
+  },
   /** Phase 4 Req 19 — anchors mapped for a stencil owner (+ optional face). */
   stencilAnchors: (modelSlug: string, face?: "front" | "back"): Promise<Row[]> =>
     fetch(

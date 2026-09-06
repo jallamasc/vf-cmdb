@@ -21,6 +21,7 @@ from .. import (
     devices,
     models,
     naming,
+    photos,
     ports,
     stencil_library,
     stencil_sources,
@@ -1006,6 +1007,75 @@ async def list_stencil_anchors(
         stmt = stmt.where(models.StencilAnchor.face == face)
     rows = (await session.execute(stmt.order_by(models.StencilAnchor.id))).scalars().all()
     return [crud.to_dict(r) for r in rows]
+
+
+# ---------------------------------------------------------------------------
+# Phase 5 Task 22/23 — per-record photo upload (Requirements 18.1, 19.1)
+# ---------------------------------------------------------------------------
+_PHOTO_MEDIA_TYPES = {
+    "jpg": "image/jpeg",
+    "png": "image/png",
+    "gif": "image/gif",
+    "webp": "image/webp",
+}
+_PHOTO_HEADERS = {"Cache-Control": "public, max-age=86400"}
+
+
+def _photo_model(resource: str):
+    """Resolve `resource` to an ORM model that has a `photo_url` column, or
+    raise 404/400. Resource-agnostic (ENTITY_REGISTRY-driven) so this same
+    function serves generic-entities today and every hardcoded device table
+    Task 23 adds `photo_url` to, with no changes here."""
+    model = ENTITY_REGISTRY.get(resource)
+    if model is None:
+        raise HTTPException(status_code=404, detail=f"Unknown resource '{resource}'.")
+    if not hasattr(model, "photo_url"):
+        raise HTTPException(
+            status_code=400, detail=f"'{resource}' records do not support a photo."
+        )
+    return model
+
+
+@router.get("/photos/{slug}")
+async def get_photo(slug: str) -> Response:
+    """Serve a previously uploaded photo. 404 when none has been uploaded."""
+    try:
+        clean_slug = photos.validate_slug(slug)
+    except photos.InvalidSlug as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    path = photos.existing_path(clean_slug)
+    if path is None:
+        raise HTTPException(status_code=404, detail="No photo uploaded for this record.")
+    media_type = _PHOTO_MEDIA_TYPES.get(path.suffix.lstrip("."), "application/octet-stream")
+    return Response(content=path.read_bytes(), media_type=media_type, headers=_PHOTO_HEADERS)
+
+
+@router.post("/photos/{resource}/{item_id}")
+async def upload_photo(
+    resource: str,
+    item_id: int,
+    file: UploadFile = File(...),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Upload a photo for one record and set its `photo_url` to the URL that
+    serves it back. Unlike a stencil (cached separately from the DB column),
+    the photo_url column IS the pointer to the uploaded file."""
+    model = _photo_model(resource)
+    row = await session.get(model, item_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"'{resource}' #{item_id} not found.")
+
+    slug = f"{resource}-{item_id}"
+    data = await file.read()
+    try:
+        photos.store_bytes(slug, data, file.content_type)
+    except photos.InvalidPhoto as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    photo_url = f"{settings.api_prefix}/photos/{slug}"
+    row.photo_url = photo_url
+    await session.commit()
+    return {"resource": resource, "id": item_id, "photo_url": photo_url}
 
 
 # ---------------------------------------------------------------------------

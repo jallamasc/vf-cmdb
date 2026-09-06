@@ -46,3 +46,10 @@ backend/static/stencils/*.svg
 # Phase 4 Sub-phase E: stencil library preview cache (keep the dir, ignore
 # the per-fetch token subdirectories it accumulates at runtime)
 backend/static/stencil_previews/*/
+# Phase 5 Task 22/23: uploaded per-record photos (keep the dir, ignore the
+# uploaded image files)
+backend/static/photos/*.jpg
+backend/static/photos/*.jpeg
+backend/static/photos/*.png
+backend/static/photos/*.gif
+backend/static/photos/*.webp

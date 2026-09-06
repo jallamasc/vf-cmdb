@@ -1,18 +1,13 @@
 import { useRef, useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { api, Row } from "../api";
 import AnchorEditor from "./AnchorEditor";
 import StencilLibraryPicker from "./StencilLibraryPicker";
 
-interface Props {
-  /** Device-type resource slug, e.g. "network-device-types". */
-  resource: string;
-}
-
 /**
- * FEAT-6 (6B) — admin panel to attach a Visio Café stencil to a device model.
+ * FEAT-6 (6B) — stencil + anchor management for a single device-type record.
  *
- * For each device-type row it offers two ways to supply the SVG:
+ * Offers two ways to supply the SVG for each face:
  *  - set ``stencil_url`` (persisted via the normal CRUD PATCH, so it is
  *    audited) — the backend downloads + caches it cache-first;
  *  - upload an SVG directly (air-gapped installs) via POST /stencils/{slug}-{id}.
@@ -20,48 +15,16 @@ interface Props {
  * The stencil is keyed by ``{resource}-{id}`` — the same slug the rack diagram
  * asks the backend for — so an uploaded/downloaded SVG shows up on the model's
  * devices immediately.
- */
-export default function StencilField({ resource }: Props) {
-  const qc = useQueryClient();
-  const { data: rows, isLoading } = useQuery({
-    queryKey: [resource],
-    queryFn: () => api.list(resource),
-  });
-
-  if (isLoading) return <p className="text-sm text-slate-500">Loading models…</p>;
-  if (!rows || rows.length === 0)
-    return (
-      <p className="text-sm text-slate-500">
-        Add a model above, then attach a stencil to it here.
-      </p>
-    );
-
-  return (
-    <div className="space-y-2">
-      <p className="text-xs text-slate-500">
-        Attach a Visio Café stencil (SVG) to a model. Devices of this model then
-        render the graphic on the rack diagram instead of a plain rectangle. You
-        can paste a URL (downloaded + cached) or upload an SVG (works offline).
-      </p>
-      <div className="space-y-1.5">
-        {rows.map((row) => (
-          <StencilRow
-            key={row.id}
-            resource={resource}
-            row={row}
-            onChanged={() => qc.invalidateQueries({ queryKey: [resource] })}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/**
- * Phase 5 Task 22 (Req 18.2) — exported so a single Generic_Entity record
- * (rather than every row of a device-*type* resource, which is what
- * `StencilField` itself lists) can reuse the exact same stencil + anchor
- * management UI, e.g. from `GenericEntityView.tsx`'s selection-driven panel.
+ *
+ * Phase 5 Task 29 (Req 24.1/24.2) removed this module's original default
+ * export, which rendered every row of a device-type resource in its own
+ * always-open list — a second, disconnected copy of the same rows the grid
+ * above it already showed (Requirement 24.2's "standalone stencil-only admin
+ * page"). `Naming.tsx` now renders `StencilRow` directly, scoped to whichever
+ * single row is selected in the grid, via `EntityGrid`'s `panel` prop — the
+ * same selection-driven idiom `GenericEntityView.tsx`'s capability panel
+ * already used to reuse this exact component for a single Generic_Entity
+ * record (Task 22, Req 18.2).
  */
 export function StencilRow({
   resource,

@@ -1,7 +1,7 @@
-import { lazy, Suspense, useMemo, useState } from "react";
-import { useQueries } from "@tanstack/react-query";
+import { lazy, Suspense, useCallback, useMemo, useState } from "react";
+import { useQueries, useQueryClient } from "@tanstack/react-query";
 import EntityGrid from "../components/EntityGrid";
-import StencilField from "../components/StencilField";
+import { StencilRow } from "../components/StencilField";
 import { api, Row } from "../api";
 import { textCol, roCol, numCol, selectCol, flagCol } from "../lib/columns";
 import { DEVICE_TYPE_ICON_NAMES } from "../lib/deviceIcons";
@@ -135,10 +135,59 @@ const columnsFor = (slug: string) => {
   return baseColumns;
 };
 
+/**
+ * Phase 5 Task 29 (Req 24.1/24.2) — inline, expandable stencil management for
+ * whichever device-type row is currently selected in the grid below, reusing
+ * `StencilField.tsx`'s single-record `StencilRow` exactly the way
+ * `GenericEntityView.tsx`'s `CapabilityPanel` already does. Replaces the old
+ * always-open `<StencilField resource={active} />` block, which rendered
+ * every row of the resource in a second, disconnected list above the grid
+ * that already listed them (Requirement 24.2's "standalone stencil-only
+ * admin page").
+ */
+function StencilPanel({
+  resource,
+  label,
+  selected,
+  onChanged,
+}: {
+  resource: string;
+  label: string;
+  selected: Row | null;
+  onChanged: () => void;
+}) {
+  if (!selected) {
+    return (
+      <div className="mb-3 px-3 py-2 border border-dashed border-slate-300 rounded text-sm text-slate-500">
+        Select a {label} row below to manage its stencil.
+      </div>
+    );
+  }
+  return (
+    <details className="mb-3 border border-slate-200 rounded-lg" open>
+      <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-slate-700">
+        Stencil — {selected.full_name ? String(selected.full_name) : `#${selected.id}`}
+      </summary>
+      <div className="px-3 pb-3">
+        <StencilRow resource={resource} row={selected} onChanged={onChanged} />
+      </div>
+    </details>
+  );
+}
+
 export default function Naming() {
+  const qc = useQueryClient();
   const [active, setActive] = useState(ALL_LOOKUPS[0].slug);
   const [search, setSearch] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  // Phase 5 Task 29 (Req 24.1) — the row currently selected in the active
+  // grid, driving the inline stencil panel below. Cleared on every lookup
+  // switch alongside `mapCountry`.
+  const [selected, setSelected] = useState<Row | null>(null);
+  const handleSelection = useCallback(
+    (rows: Row[]) => setSelected(rows.length === 1 ? rows[0] : null),
+    []
+  );
   // Phase 5 Task 11 (Req 9) — RegionMap-driven narrowing, only relevant on
   // the "regions" lookup; cleared whenever the operator switches away.
   const [mapCountry, setMapCountry] = useState<string | null>(null);
@@ -224,6 +273,7 @@ export default function Naming() {
                         onClick={() => {
                           setActive(l.slug);
                           setMapCountry(null);
+                          setSelected(null);
                         }}
                         className={`w-full flex items-center justify-between pl-6 pr-2 py-1.5 rounded text-sm ${
                           active === l.slug
@@ -257,17 +307,6 @@ export default function Naming() {
 
         {/* Active lookup grid */}
         <div className="flex-1 min-w-0 flex flex-col">
-          {/* FEAT-6 (6B): stencil manager for device-type dictionaries. */}
-          {STENCIL_RESOURCES.has(active) && (
-            <details className="mb-3 border border-slate-200 rounded-lg" open>
-              <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-slate-700">
-                Stencils — {activeLabel}
-              </summary>
-              <div className="px-3 pb-3">
-                <StencilField resource={active} />
-              </div>
-            </details>
-          )}
           {/* Phase 5 Task 11 (Req 9) — region map, only on the regions lookup. */}
           {active === "regions" && (
             <Suspense
@@ -304,6 +343,20 @@ export default function Naming() {
                       .length > 0
                 : undefined
             }
+            // Phase 5 Task 29 (Req 24.1/24.2) — inline, expandable stencil
+            // management for the selected row, replacing the old standalone
+            // "list every row" stencil panel.
+            panel={
+              STENCIL_RESOURCES.has(active) ? (
+                <StencilPanel
+                  resource={active}
+                  label={activeLabel}
+                  selected={selected}
+                  onChanged={() => qc.invalidateQueries({ queryKey: [active] })}
+                />
+              ) : undefined
+            }
+            onSelectionChanged={handleSelection}
           />
         </div>
       </div>

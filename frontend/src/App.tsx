@@ -20,6 +20,7 @@ import PortConfig from "./pages/PortConfig";
 import Naming from "./pages/Naming";
 import ReferenceData from "./pages/ReferenceData";
 import EntityTypeBuilder from "./pages/EntityTypeBuilder";
+import GenericEntityView from "./pages/GenericEntityView";
 import Ansible from "./pages/Ansible";
 import Changelog from "./pages/Changelog";
 import DeviceDashboard from "./pages/DeviceDashboard";
@@ -54,6 +55,7 @@ export default function App() {
         <Route path="naming" element={<Naming />} />
         <Route path="reference-data" element={<ReferenceData />} />
         <Route path="entity-types" element={<EntityTypeBuilder />} />
+        <Route path="entities/:typeSlug" element={<GenericEntityView />} />
         <Route path="ansible" element={<Ansible />} />
         <Route path="changelog" element={<Changelog />} />
         {/* FEAT-7: single-device dashboard, linked from every device grid. */}

@@ -82,6 +82,83 @@ describe("RackSlotEditor — empty slot (add equipment)", () => {
   });
 });
 
+describe("RackSlotEditor — Generic_Entity placement (Phase 5 Task 21, Req 17.1)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const entityTypes = [
+    { id: 9, slug: "monitor", label: "Monitor", capabilities: ["rack_placement"] },
+    { id: 10, slug: "widget", label: "Widget", capabilities: [] }, // not rack_placement-capable
+  ];
+
+  it("offers one option per rack_placement-capable Entity_Type_Def", async () => {
+    (api.list as any).mockImplementation((resource: string) =>
+      Promise.resolve(resource === "entity-type-defs" ? entityTypes : [])
+    );
+    wrap(<RackSlotEditor rackId={1} unitNumber={12} unit={null} onClose={vi.fn()} />);
+
+    await screen.findByText("Monitor");
+    expect(screen.queryByText("Widget")).toBeNull(); // capabilities: [] is excluded
+  });
+
+  it("creates a new GenericEntity with the right entity_type_id when placing a Monitor", async () => {
+    (api.list as any).mockImplementation((resource: string) =>
+      Promise.resolve(resource === "entity-type-defs" ? entityTypes : [])
+    );
+    (api.create as any)
+      .mockResolvedValueOnce({ id: 55 }) // the new generic entity
+      .mockResolvedValueOnce({ id: 101 }); // the rack_units row
+    (api.update as any).mockResolvedValue({});
+
+    wrap(<RackSlotEditor rackId={1} unitNumber={12} unit={null} onClose={vi.fn()} />);
+    await screen.findByText("Monitor");
+
+    fireEvent.change(screen.getByLabelText("Device type"), {
+      target: { value: "generic-entities:9" },
+    });
+    fireEvent.click(screen.getByText("Place in rack"));
+
+    await waitFor(() => expect(api.create).toHaveBeenCalledTimes(2));
+    expect((api.create as any).mock.calls[0]).toEqual([
+      "generic-entities",
+      { entity_type_id: 9, attributes: {} },
+    ]);
+    expect((api.update as any).mock.calls[0]).toEqual([
+      "generic-entities",
+      55,
+      { rack_id: 1, rack_unit: 12 },
+    ]);
+    const [resource, payload] = (api.create as any).mock.calls[1];
+    expect(resource).toBe("rack-units");
+    expect(payload).toMatchObject({
+      device_id: 55,
+      device_table: "generic-entities",
+      device_type: "generic",
+    });
+  });
+
+  it("scopes the unplaced-device list to the selected Entity_Type_Def only", async () => {
+    (api.list as any).mockImplementation((resource: string) => {
+      if (resource === "entity-type-defs") return Promise.resolve(entityTypes);
+      if (resource === "generic-entities")
+        return Promise.resolve([
+          { id: 1, entity_type_id: 9, rack_id: null }, // a Monitor — should show
+          { id: 2, entity_type_id: 10, rack_id: null }, // a Widget — must not show
+        ]);
+      return Promise.resolve([]);
+    });
+
+    wrap(<RackSlotEditor rackId={1} unitNumber={12} unit={null} onClose={vi.fn()} />);
+    await screen.findByText("Monitor");
+    fireEvent.change(screen.getByLabelText("Device type"), {
+      target: { value: "generic-entities:9" },
+    });
+    fireEvent.click(screen.getByLabelText(/Assign existing/i));
+
+    await waitFor(() => expect(screen.getByText("#1")).toBeTruthy());
+    expect(screen.queryByText("#2")).toBeNull();
+  });
+});
+
 describe("RackSlotEditor — occupied slot (edit / remove)", () => {
   beforeEach(() => vi.clearAllMocks());
 

@@ -141,11 +141,11 @@ capability patterns rather than reinventing them.
     - _Requirements: 18.1, 18.2_
   - [x]* 22.2 pytest upload round-trip; Vitest for `PhotoField`
 
-- [ ] 23. Photo/graphic on existing hardcoded device types
-  - [ ] 23.1 Add `photo_url` to PhysicalServer/NetworkDevice/Workstation/
+- [x] 23. Photo/graphic on existing hardcoded device types
+  - [x] 23.1 Add `photo_url` to PhysicalServer/NetworkDevice/Workstation/
         PowerDevice/PatchPanel; reuse `PhotoField.tsx` in their pages
     - _Requirements: 19.1_
-  - [ ]* 23.2 pytest column + upload; Vitest field usage
+  - [x]* 23.2 pytest column + upload; Vitest field usage
 
 - [ ] 24. Registry-driven field visibility
   - [ ] 24.1 `field_visibility_overrides` table + Reference Data panel;

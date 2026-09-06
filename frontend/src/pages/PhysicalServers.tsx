@@ -1,5 +1,6 @@
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import EntityGrid from "../components/EntityGrid";
+import DevicePhotoPanel from "../components/DevicePhotoPanel";
 import {
   useLookups,
   textCol,
@@ -9,6 +10,7 @@ import {
   ipCol,
   deviceLinkCol,
 } from "../lib/columns";
+import { Row } from "../api";
 
 const LK = [
   "sites",
@@ -23,6 +25,12 @@ const LK = [
 
 export default function PhysicalServers() {
   const { map, isLoading } = useLookups(LK);
+  // Phase 5 Task 23 (Req 19.1) — photo manager for the selected server.
+  const [selected, setSelected] = useState<Row | null>(null);
+  const handleSelection = useCallback(
+    (rows: Row[]) => setSelected(rows.length === 1 ? rows[0] : null),
+    []
+  );
   const columns = useMemo(
     () => [
       roCol("id", "ID", 70),
@@ -62,6 +70,8 @@ export default function PhysicalServers() {
       title="Physical Servers"
       description="Bare-metal compute. Short & long names auto-generate from device type, brand, role, OS and sequence. Click a long name to open that server’s dashboard."
       columns={columns}
+      panel={<DevicePhotoPanel resource="physical-servers" selected={selected} />}
+      onSelectionChanged={handleSelection}
     />
   );
 }

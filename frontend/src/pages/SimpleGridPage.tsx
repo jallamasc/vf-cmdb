@@ -1,5 +1,6 @@
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import EntityGrid from "../components/EntityGrid";
+import DevicePhotoPanel from "../components/DevicePhotoPanel";
 import {
   useLookups,
   textCol,
@@ -8,6 +9,7 @@ import {
   fkCol,
   selectCol,
 } from "../lib/columns";
+import { Row } from "../api";
 import type { ColDef } from "ag-grid-community";
 
 type Kind = "patch-panels" | "power" | "cables" | "racks";
@@ -19,6 +21,9 @@ interface Config {
   lookups: string[];
   build: (l: Record<string, any[]>) => ColDef[];
   defaults: Record<string, any>;
+  /** Phase 5 Task 23 (Req 19.1) — PowerDevice/PatchPanel support an
+   * uploaded photo; Cable/Rack rows don't. */
+  photoPanel?: boolean;
 }
 
 const CONFIGS: Record<Kind, Config> = {
@@ -38,6 +43,7 @@ const CONFIGS: Record<Kind, Config> = {
       textCol("notes", "Notes"),
     ],
     defaults: { port_count: 24, side: "front" },
+    photoPanel: true,
   },
   power: {
     resource: "power-devices",
@@ -58,6 +64,7 @@ const CONFIGS: Record<Kind, Config> = {
       textCol("notes", "Notes"),
     ],
     defaults: { device_type: "pdu" },
+    photoPanel: true,
   },
   cables: {
     resource: "cables",
@@ -109,6 +116,13 @@ export default function SimpleGridPage({ kind }: { kind: Kind }) {
   const cfg = CONFIGS[kind];
   const { map, isLoading } = useLookups(cfg.lookups);
   const columns = useMemo(() => cfg.build(map), [cfg, map]);
+  // Phase 5 Task 23 (Req 19.1) — photo manager for the selected row, only on
+  // the two kinds whose model actually has a photo_url column.
+  const [selected, setSelected] = useState<Row | null>(null);
+  const handleSelection = useCallback(
+    (rows: Row[]) => setSelected(rows.length === 1 ? rows[0] : null),
+    []
+  );
   if (isLoading && cfg.lookups.length)
     return <div className="text-slate-500">Loading…</div>;
   return (
@@ -118,6 +132,12 @@ export default function SimpleGridPage({ kind }: { kind: Kind }) {
       description={cfg.description}
       columns={columns}
       newRowDefaults={cfg.defaults}
+      panel={
+        cfg.photoPanel ? (
+          <DevicePhotoPanel resource={cfg.resource} selected={selected} />
+        ) : undefined
+      }
+      onSelectionChanged={cfg.photoPanel ? handleSelection : undefined}
     />
   );
 }

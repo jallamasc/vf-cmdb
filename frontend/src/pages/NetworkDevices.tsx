@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ICellRendererParams } from "ag-grid-community";
 import EntityGrid from "../components/EntityGrid";
 import SequenceGapHelper from "../components/SequenceGapHelper";
 import ThemeNamePicker, { ThemeSelection } from "../components/ThemeNamePicker";
+import DevicePhotoPanel from "../components/DevicePhotoPanel";
 import { api, Row } from "../api";
 import {
   useLookups,
@@ -29,6 +30,12 @@ export default function NetworkDevices() {
   const qc = useQueryClient();
   // Phase 4 Req 10 — themed "Simple Name" picker, opened per row.
   const [pickerRow, setPickerRow] = useState<Row | null>(null);
+  // Phase 5 Task 23 (Req 19.1) — photo manager for the selected device.
+  const [selected, setSelected] = useState<Row | null>(null);
+  const handleSelection = useCallback(
+    (rows: Row[]) => setSelected(rows.length === 1 ? rows[0] : null),
+    []
+  );
   const applyTheme = useMutation({
     mutationFn: ({ id, selection }: { id: number; selection: ThemeSelection }) =>
       api.update("network-devices", id, {
@@ -112,6 +119,8 @@ export default function NetworkDevices() {
           title="Network Devices"
           description="Switches, routers, firewalls and access points. Long name auto-generates from type, brand and sequence. Click a long name to open that device’s dashboard. “Simple Name” can be typed freely or picked from the networking theme."
           columns={columns}
+          panel={<DevicePhotoPanel resource="network-devices" selected={selected} />}
+          onSelectionChanged={handleSelection}
         />
       </div>
       <ThemeNamePicker

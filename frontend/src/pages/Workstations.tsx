@@ -1,5 +1,6 @@
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import EntityGrid from "../components/EntityGrid";
+import DevicePhotoPanel from "../components/DevicePhotoPanel";
 import {
   useLookups,
   textCol,
@@ -9,6 +10,7 @@ import {
   ipCol,
   deviceLinkCol,
 } from "../lib/columns";
+import { Row } from "../api";
 
 const LK = [
   "sites",
@@ -21,6 +23,12 @@ const LK = [
 
 export default function Workstations() {
   const { map, isLoading } = useLookups(LK);
+  // Phase 5 Task 23 (Req 19.1) — photo manager for the selected workstation.
+  const [selected, setSelected] = useState<Row | null>(null);
+  const handleSelection = useCallback(
+    (rows: Row[]) => setSelected(rows.length === 1 ? rows[0] : null),
+    []
+  );
   const columns = useMemo(
     () => [
       roCol("id", "ID", 70),
@@ -50,6 +58,8 @@ export default function Workstations() {
       title="Workstations"
       description="End-user workstations, laptops and thin clients. Click a long name to open that workstation’s dashboard."
       columns={columns}
+      panel={<DevicePhotoPanel resource="workstations" selected={selected} />}
+      onSelectionChanged={handleSelection}
     />
   );
 }

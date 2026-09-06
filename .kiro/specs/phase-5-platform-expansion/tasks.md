@@ -115,11 +115,11 @@ capability patterns rather than reinventing them.
     - _Requirements: 14.1, 14.2_
   - [x]* 18.2 pytest CRUD + attribute round-trip
 
-- [ ] 19. Entity Type Builder UI
-  - [ ] 19.1 `frontend/src/pages/EntityTypeBuilder.tsx` tying 14–18 together:
+- [x] 19. Entity Type Builder UI
+  - [x] 19.1 `frontend/src/pages/EntityTypeBuilder.tsx` tying 14–18 together:
         create/edit type, toggle capabilities, manage fields
     - _Requirements: 15.1_
-  - [ ]* 19.2 Vitest for the create-type-with-fields flow
+  - [x]* 19.2 Vitest for the create-type-with-fields flow
 
 - [ ] 20. Generic dynamic grid + form
   - [ ] 20.1 `frontend/src/pages/GenericEntityView.tsx` + `lib/genericColumns.tsx`

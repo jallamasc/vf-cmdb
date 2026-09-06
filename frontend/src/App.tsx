@@ -19,6 +19,7 @@ import NetworkDevices from "./pages/NetworkDevices";
 import PortConfig from "./pages/PortConfig";
 import Naming from "./pages/Naming";
 import ReferenceData from "./pages/ReferenceData";
+import EntityTypeBuilder from "./pages/EntityTypeBuilder";
 import Ansible from "./pages/Ansible";
 import Changelog from "./pages/Changelog";
 import DeviceDashboard from "./pages/DeviceDashboard";
@@ -52,6 +53,7 @@ export default function App() {
         <Route path="port-config" element={<PortConfig />} />
         <Route path="naming" element={<Naming />} />
         <Route path="reference-data" element={<ReferenceData />} />
+        <Route path="entity-types" element={<EntityTypeBuilder />} />
         <Route path="ansible" element={<Ansible />} />
         <Route path="changelog" element={<Changelog />} />
         {/* FEAT-7: single-device dashboard, linked from every device grid. */}

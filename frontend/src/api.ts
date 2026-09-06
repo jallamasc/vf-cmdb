@@ -437,6 +437,28 @@ export const api = {
       body: form,
     }).then(handle);
   },
+  /**
+   * Phase 5 Task 26/27 (Req 21.3/22.3) — URL of a record's uploaded
+   * blueprint (floor plan), for embedding in an <img src>. Mirrors
+   * `photoUrl` exactly, but for the separate `blueprint_url` column/asset
+   * class (Floor/Room/Section, not a device).
+   */
+  blueprintUrl: (resource: string, id: number): string =>
+    `${BASE}/blueprints/${resource}-${id}`,
+  /** Phase 5 Task 26/27 — upload a blueprint for one record. Mirrors
+   * `uploadPhoto`, sets that record's `blueprint_url`. */
+  uploadBlueprint: (
+    resource: string,
+    id: number,
+    file: File,
+  ): Promise<{ resource: string; id: number; blueprint_url: string }> => {
+    const form = new FormData();
+    form.append("file", file);
+    return fetch(`${BASE}/blueprints/${resource}/${id}`, {
+      method: "POST",
+      body: form,
+    }).then(handle);
+  },
   /** Phase 4 Req 19 — anchors mapped for a stencil owner (+ optional face). */
   stencilAnchors: (modelSlug: string, face?: "front" | "back"): Promise<Row[]> =>
     fetch(

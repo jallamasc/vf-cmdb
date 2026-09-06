@@ -23,6 +23,12 @@ from typing import Optional
 # so it is stable regardless of the process working directory.
 _STATIC_ROOT = Path(__file__).resolve().parent.parent / "static"
 PHOTO_DIR = _STATIC_ROOT / "photos"
+# Phase 5 Task 26/27 (Req 21.3/22.3) — a separate directory for uploaded
+# floor-plan blueprints. Same storage/validation code, distinct namespace
+# from per-record photos (both use the same `{resource}-{id}` slug shape,
+# so keeping them in separate directories avoids any collision even though
+# none exists in practice today).
+BLUEPRINT_DIR = _STATIC_ROOT / "blueprints"
 
 # Same domain-name-ish charset stencils.py validates model slugs against —
 # safe to join onto PHOTO_DIR (no dots, slashes or "..").
@@ -63,8 +69,12 @@ class InvalidPhoto(ValueError):
     large."""
 
 
-def ensure_photo_dir() -> None:
-    PHOTO_DIR.mkdir(parents=True, exist_ok=True)
+def ensure_photo_dir(base_dir: Optional[Path] = None) -> None:
+    # NOTE: default is resolved here (not as `base_dir: Path = PHOTO_DIR`)
+    # so tests that monkeypatch the module-level PHOTO_DIR/BLUEPRINT_DIR
+    # constants are honored — a bound default parameter value would freeze
+    # in the value PHOTO_DIR had at import time, before any monkeypatch.
+    (base_dir or PHOTO_DIR).mkdir(parents=True, exist_ok=True)
 
 
 def validate_slug(slug: str) -> str:
@@ -88,19 +98,26 @@ def _detect_extension(data: bytes, content_type: Optional[str]) -> Optional[str]
     return None
 
 
-def existing_path(slug: str) -> Optional[Path]:
+def existing_path(slug: str, base_dir: Optional[Path] = None) -> Optional[Path]:
     """The on-disk file for a slug, whichever extension it was stored with."""
     slug = validate_slug(slug)
-    if not PHOTO_DIR.is_dir():
+    base_dir = base_dir or PHOTO_DIR
+    if not base_dir.is_dir():
         return None
-    matches = sorted(PHOTO_DIR.glob(f"{slug}.*"))
+    matches = sorted(base_dir.glob(f"{slug}.*"))
     return matches[0] if matches else None
 
 
-def store_bytes(slug: str, data: bytes, content_type: Optional[str] = None) -> Path:
+def store_bytes(
+    slug: str,
+    data: bytes,
+    content_type: Optional[str] = None,
+    base_dir: Optional[Path] = None,
+) -> Path:
     """Validate + write an uploaded photo, overwriting any previous copy
     (including one saved under a different extension)."""
     slug = validate_slug(slug)
+    base_dir = base_dir or PHOTO_DIR
     if len(data) > MAX_PHOTO_BYTES:
         raise InvalidPhoto(
             f"Photo is too large ({len(data)} bytes) — the limit is "
@@ -112,11 +129,11 @@ def store_bytes(slug: str, data: bytes, content_type: Optional[str] = None) -> P
             "Uploaded file is not a recognised image (expected JPEG, PNG, "
             "GIF or WEBP)."
         )
-    ensure_photo_dir()
+    ensure_photo_dir(base_dir)
     # Remove any previously stored file for this slug under a different
     # extension, so re-uploading a PNG over a JPEG doesn't leave a stale copy.
-    for old in PHOTO_DIR.glob(f"{slug}.*"):
+    for old in base_dir.glob(f"{slug}.*"):
         old.unlink()
-    path = PHOTO_DIR / f"{slug}.{ext}"
+    path = base_dir / f"{slug}.{ext}"
     path.write_bytes(data)
     return path

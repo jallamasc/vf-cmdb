@@ -301,6 +301,23 @@ def _validate_entity_type_def(obj) -> None:
         )
 
 
+def _validate_rack(obj) -> None:
+    """Phase 5 Task 26/27 (Req 21.2/22.2) — a Rack may belong to a Floor, a
+    Room, or a Section directly, but at most one of the three at once (all
+    three may also be unset/None, e.g. a rack tracked only by site_id)."""
+    from fastapi import HTTPException
+
+    parents = [obj.datacenter_floor_id, obj.room_id, getattr(obj, "section_id", None)]
+    if sum(1 for p in parents if p is not None) > 1:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "A rack may belong to a Floor, a Room, or a Section directly — "
+                "pick only one, not more than one."
+            ),
+        )
+
+
 def _validate_generic_entity(obj) -> None:
     """Phase 5 Task 18 — `attributes` must be a JSON object (dict), since it
     is keyed by EntityFieldDef.key. Per-field/required-field validation
@@ -322,6 +339,8 @@ async def _validate_model(session: AsyncSession, obj, entity_id) -> None:
         _validate_entity_type_def(obj)
     elif isinstance(obj, models.GenericEntity):
         _validate_generic_entity(obj)
+    elif isinstance(obj, models.Rack):
+        _validate_rack(obj)
 
 
 async def _autoreserve_gateway(session: AsyncSession, obj) -> None:

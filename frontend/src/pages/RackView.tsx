@@ -69,6 +69,16 @@ export default function RackView() {
     queryKey: ["datacenter-floors"],
     queryFn: () => api.list("datacenter-floors"),
   });
+  // Phase 5 Task 26/27 — a rack may resolve its floor via a Room or a
+  // Section instead of a direct datacenter_floor_id (Req 21.1/22.1).
+  const { data: rooms } = useQuery({
+    queryKey: ["rooms"],
+    queryFn: () => api.list("rooms"),
+  });
+  const { data: sections } = useQuery({
+    queryKey: ["sections"],
+    queryFn: () => api.list("sections"),
+  });
   // FEAT-6 (6A/6C): port + owner data, only used on the back face.
   const { data: interfaces } = useQuery({
     queryKey: ["device-interfaces"],
@@ -298,6 +308,26 @@ export default function RackView() {
     () => new Map((sites ?? []).map((s) => [s.id, s])),
     [sites]
   );
+  // Phase 5 Task 26/27 — resolve a rack's floor through Room/Section when it
+  // has no direct datacenter_floor_id (Req 21.1/22.1).
+  const roomById = useMemo(
+    () => new Map((rooms ?? []).map((r) => [r.id, r])),
+    [rooms]
+  );
+  const sectionById = useMemo(
+    () => new Map((sections ?? []).map((s) => [s.id, s])),
+    [sections]
+  );
+  const effectiveFloorId = (r: Row): number | null => {
+    if (r.datacenter_floor_id != null) return r.datacenter_floor_id;
+    if (r.room_id != null) return roomById.get(r.room_id)?.datacenter_floor_id ?? null;
+    if (r.section_id != null) {
+      const section = sectionById.get(r.section_id);
+      const room = section ? roomById.get(section.room_id) : undefined;
+      return room?.datacenter_floor_id ?? null;
+    }
+    return null;
+  };
 
   // Req 11.3 — resolve `?rackId=` to its full ancestry, once, as soon as
   // racks + floors + datacenters have all loaded.
@@ -358,7 +388,7 @@ export default function RackView() {
         .filter((r) => matchesHierarchy(r, ALL))
         .map((r) => ({ id: r.id, label: nameOf(r, "Rack") })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [racks, site, dc, floor, dcById, floorById]
+    [racks, site, dc, floor, dcById, floorById, roomById, sectionById]
   );
 
   // Determine whether a rack matches the currently-selected hierarchy filters.
@@ -366,14 +396,16 @@ export default function RackView() {
   function matchesHierarchy(r: Row, overrideRack: Filter): boolean {
     const rk = overrideRack === ALL ? rack : overrideRack;
     if (rk !== ALL && r.id !== rk) return false;
-    if (floor !== ALL && r.datacenter_floor_id !== floor) return false;
+    const floorId = effectiveFloorId(r);
+    if (floor !== ALL && floorId !== floor) return false;
     if (dc !== ALL) {
-      const fl = floorById.get(r.datacenter_floor_id);
+      const fl = floorById.get(floorId);
       if (!fl || fl.datacenter_id !== dc) return false;
     }
     if (site !== ALL) {
-      // A rack belongs to a site directly, or via its floor->datacenter.
-      const fl = floorById.get(r.datacenter_floor_id);
+      // A rack belongs to a site directly, or via its floor->datacenter
+      // (the floor itself resolved directly or via Room/Section).
+      const fl = floorById.get(floorId);
       const dcParent = fl ? dcById.get(fl.datacenter_id) : undefined;
       const siteViaFloor = dcParent?.site_id;
       if (r.site_id !== site && siteViaFloor !== site) return false;
@@ -395,7 +427,7 @@ export default function RackView() {
   const shown = racks.filter((r) => matchesHierarchy(r, ALL));
 
   const breadcrumb = (r: Row) => {
-    const fl = floorById.get(r.datacenter_floor_id);
+    const fl = floorById.get(effectiveFloorId(r) ?? -1);
     const dcParent = fl ? dcById.get(fl.datacenter_id) : undefined;
     const st =
       siteById.get(r.site_id) ||

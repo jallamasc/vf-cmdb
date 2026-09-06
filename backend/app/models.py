@@ -373,6 +373,9 @@ class DatacenterFloor(Base):
         server_default="mixed",
     )
     description: Mapped[Optional[str]] = mapped_column(Text)
+    # Phase 5 Task 26 (Req 21.3) — an uploaded floor-plan image, set by
+    # POST /blueprints/datacenter-floors/{id} (backend/app/routers/special.py).
+    blueprint_url: Mapped[Optional[str]] = mapped_column(String(500))
 
 
 class Room(Base):
@@ -395,6 +398,40 @@ class Room(Base):
         server_default="mixed",
     )
     description: Mapped[Optional[str]] = mapped_column(Text)
+    # Phase 5 Task 26 (Req 21.3) — an uploaded floor-plan image, set by
+    # POST /blueprints/rooms/{id}.
+    blueprint_url: Mapped[Optional[str]] = mapped_column(String(500))
+
+
+class Section(Base):
+    """Phase 5 Task 27 — an optional subdivision within a Room (Req 22.1).
+
+    Unlike Room's ``datacenter_floor_id`` (nullable — a Room always has a
+    Floor conceptually, but the column stayed nullable for the same
+    backward-compatibility reason every other hierarchy FK on these tables
+    is nullable), ``room_id`` here is NOT NULL: a Section always belongs to
+    exactly one Room (Req 22.1's "Section... within a Room").
+    """
+
+    __tablename__ = "sections"
+    __table_args__ = (
+        _charset_check("code", "ck_sections_code_charset"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    code: Mapped[Optional[str]] = mapped_column(String(16))
+    room_id: Mapped[int] = mapped_column(ForeignKey("rooms.id"), nullable=False)
+    theme_name: Mapped[Optional[str]] = mapped_column(String(120))
+    theme_category: Mapped[Optional[str]] = mapped_column(String(40))
+    case_enforcement: Mapped[str] = mapped_column(
+        _case_enum("section_case_enforcement"), nullable=False, default="mixed",
+        server_default="mixed",
+    )
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    # Phase 5 Task 27 (Req 22.3) — an uploaded floor-plan image, set by
+    # POST /blueprints/sections/{id}.
+    blueprint_url: Mapped[Optional[str]] = mapped_column(String(500))
 
 
 class RackType(Base):
@@ -429,6 +466,11 @@ class Rack(Base):
         ForeignKey("datacenter_floors.id")
     )
     room_id: Mapped[Optional[int]] = mapped_column(ForeignKey("rooms.id"))
+    # Phase 5 Task 27 (Req 22.2) — a Rack may belong to a Floor, a Room, or a
+    # Section, but only one of the three (enforced at the app layer, see
+    # crud._validate_rack — the three columns are independently nullable at
+    # the schema level, consistent with every other hierarchy FK here).
+    section_id: Mapped[Optional[int]] = mapped_column(ForeignKey("sections.id"))
     rack_type_id: Mapped[Optional[int]] = mapped_column(ForeignKey("rack_types.id"))
     code: Mapped[Optional[str]] = mapped_column(String(16))  # abbreviation
     grid_coordinates: Mapped[Optional[str]] = mapped_column(String(20))

@@ -4,6 +4,7 @@ import { api, Row } from "../api";
 import AbbrevField, { CASE_MODES } from "../components/AbbrevField";
 import CityAirportField from "../components/CityAirportField";
 import EntityGrid from "../components/EntityGrid";
+import BlueprintField from "../components/BlueprintField";
 import { lookupLabel, roCol, textCol, airportCol } from "../lib/columns";
 import { useNamePreview } from "../lib/useNamePreview";
 
@@ -170,6 +171,50 @@ function SimpleList({ rows, render }: { rows: Row[]; render: (r: Row) => string 
   );
 }
 
+/**
+ * Phase 5 Task 26/27 (Req 21.3/22.3) — like `SimpleList`, but each row has a
+ * "Blueprint" toggle that expands an inline `BlueprintField` below it (the
+ * same click-to-expand idiom `StencilField.tsx`'s "Edit anchors" toggle
+ * uses) — there is otherwise no per-record detail view anywhere on this
+ * page to attach a "Blueprint tab" to, so a single toggle IS the tab.
+ */
+function BlueprintList({
+  rows,
+  resource,
+  render,
+}: {
+  rows: Row[];
+  resource: string;
+  render: (r: Row) => string;
+}) {
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  if (rows.length === 0)
+    return <div className="text-xs text-slate-400 italic">No records yet.</div>;
+  return (
+    <ul className="divide-y divide-slate-100 border border-slate-100 rounded">
+      {rows.map((r) => (
+        <li key={r.id} className="px-3 py-1.5 text-sm text-slate-700">
+          <div className="flex items-center justify-between gap-2">
+            <span>{render(r)}</span>
+            <button
+              type="button"
+              onClick={() => setExpandedId((id) => (id === r.id ? null : r.id))}
+              className="px-2 py-0.5 text-xs rounded border border-slate-300 bg-white hover:bg-slate-100"
+            >
+              {expandedId === r.id ? "Hide blueprint" : "Blueprint"}
+            </button>
+          </div>
+          {expandedId === r.id && (
+            <div className="mt-2 pt-2 border-t border-slate-100">
+              <BlueprintField resource={resource} row={r} />
+            </div>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 // Req 9: airportCol gives the IATA cell an in-cell search/select editor.
 const DATACENTER_COLUMNS = [
   roCol("id", "ID", 60),
@@ -188,6 +233,7 @@ export default function Hierarchy() {
   const datacenters = useList("datacenters");
   const floors = useList("datacenter-floors");
   const rooms = useList("rooms");
+  const sections = useList("sections");
   const racks = useList("racks");
   const rackTypes = useList("rack-types");
   const orgs = useList("organizations");
@@ -204,9 +250,13 @@ export default function Hierarchy() {
     <div className="max-w-4xl">
       <h1 className="text-xl font-semibold mb-1">Physical Hierarchy</h1>
       <p className="text-sm text-slate-500 mb-4">
-        Build the physical chain <b>Site → Datacenter → Floor → Room → Rack</b>{" "}
-        with inline Quick Add forms. Each abbreviation / code is validated for
-        the domain-name charset and checked for global uniqueness as you type.
+        Build the physical chain{" "}
+        <b>Site → Datacenter → Floor → Room → Section → Rack</b> with inline
+        Quick Add forms. Room and Section are optional — a rack may sit
+        directly on a Floor, in a Room, or in a Section, but only one of the
+        three. Each abbreviation / code is validated for the domain-name
+        charset and checked for global uniqueness as you type. Floor, Room
+        and Section can each carry an uploaded blueprint image.
       </p>
 
       {err && (
@@ -270,11 +320,12 @@ export default function Hierarchy() {
       {/* ---- Floor ---- */}
       <LevelCard
         title="Floors"
-        subtitle="A floor belongs to a datacenter."
+        subtitle="A floor belongs to a datacenter. Click “Blueprint” on a row to upload or view its floor plan."
         count={floors.data?.length ?? 0}
         list={
-          <SimpleList
+          <BlueprintList
             rows={floors.data ?? []}
+            resource="datacenter-floors"
             render={(r) => `${r.name}${r.code ? ` (${r.code})` : ""}`}
           />
         }
@@ -290,11 +341,12 @@ export default function Hierarchy() {
       {/* ---- Room ---- */}
       <LevelCard
         title="Rooms"
-        subtitle="A room belongs to a floor."
+        subtitle="A room belongs to a floor. Optional — a rack can sit directly on the floor instead. Click “Blueprint” on a row to upload or view its floor plan."
         count={rooms.data?.length ?? 0}
         list={
-          <SimpleList
+          <BlueprintList
             rows={rooms.data ?? []}
+            resource="rooms"
             render={(r) => `${r.name}${r.code ? ` (${r.code})` : ""}`}
           />
         }
@@ -307,10 +359,31 @@ export default function Hierarchy() {
         )}
       />
 
+      {/* ---- Section ---- */}
+      <LevelCard
+        title="Sections"
+        subtitle="A section always belongs to a room — a further subdivision when a room is large enough to need one. Click “Blueprint” on a row to upload or view its floor plan."
+        count={sections.data?.length ?? 0}
+        list={
+          <BlueprintList
+            rows={sections.data ?? []}
+            resource="sections"
+            render={(r) => `${r.name}${r.code ? ` (${r.code})` : ""}`}
+          />
+        }
+        renderForm={(onDone) => (
+          <SectionForm
+            onDone={onDone}
+            onErr={onErr}
+            rooms={rooms.data ?? []}
+          />
+        )}
+      />
+
       {/* ---- Rack ---- */}
       <LevelCard
         title="Racks"
-        subtitle="A rack sits in a room / floor and has a rack type."
+        subtitle="A rack sits directly on a floor, in a room, or in a section — pick only one — and has a rack type."
         count={racks.data?.length ?? 0}
         list={
           <SimpleList
@@ -327,6 +400,7 @@ export default function Hierarchy() {
             sites={sites.data ?? []}
             floors={floors.data ?? []}
             rooms={rooms.data ?? []}
+            sections={sections.data ?? []}
             rackTypes={rackTypes.data ?? []}
           />
         )}
@@ -348,6 +422,7 @@ const FIELD_LABELS: Record<string, string> = {
   floor_section_id: "Floor / Section",
   site_id: "Site",
   room_id: "Room",
+  section_id: "Section",
   datacenter_id: "Datacenter",
   datacenter_floor_id: "Floor",
   rack_type_id: "Rack type",
@@ -710,12 +785,70 @@ function RoomForm({
   );
 }
 
+function SectionForm({
+  onDone,
+  onErr,
+  rooms,
+}: {
+  onDone: () => void;
+  onErr: (msg: string) => void;
+  rooms: Row[];
+}) {
+  const create = useCreate("sections", onDone, onErr);
+  const [name, setName] = useState("");
+  const [code, setCode] = useState("");
+  const [trim, setTrim] = useState("manual");
+  const [caseEnf, setCaseEnf] = useState("mixed");
+  const [roomId, setRoomId] = useState("");
+  const [valid, setValid] = useState(false);
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        create.mutate({
+          name,
+          code: code || null,
+          case_enforcement: caseEnf,
+          room_id: roomId ? Number(roomId) : null,
+        });
+      }}
+      className="grid grid-cols-2 gap-3"
+    >
+      <Field label="Name">
+        <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} required />
+      </Field>
+      <Field label="Room (parent)">
+        <Select value={roomId} onChange={setRoomId} rows={rooms} placeholder="— select room —" />
+      </Field>
+      <div className="col-span-2 grid grid-cols-2 gap-3">
+        <AbbrevField
+          value={code}
+          onChange={setCode}
+          fullName={name}
+          trimMode={trim}
+          onTrimModeChange={setTrim}
+          caseEnforcement={caseEnf}
+          entityType="sections"
+          onValidityChange={setValid}
+        />
+        <Field label="Case enforcement">
+          <CaseSelect value={caseEnf} onChange={setCaseEnf} />
+        </Field>
+      </div>
+      <div className="col-span-2">
+        <SubmitRow disabled={!name || !roomId || (!!code && !valid)} pending={create.isPending} />
+      </div>
+    </form>
+  );
+}
+
 function RackForm({
   onDone,
   onErr,
   sites,
   floors,
   rooms,
+  sections,
   rackTypes,
 }: {
   onDone: () => void;
@@ -723,6 +856,7 @@ function RackForm({
   sites: Row[];
   floors: Row[];
   rooms: Row[];
+  sections: Row[];
   rackTypes: Row[];
 }) {
   const create = useCreate("racks", onDone, onErr);
@@ -731,6 +865,7 @@ function RackForm({
   const [siteId, setSiteId] = useState("");
   const [floorId, setFloorId] = useState("");
   const [roomId, setRoomId] = useState("");
+  const [sectionId, setSectionId] = useState("");
   const [typeId, setTypeId] = useState("");
   const [units, setUnits] = useState("42");
   const [gridCoords, setGridCoords] = useState("");
@@ -744,6 +879,7 @@ function RackForm({
           site_id: siteId ? Number(siteId) : null,
           datacenter_floor_id: floorId ? Number(floorId) : null,
           room_id: roomId ? Number(roomId) : null,
+          section_id: sectionId ? Number(sectionId) : null,
           rack_type_id: typeId ? Number(typeId) : null,
           grid_coordinates: gridCoords || null,
           total_units: units ? Number(units) : 42,
@@ -757,11 +893,14 @@ function RackForm({
       <Field label="Rack type">
         <Select value={typeId} onChange={setTypeId} rows={rackTypes} placeholder="— select rack type —" />
       </Field>
-      <Field label="Floor">
+      <Field label="Floor (or Room, or Section — only one)">
         <Select value={floorId} onChange={setFloorId} rows={floors} placeholder="— select floor —" />
       </Field>
-      <Field label="Room">
+      <Field label="Room (or Floor, or Section — only one)">
         <Select value={roomId} onChange={setRoomId} rows={rooms} placeholder="— select room —" />
+      </Field>
+      <Field label="Section (or Floor, or Room — only one)">
+        <Select value={sectionId} onChange={setSectionId} rows={sections} placeholder="— select section —" />
       </Field>
       <Field label="Total units (U)">
         <input type="number" className={inputCls} value={units} onChange={(e) => setUnits(e.target.value)} />

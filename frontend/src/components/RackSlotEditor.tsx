@@ -10,13 +10,33 @@ interface Props {
   onClose: () => void;
 }
 
+interface DeviceTableOption {
+  /** Distinguishes options in the <select> — see the "generic entities"
+   * comment below for why this isn't always the same as `slug`. */
+  optionKey: string;
+  /** Real resource this option reads/writes through. */
+  slug: string;
+  deviceType: string;
+  label: string;
+  /**
+   * Phase 5 Task 21 — set only for a Generic_Entity option: which
+   * Entity_Type_Def a "Create new" placement belongs to, and which type
+   * the "assign existing unplaced device" list is scoped to. Every
+   * rack_placement-capable Entity_Type_Def gets its OWN option here (all
+   * sharing `slug: "generic-entities"`), rather than one generic
+   * "Generic Entity" option, since the operator needs to place a specific
+   * *kind* of custom asset, not an untyped record.
+   */
+  entityTypeId?: number;
+}
+
 // Device resources that can be mounted in a rack, and the coarse
 // `device_type` discriminator RackDiagramSVG colours slots by.
-const DEVICE_TABLES: { slug: string; deviceType: string; label: string }[] = [
-  { slug: "network-devices", deviceType: "switch", label: "Network Device" },
-  { slug: "physical-servers", deviceType: "server", label: "Physical Server" },
-  { slug: "power-devices", deviceType: "pdu", label: "Power Device" },
-  { slug: "patch-panels", deviceType: "patchpanel", label: "Patch Panel" },
+const STATIC_DEVICE_TABLES: DeviceTableOption[] = [
+  { optionKey: "network-devices", slug: "network-devices", deviceType: "switch", label: "Network Device" },
+  { optionKey: "physical-servers", slug: "physical-servers", deviceType: "server", label: "Physical Server" },
+  { optionKey: "power-devices", slug: "power-devices", deviceType: "pdu", label: "Power Device" },
+  { optionKey: "patch-panels", slug: "patch-panels", deviceType: "patchpanel", label: "Patch Panel" },
 ];
 
 function deviceLabel(row: Row): string {
@@ -90,27 +110,53 @@ function AddEquipmentForm({
   onDone: () => void;
   qc: ReturnType<typeof useQueryClient>;
 }) {
-  const [table, setTable] = useState(DEVICE_TABLES[0].slug);
+  // Phase 5 Task 21 — every rack_placement-capable Entity_Type_Def becomes
+  // its own placeable "device type" alongside the hardcoded ones.
+  const { data: entityTypes } = useQuery({
+    queryKey: ["entity-type-defs"],
+    queryFn: () => api.list("entity-type-defs"),
+  });
+  const deviceTables = useMemo<DeviceTableOption[]>(() => {
+    const generic = (entityTypes ?? [])
+      .filter((et) => Array.isArray(et.capabilities) && et.capabilities.includes("rack_placement"))
+      .map((et) => ({
+        optionKey: `generic-entities:${et.id}`,
+        slug: "generic-entities",
+        deviceType: "generic",
+        label: et.label,
+        entityTypeId: et.id,
+      }));
+    return [...STATIC_DEVICE_TABLES, ...generic];
+  }, [entityTypes]);
+
+  const [optionKey, setOptionKey] = useState(STATIC_DEVICE_TABLES[0].optionKey);
   const [mode, setMode] = useState<"new" | "existing">("new");
   const [existingId, setExistingId] = useState<number | "">("");
   const [error, setError] = useState<string | null>(null);
 
-  const deviceType = DEVICE_TABLES.find((d) => d.slug === table)?.deviceType ?? "empty";
+  const selected = deviceTables.find((d) => d.optionKey === optionKey) ?? deviceTables[0];
+  const table = selected.slug;
+  const deviceType = selected.deviceType;
+  const entityTypeId = selected.entityTypeId;
 
   const { data: rows } = useQuery({
     queryKey: [table],
     queryFn: () => api.list(table),
   });
   const unplaced = useMemo(
-    () => (rows ?? []).filter((r) => r.rack_id == null),
-    [rows]
+    () =>
+      (rows ?? []).filter(
+        (r) => r.rack_id == null && (entityTypeId == null || r.entity_type_id === entityTypeId)
+      ),
+    [rows, entityTypeId]
   );
 
   const place = useMutation({
     mutationFn: async () => {
       let deviceId: number;
       if (mode === "new") {
-        const created = await api.create(table, {});
+        const payload = entityTypeId != null ? { entity_type_id: entityTypeId, attributes: {} } : {};
+        const created = await api.create(table, payload);
         deviceId = created.id;
       } else {
         if (existingId === "") throw new Error("Pick a device to place.");
@@ -140,15 +186,15 @@ function AddEquipmentForm({
       <label className="block text-xs text-slate-500 uppercase tracking-wide">
         Device type
         <select
-          value={table}
+          value={optionKey}
           onChange={(e) => {
-            setTable(e.target.value);
+            setOptionKey(e.target.value);
             setExistingId("");
           }}
           className="mt-1 w-full border border-slate-300 rounded px-2 py-1.5 text-sm"
         >
-          {DEVICE_TABLES.map((d) => (
-            <option key={d.slug} value={d.slug}>
+          {deviceTables.map((d) => (
+            <option key={d.optionKey} value={d.optionKey}>
               {d.label}
             </option>
           ))}
@@ -190,8 +236,8 @@ function AddEquipmentForm({
       )}
       {mode === "existing" && unplaced.length === 0 && (
         <p className="text-xs text-slate-400">
-          No unplaced {DEVICE_TABLES.find((d) => d.slug === table)?.label.toLowerCase()}s
-          — every one is already mounted somewhere.
+          No unplaced {selected.label.toLowerCase()}s — every one is already
+          mounted somewhere.
         </p>
       )}
 

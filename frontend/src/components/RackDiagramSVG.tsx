@@ -15,6 +15,9 @@ export const TYPE_HEX: Record<string, { fill: string; stroke: string }> = {
   ups: { fill: "#fed7aa", stroke: "#fb923c" }, // orange-200 / orange-400
   patchpanel: { fill: "#ddd6fe", stroke: "#a78bfa" }, // violet-200 / violet-400
   storage: { fill: "#a5f3fc", stroke: "#22d3ee" }, // cyan-200 / cyan-400
+  // Phase 5 Task 21 — a rack-placed Generic_Entity (admin-defined asset
+  // type), regardless of which specific Entity_Type_Def it is.
+  generic: { fill: "#e9d5ff", stroke: "#c084fc" }, // purple-200 / purple-400
   empty: { fill: "#f8fafc", stroke: "#e2e8f0" }, // slate-50 / slate-200
 };
 

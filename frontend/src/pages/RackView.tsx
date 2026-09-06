@@ -16,6 +16,10 @@ const PORT_OWNER_RESOURCES = [
   "network-devices",
   "physical-servers",
   "workstations",
+  // Phase 5 Task 21 — a Generic_Entity whose Entity_Type_Def enables
+  // rack_placement/network_ports/cabling can own ports and be mounted in a
+  // rack exactly like a hardcoded device type (Req 17.1/17.2).
+  "generic-entities",
 ] as const;
 
 // Tailwind classes for the legend swatches (kept in sync with TYPE_HEX).
@@ -28,6 +32,7 @@ const TYPE_COLORS: Record<string, string> = {
   ups: "bg-orange-200 border-orange-400",
   patchpanel: "bg-violet-200 border-violet-400",
   storage: "bg-cyan-200 border-cyan-400",
+  generic: "bg-purple-200 border-purple-400",
 };
 
 type Filter = BreadcrumbFilter;
@@ -84,6 +89,11 @@ export default function RackView() {
   const { data: workstations } = useQuery({
     queryKey: ["workstations"],
     queryFn: () => api.list("workstations"),
+  });
+  // Phase 5 Task 21 — Generic_Entity owners (rack_placement/network_ports).
+  const { data: genericEntities } = useQuery({
+    queryKey: ["generic-entities"],
+    queryFn: () => api.list("generic-entities"),
   });
   // Req 14 — resolving a per-unit stencil needs the owning power device (for
   // its device_type_id) and the three device-type lookups' stencil columns.
@@ -149,9 +159,10 @@ export default function RackView() {
       "physical-servers": new Map((physicalServers ?? []).map((d) => [d.id, d])),
       workstations: new Map((workstations ?? []).map((d) => [d.id, d])),
       "power-devices": new Map((powerDevices ?? []).map((d) => [d.id, d])),
+      "generic-entities": new Map((genericEntities ?? []).map((d) => [d.id, d])),
     };
     return m;
-  }, [networkDevices, physicalServers, workstations, powerDevices]);
+  }, [networkDevices, physicalServers, workstations, powerDevices, genericEntities]);
 
   // Phase 4 Req 20 — display name + rack id for a resolved far end, so the
   // ConnectionInfoPanel can show who it's connected to and jump there.

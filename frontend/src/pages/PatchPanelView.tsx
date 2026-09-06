@@ -68,6 +68,11 @@ export default function PatchPanelView() {
     queryKey: ["power-devices"],
     queryFn: () => api.list("power-devices"),
   });
+  // Phase 5 Task 21 — resolve a cabled far-end that's a Generic_Entity.
+  const { data: genericEntities } = useQuery({
+    queryKey: ["generic-entities"],
+    queryFn: () => api.list("generic-entities"),
+  });
 
   const [site, setSite] = useState<Filter>(ALL);
   const [dc, setDc] = useState<Filter>(ALL);
@@ -101,9 +106,10 @@ export default function PatchPanelView() {
       workstations: new Map((workstations ?? []).map((d) => [d.id, d])),
       "power-devices": new Map((powerDevices ?? []).map((d) => [d.id, d])),
       "patch-panels": new Map((panels ?? []).map((p) => [p.id, p])),
+      "generic-entities": new Map((genericEntities ?? []).map((d) => [d.id, d])),
     };
     return m;
-  }, [networkDevices, physicalServers, workstations, powerDevices, panels]);
+  }, [networkDevices, physicalServers, workstations, powerDevices, panels, genericEntities]);
 
   const describeOwner = (ref: { type: string | null | undefined; id: number | null | undefined }) => {
     if (!ref.type || ref.id == null) return { name: "Unknown device", rackId: null as number | null };

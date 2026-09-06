@@ -127,12 +127,12 @@ capability patterns rather than reinventing them.
     - _Requirements: 16.1, 16.2_
   - [x]* 20.2 Vitest against a synthetic type definition (columns, edit, save)
 
-- [ ] 21. Capability integration — rack/power/network ports + cabling
-  - [ ] 21.1 Extend `ports.py`'s polymorphic resolution with a
+- [x] 21. Capability integration — rack/power/network ports + cabling
+  - [x] 21.1 Extend `ports.py`'s polymorphic resolution with a
         `generic_entities` branch; wire `RackSlotEditor`/`ConnectionDot`
         candidate logic
     - _Requirements: 17.1, 17.2, 17.3_
-  - [ ]* 21.2 pytest: a generic entity with rack_placement+network_ports
+  - [x]* 21.2 pytest: a generic entity with rack_placement+network_ports
         capabilities places and cables exactly like a hardcoded device type
 
 - [ ] 22. Capability integration — photo + stencil diagram

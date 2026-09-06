@@ -21,10 +21,22 @@ from .registry import ENTITY_REGISTRY
 # Device classes that can be mounted in a rack and can own ports for cabling.
 # Maps the kebab-case slug (as stored on owner_device_type / port_*_type) to the
 # ORM model. PowerOutlet is handled separately (it is a port, not a device).
+#
+# Phase 5 Task 21 — "generic-entities" is listed explicitly here even though
+# every function below already falls back to ENTITY_REGISTRY (which also
+# has it), so a GenericEntity resolves through the exact same code paths as
+# a hardcoded device type with zero further changes. Listing it here too
+# documents the intent: a Generic_Entity whose Entity_Type_Def enables
+# rack_placement/power_ports/network_ports/cabling participates in rack
+# placement and cabling exactly like NetworkDevice/PhysicalServer/
+# Workstation (Req 17.1/17.2/17.3). Nothing here enforces that the
+# capability is actually enabled — same as every hardcoded device type,
+# there is no existing capability/type gate on rack or cable operations.
 RACKABLE_SLUGS = {
     "network-devices": models.NetworkDevice,
     "physical-servers": models.PhysicalServer,
     "workstations": models.Workstation,
+    "generic-entities": models.GenericEntity,
 }
 
 

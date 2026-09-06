@@ -1,125 +1,124 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, Row } from "../api";
-import { lookupLabel } from "../lib/columns";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import type { ColDef, ICellRendererParams } from "ag-grid-community";
+import EntityGrid from "../components/EntityGrid";
+import { api } from "../api";
+import { useLookups, textCol, roCol, numCol, fkCol, selectCol } from "../lib/columns";
 
-/** Human label for a site id; unassigned subnets are called out explicitly. */
-function siteLabel(sites: Row[], id: number | null | undefined): string {
-  if (id == null) return "unassigned";
-  const s = sites.find((x) => x.id === id);
-  return s ? lookupLabel(s) : `Site #${id}`;
-}
+/**
+ * Phase 5 Task 4 — Subnets used to be a hand-written, entirely read-only pair
+ * of tables (no add/edit/delete). It now uses the same `EntityGrid` CRUD
+ * pattern as every other section; the backend already supported full CRUD
+ * for `subnets-ipv4`/`subnets-ipv6`, only the frontend was a dead end. The
+ * two custom, per-row behaviors that don't fit a plain column (live
+ * utilization and "next free IP") survive as AG-Grid cell renderers instead
+ * of being dropped.
+ */
 
 function UtilBar({ pct }: { pct: number }) {
   const color =
     pct >= 90 ? "bg-red-500" : pct >= 70 ? "bg-amber-500" : "bg-emerald-500";
   return (
-    <div className="w-32 bg-slate-200 rounded h-3 overflow-hidden inline-block align-middle">
+    <div className="w-24 bg-slate-200 rounded h-3 overflow-hidden inline-block align-middle">
       <div className={`h-3 ${color}`} style={{ width: `${Math.min(pct, 100)}%` }} />
     </div>
   );
 }
 
-function Ipv4Row({
-  subnet,
-  vlanLabel,
-  site,
-}: {
-  subnet: Row;
-  vlanLabel: string;
-  site: string;
-}) {
-  const [nextIp, setNextIp] = useState<string | null>(null);
-  const hasCidr = Boolean(subnet.network_cidr);
+function UtilizationCell(p: ICellRendererParams) {
+  const subnetId: number | undefined = p.data?.id;
+  const hasCidr = Boolean(p.data?.network_cidr);
   const { data: util } = useQuery({
-    queryKey: ["utilization", subnet.id],
-    queryFn: () => api.utilization(subnet.id),
-    enabled: hasCidr,
+    queryKey: ["utilization", subnetId],
+    queryFn: () => api.utilization(subnetId as number),
+    enabled: hasCidr && subnetId != null,
     retry: false,
   });
+  if (!hasCidr) return <span className="text-slate-400 text-xs">no CIDR</span>;
+  if (!util) return <span className="text-slate-400 text-xs">…</span>;
+  return (
+    <span className="flex items-center gap-2">
+      <UtilBar pct={util.utilization_pct} />
+      <span className="text-xs text-slate-600">
+        {util.used}/{util.total_usable} ({util.utilization_pct}%)
+      </span>
+    </span>
+  );
+}
+
+function NextFreeIpCell(p: ICellRendererParams) {
+  const subnetId: number | undefined = p.data?.id;
+  const hasCidr = Boolean(p.data?.network_cidr);
+  const [nextIp, setNextIp] = useState<string | null>(null);
   const nextMut = useMutation({
-    mutationFn: () => api.nextIp(subnet.id),
+    mutationFn: () => api.nextIp(subnetId as number),
     onSuccess: (d: any) => setNextIp(d.next_ip ?? "none free"),
     onError: () => setNextIp("no free IP"),
   });
   return (
-    <tr className="border-t border-slate-100">
-      <td className="px-3 py-2 text-sm text-slate-500">{subnet.description ?? "—"}</td>
-      <td className="px-3 py-2 font-mono text-sm">{subnet.network_cidr}</td>
-      <td className="px-3 py-2 font-mono text-xs">{subnet.gateway ?? "—"}</td>
-      <td className="px-3 py-2">{vlanLabel}</td>
-      <td
-        className={`px-3 py-2 text-xs ${
-          subnet.site_id == null ? "text-amber-600 italic" : "text-slate-600"
-        }`}
+    <span>
+      <button
+        onClick={() => nextMut.mutate()}
+        disabled={!hasCidr || subnetId == null}
+        className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-40"
       >
-        {site}
-      </td>
-      {/* BUG-D: range / expansion / reservation fields from the model */}
-      <td className="px-3 py-2 font-mono text-xs">{subnet.range_from ?? "—"}</td>
-      <td className="px-3 py-2 font-mono text-xs">{subnet.range_to ?? "—"}</td>
-      <td className="px-3 py-2 font-mono text-xs">
-        {subnet.expansion_ceiling ?? "—"}
-      </td>
-      <td className="px-3 py-2 text-xs text-slate-600">
-        {subnet.reserved_count ?? 0}
-        <span className="text-slate-400">
-          {" "}
-          · {subnet.reservation_anchor ?? "from_end"}
-        </span>
-      </td>
-      <td className="px-3 py-2 whitespace-nowrap">
-        {!hasCidr ? (
-          <span className="text-slate-400 text-xs">no CIDR</span>
-        ) : util ? (
-          <span className="flex items-center gap-2">
-            <UtilBar pct={util.utilization_pct} />
-            <span className="text-xs text-slate-600">
-              {util.used}/{util.total_usable} ({util.utilization_pct}%)
-            </span>
-          </span>
-        ) : (
-          <span className="text-slate-400 text-xs">…</span>
-        )}
-      </td>
-      <td className="px-3 py-2">
-        <button
-          onClick={() => nextMut.mutate()}
-          disabled={!hasCidr}
-          className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-40"
-        >
-          Next free IP
-        </button>
-        {nextIp && (
-          <span className="ml-2 font-mono text-sm text-emerald-700">{nextIp}</span>
-        )}
-      </td>
-    </tr>
+        Next free IP
+      </button>
+      {nextIp && <span className="ml-2 font-mono text-sm text-emerald-700">{nextIp}</span>}
+    </span>
   );
 }
 
+const ANCHOR_VALUES = ["from_end", "from_start"];
+
+const REQUIRED_FIELDS = [
+  { field: "reserved_count", label: "Reserved Count", hint: "Defaults to 0 — cannot be cleared." },
+  { field: "reservation_anchor", label: "Anchor", hint: "Pick from_end or from_start." },
+];
+
+function useSubnetColumns(kind: "v4" | "v6"): ColDef[] {
+  const { map, isLoading } = useLookups(["sites", "vlans"]);
+  if (isLoading) return [];
+  const shared: ColDef[] = [
+    roCol("id", "ID", 70),
+    textCol("description", "Description", 220),
+    textCol("network_cidr", "Network CIDR", 160),
+  ];
+  const gateway: ColDef[] = kind === "v4" ? [textCol("gateway", "Gateway", 140)] : [];
+  const middle: ColDef[] = [
+    fkCol("vlan_id", "VLAN", map.vlans),
+    fkCol("site_id", "Site", map.sites),
+    textCol("range_from", "Range From", 140),
+    textCol("range_to", "Range To", 140),
+  ];
+  const expansion: ColDef[] =
+    kind === "v4" ? [textCol("expansion_ceiling", "Expansion Ceiling", 150)] : [];
+  const reservation: ColDef[] = [
+    numCol("reserved_count", "Reserved Count"),
+    selectCol("reservation_anchor", "Anchor", ANCHOR_VALUES),
+  ];
+  const actions: ColDef[] =
+    kind === "v4"
+      ? [
+          { field: "__utilization", headerName: "Utilisation", editable: false, width: 190, cellRenderer: UtilizationCell },
+          { field: "__next_ip", headerName: "Next Free IP", editable: false, width: 190, cellRenderer: NextFreeIpCell },
+        ]
+      : [];
+  return [...shared, ...gateway, ...middle, ...expansion, ...reservation, ...actions];
+}
+
 export default function Subnets() {
-  const qc = useQueryClient();
-  const { data: v4 } = useQuery({ queryKey: ["subnets-ipv4"], queryFn: () => api.list("subnets-ipv4") });
-  const { data: v6 } = useQuery({ queryKey: ["subnets-ipv6"], queryFn: () => api.list("subnets-ipv6") });
-  const { data: vlans } = useQuery({ queryKey: ["vlans"], queryFn: () => api.list("vlans") });
-  const { data: sites } = useQuery({ queryKey: ["sites"], queryFn: () => api.list("sites") });
   const [tab, setTab] = useState<"v4" | "v6">("v4");
-  const siteList = sites ?? [];
-
-  const vlanLabel = (id: number | null) => {
-    const v = (vlans ?? []).find((x) => x.id === id);
-    return v ? `${v.vlan_id ?? ""} ${v.name ?? ""}`.trim() : "—";
-  };
-
-  void qc;
+  const v4Columns = useSubnetColumns("v4");
+  const v6Columns = useSubnetColumns("v6");
 
   return (
     <div>
       <h1 className="text-xl font-semibold mb-1">Subnets (IPAM)</h1>
       <p className="text-sm text-slate-500 mb-4">
-        Live utilisation is calculated from IP assignments and role slots. Use
-        “Next free IP” to grab the lowest unused address.
+        Add, edit, and delete subnets directly in the grid. Live utilisation is
+        calculated from IP assignments and role slots. Use “Next free IP” to
+        grab the lowest unused address.
       </p>
 
       <div className="flex gap-2 mb-3">
@@ -127,88 +126,37 @@ export default function Subnets() {
           onClick={() => setTab("v4")}
           className={`px-3 py-1.5 rounded text-sm ${tab === "v4" ? "bg-blue-600 text-white" : "bg-slate-200"}`}
         >
-          IPv4 ({v4?.length ?? 0})
+          IPv4
         </button>
         <button
           onClick={() => setTab("v6")}
           className={`px-3 py-1.5 rounded text-sm ${tab === "v6" ? "bg-blue-600 text-white" : "bg-slate-200"}`}
         >
-          IPv6 ({v6?.length ?? 0})
+          IPv6
         </button>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-x-auto">
-        {tab === "v4" ? (
-          <table className="w-full text-sm">
-            <thead className="bg-slate-100 text-slate-600">
-              <tr>
-                <th className="text-left px-3 py-2">Description</th>
-                <th className="text-left px-3 py-2">Network</th>
-                <th className="text-left px-3 py-2">Gateway</th>
-                <th className="text-left px-3 py-2">VLAN</th>
-                <th className="text-left px-3 py-2">Site</th>
-                <th className="text-left px-3 py-2">Range from</th>
-                <th className="text-left px-3 py-2">Range to</th>
-                <th className="text-left px-3 py-2">Expansion ceiling</th>
-                <th className="text-left px-3 py-2">Reserved · anchor</th>
-                <th className="text-left px-3 py-2">Utilisation</th>
-                <th className="text-left px-3 py-2">IPAM</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(v4 ?? []).map((s) => (
-                <Ipv4Row
-                  key={s.id}
-                  subnet={s}
-                  vlanLabel={vlanLabel(s.vlan_id)}
-                  site={siteLabel(siteList, s.site_id)}
-                />
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-slate-100 text-slate-600">
-              <tr>
-                <th className="text-left px-3 py-2">Description</th>
-                <th className="text-left px-3 py-2">Network</th>
-                <th className="text-left px-3 py-2">VLAN</th>
-                <th className="text-left px-3 py-2">Site</th>
-                <th className="text-left px-3 py-2">Range from</th>
-                <th className="text-left px-3 py-2">Range to</th>
-                <th className="text-left px-3 py-2">Reserved · anchor</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(v6 ?? []).map((s) => (
-                <tr key={s.id} className="border-t border-slate-100">
-                  <td className="px-3 py-2 text-slate-500">{s.description ?? "—"}</td>
-                  <td className="px-3 py-2 font-mono text-xs">{s.network_cidr}</td>
-                  <td className="px-3 py-2">{vlanLabel(s.vlan_id)}</td>
-                  <td
-                    className={`px-3 py-2 text-xs ${
-                      s.site_id == null
-                        ? "text-amber-600 italic"
-                        : "text-slate-600"
-                    }`}
-                  >
-                    {siteLabel(siteList, s.site_id)}
-                  </td>
-                  <td className="px-3 py-2 font-mono text-xs">{s.range_from ?? "—"}</td>
-                  <td className="px-3 py-2 font-mono text-xs">{s.range_to ?? "—"}</td>
-                  <td className="px-3 py-2 text-xs text-slate-600">
-                    {s.reserved_count ?? 0}
-                    <span className="text-slate-400">
-                      {" "}
-                      · {s.reservation_anchor ?? "from_end"}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      {tab === "v4" ? (
+        v4Columns.length > 0 && (
+          <EntityGrid
+            resource="subnets-ipv4"
+            title="IPv4 Subnets"
+            columns={v4Columns}
+            newRowDefaults={{ reserved_count: 0, reservation_anchor: "from_end" }}
+            requiredFields={REQUIRED_FIELDS}
+          />
+        )
+      ) : (
+        v6Columns.length > 0 && (
+          <EntityGrid
+            resource="subnets-ipv6"
+            title="IPv6 Subnets"
+            columns={v6Columns}
+            newRowDefaults={{ reserved_count: 0, reservation_anchor: "from_end" }}
+            requiredFields={REQUIRED_FIELDS}
+          />
+        )
+      )}
     </div>
   );
 }

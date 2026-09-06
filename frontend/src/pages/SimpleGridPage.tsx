@@ -25,14 +25,15 @@ const CONFIGS: Record<Kind, Config> = {
   "patch-panels": {
     resource: "patch-panels",
     title: "Patch Panels",
-    description: "Structured cabling patch panels mounted in racks.",
+    description:
+      "Structured cabling patch panels mounted in racks. Panel ID is auto-generated from the parent rack and a per-rack sequence.",
     lookups: ["racks"],
     build: (l) => [
       roCol("id", "ID", 70),
       fkCol("rack_id", "Rack", l.racks),
       numCol("rack_unit", "Rack U"),
       numCol("port_count", "Ports"),
-      textCol("panel_id_label", "Panel ID"),
+      roCol("panel_id_label", "Panel ID", 160),
       selectCol("side", "Side", ["front", "rear", "both"]),
       textCol("notes", "Notes"),
     ],
@@ -41,7 +42,8 @@ const CONFIGS: Record<Kind, Config> = {
   power: {
     resource: "power-devices",
     title: "Power Devices",
-    description: "UPS units and PDUs supplying rack power.",
+    description:
+      "UPS units and PDUs supplying rack power. VF Long Name is auto-generated from the parent site/rack, device type, and a sequence number.",
     lookups: ["sites", "racks"],
     build: (l) => [
       roCol("id", "ID", 70),

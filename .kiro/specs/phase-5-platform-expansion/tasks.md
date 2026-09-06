@@ -159,19 +159,19 @@ capability patterns rather than reinventing them.
 
 ### Sub-phase D — Depth Features
 
-- [ ] 26. Room hierarchy level + blueprint upload
-  - [ ] 26.1 `Room` model/migration/registry entry (nullable `room_id` on
+- [x] 26. Room hierarchy level + blueprint upload
+  - [x] 26.1 `Room` model/migration/registry entry (nullable `room_id` on
         Rack); `blueprint_url` on Floor + Room; "Blueprint" tab rendering the
         uploaded image
     - _Requirements: 21.1, 21.2, 21.3_
-  - [ ]* 26.2 pytest for Room CRUD + nullable placement; Vitest for blueprint
+  - [x]* 26.2 pytest for Room CRUD + nullable placement; Vitest for blueprint
         upload/display
 
-- [ ] 27. Section hierarchy level + blueprint upload
-  - [ ] 27.1 `Section` model/migration/registry entry (`room_id` required on
+- [x] 27. Section hierarchy level + blueprint upload
+  - [x] 27.1 `Section` model/migration/registry entry (`room_id` required on
         Section; nullable `section_id` on Rack); `blueprint_url` on Section
     - _Requirements: 22.1, 22.2, 22.3_
-  - [ ]* 27.2 pytest for Section CRUD + exactly-one-parent enforcement
+  - [x]* 27.2 pytest for Section CRUD + exactly-one-parent enforcement
 
 - [ ] 28. Code Mode toggle for naming-engine fields
   - [ ] 28.1 `naming_mode` column (auto/manual, default auto) on every

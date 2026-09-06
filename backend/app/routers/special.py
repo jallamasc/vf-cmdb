@@ -1079,6 +1079,67 @@ async def upload_photo(
 
 
 # ---------------------------------------------------------------------------
+# Phase 5 Task 26/27 — per-record blueprint upload (Requirements 21.3, 22.3)
+#
+# Mirrors the photo routes exactly (same photos.py storage/validation
+# helpers, generalized in Task 26 to accept a `base_dir`), but checks
+# `blueprint_url` instead of `photo_url` and stores under a separate
+# directory (photos.BLUEPRINT_DIR) — floor plans are a distinct asset class
+# from a device photo, not a variant of it.
+# ---------------------------------------------------------------------------
+def _blueprint_model(resource: str):
+    model = ENTITY_REGISTRY.get(resource)
+    if model is None:
+        raise HTTPException(status_code=404, detail=f"Unknown resource '{resource}'.")
+    if not hasattr(model, "blueprint_url"):
+        raise HTTPException(
+            status_code=400, detail=f"'{resource}' records do not support a blueprint."
+        )
+    return model
+
+
+@router.get("/blueprints/{slug}")
+async def get_blueprint(slug: str) -> Response:
+    """Serve a previously uploaded blueprint. 404 when none has been uploaded."""
+    try:
+        clean_slug = photos.validate_slug(slug)
+    except photos.InvalidSlug as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    path = photos.existing_path(clean_slug, base_dir=photos.BLUEPRINT_DIR)
+    if path is None:
+        raise HTTPException(status_code=404, detail="No blueprint uploaded for this record.")
+    media_type = _PHOTO_MEDIA_TYPES.get(path.suffix.lstrip("."), "application/octet-stream")
+    return Response(content=path.read_bytes(), media_type=media_type, headers=_PHOTO_HEADERS)
+
+
+@router.post("/blueprints/{resource}/{item_id}")
+async def upload_blueprint(
+    resource: str,
+    item_id: int,
+    file: UploadFile = File(...),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Upload a blueprint for one record and set its `blueprint_url` to the
+    URL that serves it back."""
+    model = _blueprint_model(resource)
+    row = await session.get(model, item_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"'{resource}' #{item_id} not found.")
+
+    slug = f"{resource}-{item_id}"
+    data = await file.read()
+    try:
+        photos.store_bytes(slug, data, file.content_type, base_dir=photos.BLUEPRINT_DIR)
+    except photos.InvalidPhoto as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    blueprint_url = f"{settings.api_prefix}/blueprints/{slug}"
+    row.blueprint_url = blueprint_url
+    await session.commit()
+    return {"resource": resource, "id": item_id, "blueprint_url": blueprint_url}
+
+
+# ---------------------------------------------------------------------------
 # Phase 4 Sub-phase E — Stencil Library Import (Requirement 22)
 # ---------------------------------------------------------------------------
 _STENCIL_FETCH_TIMEOUT = 30.0

@@ -53,3 +53,9 @@ backend/static/photos/*.jpeg
 backend/static/photos/*.png
 backend/static/photos/*.gif
 backend/static/photos/*.webp
+# Phase 5 Task 26/27: uploaded blueprint images (same rationale)
+backend/static/blueprints/*.jpg
+backend/static/blueprints/*.jpeg
+backend/static/blueprints/*.png
+backend/static/blueprints/*.gif
+backend/static/blueprints/*.webp

@@ -37,6 +37,8 @@ ENTITY_REGISTRY = {
     "datacenters": models.Datacenter,
     "datacenter-floors": models.DatacenterFloor,
     "rooms": models.Room,
+    # Phase 5 Task 27 — an optional subdivision within a Room.
+    "sections": models.Section,
     "racks": models.Rack,
     "rack-units": models.RackUnit,
     "power-devices": models.PowerDevice,

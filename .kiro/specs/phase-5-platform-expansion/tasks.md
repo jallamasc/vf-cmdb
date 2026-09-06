@@ -181,11 +181,11 @@ capability patterns rather than reinventing them.
   - [x]* 28.2 pytest: manual mode preserves a hand-typed value across an
         unrelated update
 
-- [ ] 29. Fold stencils into device lists
-  - [ ] 29.1 Inline expandable stencil row-detail (reusing `StencilField.tsx`)
+- [x] 29. Fold stencils into device lists
+  - [x] 29.1 Inline expandable stencil row-detail (reusing `StencilField.tsx`)
         in each device type's own grid; remove the standalone stencil page
     - _Requirements: 24.1, 24.2_
-  - [ ]* 29.2 Vitest for the expand-row stencil editing flow
+  - [x]* 29.2 Vitest for the expand-row stencil editing flow
 
 - [ ] 30. Hard city/airport validation
   - [ ] 30.1 Extend `CityAirportField.tsx`/`AirportCellEditor.tsx`: require

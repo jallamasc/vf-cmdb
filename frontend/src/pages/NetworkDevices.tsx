@@ -8,6 +8,8 @@ import DevicePhotoPanel from "../components/DevicePhotoPanel";
 import { api, Row } from "../api";
 import {
   useLookups,
+  useFieldVisibility,
+  filterHiddenColumns,
   textCol,
   roCol,
   numCol,
@@ -53,57 +55,64 @@ export default function NetworkDevices() {
       api.create("network-devices", payload),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["network-devices"] }),
   });
+  // Phase 5 Task 24 (Req 20.2) — respect any administrator-hidden columns
+  // for this grid (managed in Reference Data's Field Visibility panel).
+  const hiddenFields = useFieldVisibility("network-devices");
   const columns = useMemo(
-    () => [
-      roCol("id", "ID", 70),
-      // Phase 5 Req 6.2/7.1: device-type icon, pulsing when recently active
-      // (last_fact_sync_at within 24h).
-      deviceTypeIconCol(
-        "device_type_id",
-        "",
-        map["network-device-types"],
-        "last_fact_sync_at"
+    () =>
+      filterHiddenColumns(
+        [
+          roCol("id", "ID", 70),
+          // Phase 5 Req 6.2/7.1: device-type icon, pulsing when recently
+          // active (last_fact_sync_at within 24h).
+          deviceTypeIconCol(
+            "device_type_id",
+            "",
+            map["network-device-types"],
+            "last_fact_sync_at"
+          ),
+          // FEAT-7: the long name opens the device detail dashboard.
+          deviceLinkCol("vf_long_name", "VF Long Name", "network_devices", 240),
+          textCol("vf_friendly_name", "Friendly Name", 150),
+          // Req 10.2/10.4 — "Simple Name" is still a free-text cell (manual
+          // entry always works) plus a themed-picker button next to it.
+          textCol("alternative_name", "Simple Name", 140),
+          {
+            headerName: "Theme",
+            width: 90,
+            editable: false,
+            cellRenderer: (p: ICellRendererParams) => (
+              <button
+                type="button"
+                onClick={() => setPickerRow(p.data)}
+                title="Pick a networking-themed simple name"
+                className="px-2 py-0.5 text-xs rounded border border-slate-300 bg-white hover:bg-slate-100"
+              >
+                🎭 Pick
+              </button>
+            ),
+          },
+          fkCol("site_id", "Site", map["sites"]),
+          fkCol("rack_id", "Rack", map["racks"]),
+          numCol("rack_unit", "U"),
+          fkCol("device_type_id", "Type", map["network-device-types"]),
+          fkCol("subtype_id", "Subtype", map["network-subtypes"]),
+          fkCol("brand_id", "Brand", map["brands"]),
+          numCol("consecutive", "Seq"),
+          textCol("model", "Model"),
+          textCol("serial_number", "Serial"),
+          textCol("os_version", "OS Version"),
+          ipCol("management_ipv4", "Mgmt IPv4", "management"),
+          ipCol("management_ipv6", "Mgmt IPv6", "management"),
+          textCol("management_fqdn", "Mgmt FQDN", 200),
+          textCol("default_ip", "Default IP"),
+          textCol("bitwarden_collection_ref", "Bitwarden Ref"),
+          textCol("description", "Description", 200),
+          textCol("notes", "Notes"),
+        ],
+        hiddenFields
       ),
-      // FEAT-7: the long name opens the device detail dashboard.
-      deviceLinkCol("vf_long_name", "VF Long Name", "network_devices", 240),
-      textCol("vf_friendly_name", "Friendly Name", 150),
-      // Req 10.2/10.4 — "Simple Name" is still a free-text cell (manual entry
-      // always works) plus a themed-picker button next to it.
-      textCol("alternative_name", "Simple Name", 140),
-      {
-        headerName: "Theme",
-        width: 90,
-        editable: false,
-        cellRenderer: (p: ICellRendererParams) => (
-          <button
-            type="button"
-            onClick={() => setPickerRow(p.data)}
-            title="Pick a networking-themed simple name"
-            className="px-2 py-0.5 text-xs rounded border border-slate-300 bg-white hover:bg-slate-100"
-          >
-            🎭 Pick
-          </button>
-        ),
-      },
-      fkCol("site_id", "Site", map["sites"]),
-      fkCol("rack_id", "Rack", map["racks"]),
-      numCol("rack_unit", "U"),
-      fkCol("device_type_id", "Type", map["network-device-types"]),
-      fkCol("subtype_id", "Subtype", map["network-subtypes"]),
-      fkCol("brand_id", "Brand", map["brands"]),
-      numCol("consecutive", "Seq"),
-      textCol("model", "Model"),
-      textCol("serial_number", "Serial"),
-      textCol("os_version", "OS Version"),
-      ipCol("management_ipv4", "Mgmt IPv4", "management"),
-      ipCol("management_ipv6", "Mgmt IPv6", "management"),
-      textCol("management_fqdn", "Mgmt FQDN", 200),
-      textCol("default_ip", "Default IP"),
-      textCol("bitwarden_collection_ref", "Bitwarden Ref"),
-      textCol("description", "Description", 200),
-      textCol("notes", "Notes"),
-    ],
-    [map]
+    [map, hiddenFields]
   );
   if (isLoading) return <div className="text-slate-500">Loading…</div>;
   return (

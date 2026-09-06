@@ -1,4 +1,4 @@
-import { useQueries } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import type { ColDef, ICellRendererParams } from "ag-grid-community";
 import { api, Row } from "../api";
@@ -7,6 +7,37 @@ import FuzzySelectEditor from "../components/FuzzySelectEditor";
 import AirportCellEditor from "../components/AirportCellEditor";
 import { resolveDeviceTypeIcon, isRecentlyActive } from "./deviceIcons";
 import CountryFlag from "./countryFlags";
+
+/**
+ * Phase 5 Task 24 (Req 20.1/20.2) — the set of field/column keys an
+ * administrator has explicitly hidden (`visible: false`) for one entity
+ * slug, via the Field Visibility panel in Reference Data
+ * (`field-visibility-overrides`). Absence of an override row means
+ * visible, so only `visible === false` rows contribute here.
+ */
+export function useFieldVisibility(resource: string): Set<string> {
+  const { data } = useQuery({
+    queryKey: ["field-visibility-overrides"],
+    queryFn: () => api.list("field-visibility-overrides"),
+  });
+  const hidden = new Set<string>(
+    ((data as Row[]) ?? [])
+      .filter((o) => o.entity_slug === resource && o.visible === false)
+      .map((o) => String(o.field_key))
+  );
+  return hidden;
+}
+
+/**
+ * Phase 5 Task 24 — drop any column whose `field` is in `hidden`. Columns
+ * with no `field` (e.g. a cellRenderer-only action column) are never
+ * affected, since an override names a field/column key, not an arbitrary
+ * colId.
+ */
+export function filterHiddenColumns(columns: ColDef[], hidden: Set<string>): ColDef[] {
+  if (hidden.size === 0) return columns;
+  return columns.filter((c) => !c.field || !hidden.has(c.field));
+}
 
 // Load several lookup resources at once and return a map slug -> rows
 export function useLookups(slugs: string[]) {

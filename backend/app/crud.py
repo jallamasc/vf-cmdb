@@ -42,9 +42,27 @@ def _to_str(value: Any) -> Optional[str]:
     return str(value)
 
 
-def sanitize_payload(model, payload: dict) -> dict:
+def sanitize_payload(model, payload: dict, existing=None) -> dict:
     cols = {c.key: c for c in inspect(model).columns}
     computed = COMPUTED_FIELDS | MODEL_COMPUTED_FIELDS.get(model, set())
+    # Phase 5 Task 28 (Req 23.2) — on the models that HAVE a `naming_mode`
+    # column, the naming-engine-computed fields (vf_long_name/vf_short_name/
+    # tia606b_name/vf_friendly_name) are normally unconditionally stripped
+    # by COMPUTED_FIELDS above — but "manual" mode's whole point is letting
+    # an operator type a value into one of those columns, so under the
+    # EFFECTIVE mode (this payload's own `naming_mode`, else the existing
+    # row's current value, else "auto") being "manual", stop treating them
+    # as computed for THIS write. `existing` is the pre-update row (None on
+    # create); MODEL_COMPUTED_FIELDS (e.g. Cable.label) is untouched by
+    # this — no model with a per-model computed field also has naming_mode.
+    if "naming_mode" in cols:
+        effective_mode = payload.get(
+            "naming_mode", getattr(existing, "naming_mode", None) or "auto"
+        )
+        if effective_mode == "manual":
+            computed = computed - {
+                "vf_long_name", "vf_short_name", "tia606b_name", "vf_friendly_name"
+            }
     clean: dict[str, Any] = {}
     for key, value in payload.items():
         if key in computed:
@@ -559,7 +577,7 @@ async def update_item(
     # interface's own label as it was prior to this update, in case
     # description/port_number (which the label is derived from) is changing.
     prior_label_a = _interface_own_label(obj) if isinstance(obj, models.DeviceInterface) else None
-    data = sanitize_payload(model, payload)
+    data = sanitize_payload(model, payload, existing=obj)
     changes: list[tuple[str, Any, Any]] = []
     for field, new_value in data.items():
         old_value = getattr(obj, field)

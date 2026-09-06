@@ -8,7 +8,9 @@ import {
   numCol,
   fkCol,
   selectCol,
+  namingComputedCol,
 } from "../lib/columns";
+import { NAMING_MODE_VALUES } from "../lib/namingMode";
 import { Row } from "../api";
 import type { ColDef } from "ag-grid-community";
 
@@ -38,7 +40,10 @@ const CONFIGS: Record<Kind, Config> = {
       fkCol("rack_id", "Rack", l.racks),
       numCol("rack_unit", "Rack U"),
       numCol("port_count", "Ports"),
-      roCol("panel_id_label", "Panel ID", 160),
+      namingComputedCol("panel_id_label", "Panel ID", 160),
+      // Phase 5 Task 28 (Req 23.1) — switch to "manual" to type a Panel ID
+      // directly.
+      selectCol("naming_mode", "Naming Mode", [...NAMING_MODE_VALUES]),
       selectCol("side", "Side", ["front", "rear", "both"]),
       textCol("notes", "Notes"),
     ],
@@ -60,7 +65,10 @@ const CONFIGS: Record<Kind, Config> = {
       textCol("brand", "Brand"),
       textCol("model", "Model"),
       textCol("serial_number", "Serial"),
-      roCol("vf_long_name", "VF Long Name", 200),
+      namingComputedCol("vf_long_name", "VF Long Name", 200),
+      // Phase 5 Task 28 (Req 23.1) — switch to "manual" to type a VF Long
+      // Name directly.
+      selectCol("naming_mode", "Naming Mode", [...NAMING_MODE_VALUES]),
       textCol("notes", "Notes"),
     ],
     defaults: { device_type: "pdu" },
@@ -93,15 +101,19 @@ const CONFIGS: Record<Kind, Config> = {
     title: "Racks",
     description:
       "Rack inventory. VF Long Name is auto-generated from the parent site and the rack's grid coordinates; use the Rack View page for the elevation diagram.",
-    lookups: ["sites", "datacenter-floors", "rooms", "rack-types"],
+    lookups: ["sites", "datacenter-floors", "rooms", "sections", "rack-types"],
     build: (l) => [
       roCol("id", "ID", 70),
       textCol("simple_name", "Simple Name", 170),
       textCol("code", "Code", 120),
-      roCol("vf_long_name", "VF Long Name", 220),
+      namingComputedCol("vf_long_name", "VF Long Name", 220),
+      // Phase 5 Task 28 (Req 23.1) — switch to "manual" to type a VF Long
+      // Name directly.
+      selectCol("naming_mode", "Naming Mode", [...NAMING_MODE_VALUES]),
       fkCol("site_id", "Site", l.sites),
       fkCol("datacenter_floor_id", "Floor", l["datacenter-floors"]),
       fkCol("room_id", "Room", l.rooms),
+      fkCol("section_id", "Section", l.sections),
       fkCol("rack_type_id", "Rack Type", l["rack-types"]),
       textCol("grid_coordinates", "Grid Coords", 130),
       numCol("total_units", "Total U"),

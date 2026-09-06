@@ -166,6 +166,27 @@ export const roCol = (field: string, headerName?: string, width?: number): ColDe
   width,
 });
 
+/**
+ * Phase 5 Task 28 (Req 23.1/23.2/23.3) — a naming-engine-computed column
+ * (e.g. Site.vf_long_name, Rack.vf_long_name, PatchPanel.panel_id_label)
+ * that becomes a normal editable cell exactly when the row's `naming_mode`
+ * is "manual" (the whole point of manual mode), and stays read-only
+ * (styled like `roCol`) under "auto" — unlike `roCol`, this can't be a
+ * fixed `editable: false`, since editability now depends on another field
+ * on the same row.
+ */
+export const namingComputedCol = (
+  field: string,
+  headerName?: string,
+  width?: number
+): ColDef => ({
+  field,
+  headerName: headerName ?? field,
+  editable: (p) => p.data?.naming_mode === "manual",
+  cellClass: (p) => (p.data?.naming_mode === "manual" ? "" : "text-slate-500 italic"),
+  width,
+});
+
 export const numCol = (field: string, headerName?: string): ColDef => ({
   field,
   headerName: headerName ?? field,

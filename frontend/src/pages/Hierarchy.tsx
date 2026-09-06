@@ -5,7 +5,15 @@ import AbbrevField, { CASE_MODES } from "../components/AbbrevField";
 import CityAirportField from "../components/CityAirportField";
 import EntityGrid from "../components/EntityGrid";
 import BlueprintField from "../components/BlueprintField";
-import { lookupLabel, roCol, textCol, airportCol } from "../lib/columns";
+import {
+  lookupLabel,
+  roCol,
+  textCol,
+  airportCol,
+  selectCol,
+  namingComputedCol,
+} from "../lib/columns";
+import { NAMING_MODE_VALUES } from "../lib/namingMode";
 import { useNamePreview } from "../lib/useNamePreview";
 
 // ---------------------------------------------------------------------------
@@ -222,7 +230,10 @@ const DATACENTER_COLUMNS = [
   textCol("code", "Code", 100),
   textCol("city", "City", 140),
   airportCol("iata_code", "Airport (IATA)"),
-  roCol("vf_long_name", "VF Long Name", 220),
+  namingComputedCol("vf_long_name", "VF Long Name", 220),
+  // Phase 5 Task 28 (Req 23.1) — switch to "manual" to type a value into
+  // VF Long Name directly.
+  selectCol("naming_mode", "Naming Mode", [...NAMING_MODE_VALUES]),
 ];
 
 // ---------------------------------------------------------------------------

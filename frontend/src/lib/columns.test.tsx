@@ -1,7 +1,7 @@
 // Phase 5 Task 9 — deviceTypeIconCol: icon resolution + animated active dot.
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render } from "@testing-library/react";
-import { deviceTypeIconCol, flagCol } from "./columns";
+import { deviceTypeIconCol, flagCol, namingComputedCol } from "./columns";
 
 const TYPES = [
   { id: 1, full_name: "24-port switch", abbreviation: "sw24", icon: "Router" },
@@ -71,5 +71,27 @@ describe("flagCol", () => {
     const { container } = renderCell(col, "CAN", { abbreviation: "CAN" });
     const img = container.querySelector("img");
     expect(img?.getAttribute("title")).toBe("Canada");
+  });
+});
+
+describe("namingComputedCol (Phase 5 Task 28, Req 23.1/23.2/23.3)", () => {
+  it("is read-only (roCol-styled) on a row in auto mode", () => {
+    const col = namingComputedCol("vf_long_name", "VF Long Name");
+    const params = { data: { naming_mode: "auto" } } as any;
+    expect((col.editable as (p: any) => boolean)(params)).toBe(false);
+    expect((col.cellClass as (p: any) => string)(params)).toBe("text-slate-500 italic");
+  });
+
+  it("is editable and unstyled-italic on a row in manual mode", () => {
+    const col = namingComputedCol("vf_long_name", "VF Long Name");
+    const params = { data: { naming_mode: "manual" } } as any;
+    expect((col.editable as (p: any) => boolean)(params)).toBe(true);
+    expect((col.cellClass as (p: any) => string)(params)).toBe("");
+  });
+
+  it("defaults to read-only when the row has no naming_mode at all", () => {
+    const col = namingComputedCol("vf_long_name", "VF Long Name");
+    const params = { data: {} } as any;
+    expect((col.editable as (p: any) => boolean)(params)).toBe(false);
   });
 });

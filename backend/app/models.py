@@ -85,6 +85,23 @@ def _case_enum(name: str) -> Enum:
     return Enum(*CASE_ENFORCEMENT_VALUES, name=name, native_enum=False)
 
 
+# Phase 5 Task 28 (Req 23.1) — every naming-engine-computed field's manual/
+# auto override state (see naming.py's `_is_auto()`). Scoped to the 5 tables
+# whose naming.py generator actually sets a field (sites/datacenters/racks/
+# patch_panels/power_devices) — DatacenterFloor/Room/Section have no
+# generator at all to gate, so adding this column there would be inert.
+NAMING_MODE_VALUES = ("auto", "manual")
+
+
+def _naming_mode_enum(name: str) -> Enum:
+    """A non-native (VARCHAR + CHECK) enum for naming_mode. Explicit length
+    (longer than "manual") for the same reason `_storage_kind_enum` needs
+    one — see that helper's comment for the auto-sizing pitfall."""
+    return Enum(
+        *NAMING_MODE_VALUES, name=name, native_enum=False, create_constraint=True, length=10
+    )
+
+
 def _trim_enum(name: str) -> Enum:
     """A non-native (VARCHAR + CHECK) enum for trim modes."""
     return Enum(*TRIM_MODE_VALUES, name=name, native_enum=False)
@@ -320,6 +337,13 @@ class Site(Base):
     vf_long_name: Mapped[Optional[str]] = mapped_column(String(200))
     vf_short_name: Mapped[Optional[str]] = mapped_column(String(120))
     tia606b_name: Mapped[Optional[str]] = mapped_column(String(200))
+    # Phase 5 Task 28 (Req 23.1/23.2/23.3) — gates vf_long_name/vf_short_name/
+    # tia606b_name only; site_code_type above already has its own separate
+    # auto/custom/theme mode for simple_name, untouched by this column.
+    naming_mode: Mapped[str] = mapped_column(
+        _naming_mode_enum("site_naming_mode"), nullable=False,
+        default="auto", server_default="auto",
+    )
     # Arbitrary user-defined columns (dynamic column feature). Stored as JSON.
     custom_fields: Mapped[Optional[dict]] = mapped_column(JSONB)
     notes: Mapped[Optional[str]] = mapped_column(Text)
@@ -350,6 +374,11 @@ class Datacenter(Base):
     case_enforcement: Mapped[str] = mapped_column(
         _case_enum("dc_case_enforcement"), nullable=False, default="mixed",
         server_default="mixed",
+    )
+    # Phase 5 Task 28 (Req 23.1/23.2/23.3) — gates vf_long_name.
+    naming_mode: Mapped[str] = mapped_column(
+        _naming_mode_enum("datacenter_naming_mode"), nullable=False,
+        default="auto", server_default="auto",
     )
     notes: Mapped[Optional[str]] = mapped_column(Text)
 
@@ -478,6 +507,11 @@ class Rack(Base):
     description: Mapped[Optional[str]] = mapped_column(Text)
     vf_long_name: Mapped[Optional[str]] = mapped_column(String(200))
     simple_name: Mapped[Optional[str]] = mapped_column(String(120))
+    # Phase 5 Task 28 (Req 23.1/23.2/23.3) — gates vf_long_name.
+    naming_mode: Mapped[str] = mapped_column(
+        _naming_mode_enum("rack_naming_mode"), nullable=False,
+        default="auto", server_default="auto",
+    )
     notes: Mapped[Optional[str]] = mapped_column(Text)
 
 
@@ -514,6 +548,11 @@ class PowerDevice(Base):
     # Phase 5 Task 23 (Req 19.1) — an uploaded photo of this specific unit,
     # set by POST /photos/power-devices/{id} (backend/app/photos.py).
     photo_url: Mapped[Optional[str]] = mapped_column(String(500))
+    # Phase 5 Task 28 (Req 23.1/23.2/23.3) — gates vf_long_name.
+    naming_mode: Mapped[str] = mapped_column(
+        _naming_mode_enum("power_device_naming_mode"), nullable=False,
+        default="auto", server_default="auto",
+    )
     notes: Mapped[Optional[str]] = mapped_column(Text)
 
 
@@ -542,6 +581,11 @@ class PatchPanel(Base):
     side: Mapped[str] = mapped_column(String(10), default="front")
     # Phase 5 Task 23 (Req 19.1) — an uploaded photo of this specific panel.
     photo_url: Mapped[Optional[str]] = mapped_column(String(500))
+    # Phase 5 Task 28 (Req 23.1/23.2/23.3) — gates panel_id_label.
+    naming_mode: Mapped[str] = mapped_column(
+        _naming_mode_enum("patch_panel_naming_mode"), nullable=False,
+        default="auto", server_default="auto",
+    )
     notes: Mapped[Optional[str]] = mapped_column(Text)
 
 

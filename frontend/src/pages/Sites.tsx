@@ -5,7 +5,16 @@ import ColumnManager, {
 } from "../components/ColumnManager";
 import SiteCodePanel from "../components/SiteCodePanel";
 import { useCustomColumns } from "../lib/useCustomColumns";
-import { useLookups, textCol, roCol, fkCol, customCol } from "../lib/columns";
+import {
+  useLookups,
+  textCol,
+  roCol,
+  fkCol,
+  customCol,
+  selectCol,
+  namingComputedCol,
+} from "../lib/columns";
+import { NAMING_MODE_VALUES } from "../lib/namingMode";
 import { Row } from "../api";
 
 /**
@@ -65,9 +74,13 @@ export default function Sites() {
       fkCol("campus_id", "Campus", map["campuses"] ?? []),
       // Address is reference data, resolved from the site_addresses table.
       fkCol("site_address_id", "Address", map["site-addresses"] ?? []),
-      roCol("vf_long_name", "VF Long Name", 200),
-      roCol("vf_short_name", "VF Short Name", 150),
-      roCol("tia606b_name", "TIA-606-B Name", 200),
+      namingComputedCol("vf_long_name", "VF Long Name", 200),
+      namingComputedCol("vf_short_name", "VF Short Name", 150),
+      namingComputedCol("tia606b_name", "TIA-606-B Name", 200),
+      // Phase 5 Task 28 (Req 23.1) — switch to "manual" to type a value
+      // into VF Long/Short/TIA-606-B Name directly; unrelated to
+      // site_code_type above, which is Simple Name's own separate mode.
+      selectCol("naming_mode", "Naming Mode", [...NAMING_MODE_VALUES]),
       textCol("description", "Description", 200),
       textCol("notes", "Notes"),
       // User-defined dynamic columns.

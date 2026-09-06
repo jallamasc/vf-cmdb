@@ -25,6 +25,9 @@ ENTITY_REGISTRY = {
     "site-addresses": models.SiteAddress,
     "rack-types": models.RackType,
     "stencil-anchors": models.StencilAnchor,
+    # Phase 5 Task 14/16 — generic entity framework metadata.
+    "field-type-defs": models.FieldTypeDef,
+    "entity-type-defs": models.EntityTypeDef,
     # physical
     "sites": models.Site,
     "datacenters": models.Datacenter,
@@ -73,4 +76,7 @@ LOOKUP_SLUGS = [
 REFERENCE_SLUGS = [
     "site-addresses",
     "rack-types",
+    # Phase 5 Task 14/15 — managed from Reference Data, not a naming
+    # convention dictionary.
+    "field-type-defs",
 ]

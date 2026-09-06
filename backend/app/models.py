@@ -54,6 +54,31 @@ DOMAIN_NAME_REGEX = r"^[A-Za-z0-9]+(-[A-Za-z0-9]+)*$"
 #   theme  -> picked from a themed name catalogue (FEAT-3)
 SITE_CODE_TYPE_VALUES = ("auto", "custom", "theme")
 
+# Phase 5 Task 14 — the fixed set of value representations a FieldTypeDef can
+# be backed by. An administrator can name new FieldTypeDefs (e.g. "MAC
+# Address") but every one of them still resolves to one of these six storage
+# primitives, which is what lets the generic form/grid layer (Task 20) render
+# and validate any field type without new code per type.
+STORAGE_KIND_VALUES = ("text", "number", "boolean", "date", "reference", "file")
+
+# Phase 5 Task 16 — the fixed set of integrations an EntityTypeDef can opt
+# into. Each corresponds to a real code path elsewhere in the app (rack
+# elevation, power/network port diagrams, cabling, IP assignment, Ansible
+# lifecycle sync, photo upload, stencil/anchor diagrams, blueprint upload) —
+# unlike field types and entity types, this list is NOT itself user-
+# definable, since every entry has to have actual integration code behind it.
+CAPABILITY_VALUES = (
+    "rack_placement",
+    "power_ports",
+    "network_ports",
+    "ip_assignment",
+    "ansible_managed",
+    "cabling",
+    "photo",
+    "stencil_diagram",
+    "blueprint",
+)
+
 
 def _case_enum(name: str) -> Enum:
     """A non-native (VARCHAR + CHECK) enum for case enforcement."""
@@ -74,6 +99,24 @@ def _site_code_type_enum(name: str) -> Enum:
     """
     return Enum(
         *SITE_CODE_TYPE_VALUES, name=name, native_enum=False, create_constraint=True
+    )
+
+
+def _storage_kind_enum(name: str) -> Enum:
+    """A non-native (VARCHAR + CHECK) enum for FieldTypeDef.storage_kind.
+
+    ``length=20`` is deliberately wider than the longest value ("reference",
+    9 chars) — SQLAlchemy defaults a non-native Enum's VARCHAR to exactly the
+    longest member's length, which means an invalid, longer value gets
+    rejected by a raw string-truncation error instead of the intended CHECK
+    constraint. Widening the column lets the CHECK do the actual validation.
+    """
+    return Enum(
+        *STORAGE_KIND_VALUES,
+        name=name,
+        native_enum=False,
+        create_constraint=True,
+        length=20,
     )
 
 
@@ -888,3 +931,67 @@ class AbbreviationRegistry(Base):
     entity_type: Mapped[str] = mapped_column(String(60), nullable=False)
     entity_id: Mapped[int] = mapped_column(Integer, nullable=False)
     field_name: Mapped[str] = mapped_column(String(40), nullable=False, default="abbreviation")
+
+
+# ---------------------------------------------------------------------------
+# Generic Entity Framework (Phase 5, Sub-phase C)
+#
+# A reference-data-driven layer on top of the hardcoded models above: an
+# administrator can define new entity types (EntityTypeDef, Task 16) with
+# custom fields (EntityFieldDef, Task 17) backed by named field types
+# (FieldTypeDef, this table), and manage records of those types
+# (GenericEntity, Task 18) without any code change. See design.md's "Key
+# Decisions" for why this is JSONB-backed rather than dynamic DDL.
+# ---------------------------------------------------------------------------
+class FieldTypeDef(Base):
+    """Phase 5 Task 14 — a named field type available when defining custom
+    Entity_Field_Defs on an Entity_Type_Def.
+
+    ``builtin`` rows (the 6 seeded storage kinds themselves, used verbatim)
+    are protected from deletion by the API layer, not the schema — an
+    administrator can still add further NAMED types on top of the same 6
+    storage kinds (e.g. "MAC Address" -> storage_kind="text").
+    """
+
+    __tablename__ = "field_type_defs"
+    __table_args__ = (
+        UniqueConstraint("slug", name="uq_field_type_defs_slug"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    slug: Mapped[str] = mapped_column(String(60), nullable=False)
+    label: Mapped[str] = mapped_column(String(120), nullable=False)
+    storage_kind: Mapped[str] = mapped_column(
+        _storage_kind_enum("field_type_def_storage_kind"), nullable=False
+    )
+    builtin: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    notes: Mapped[Optional[str]] = mapped_column(Text)
+
+
+class EntityTypeDef(Base):
+    """Phase 5 Task 16 — an admin-defined kind of managed asset.
+
+    ``capabilities`` is a JSONB array of strings drawn from
+    ``CAPABILITY_VALUES`` (validated at the application layer in
+    ``crud._validate_entity_type_def`` — Postgres has no cheap way to CHECK
+    "every element of this JSON array is one of N strings" the way a scalar
+    CHECK constrains a single column). Not every type needs every
+    capability: a "Monitor" custom type might enable ``photo`` +
+    ``power_ports`` without ``ansible_managed``, for example.
+    """
+
+    __tablename__ = "entity_type_defs"
+    __table_args__ = (
+        UniqueConstraint("slug", name="uq_entity_type_defs_slug"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    slug: Mapped[str] = mapped_column(String(60), nullable=False)
+    label: Mapped[str] = mapped_column(String(120), nullable=False)
+    icon: Mapped[Optional[str]] = mapped_column(String(60))
+    capabilities: Mapped[list] = mapped_column(
+        JSONB, nullable=False, default=list, server_default="[]"
+    )
+    notes: Mapped[Optional[str]] = mapped_column(Text)

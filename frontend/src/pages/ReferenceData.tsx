@@ -1,14 +1,15 @@
 import { useState } from "react";
 import EntityGrid from "../components/EntityGrid";
 import type { RequiredField } from "../components/EntityGrid";
-import { textCol, roCol, flagCol } from "../lib/columns";
+import { textCol, roCol, flagCol, selectCol } from "../lib/columns";
+import { STORAGE_KIND_VALUES } from "../lib/fieldTypes";
 
 interface RefTable {
   slug: string;
   label: string;
   description: string;
   columns: ReturnType<typeof textCol>[];
-  newRowDefaults?: Record<string, unknown>;
+  newRowDefaults?: Record<string, unknown> | (() => Record<string, unknown>);
   /** Columns the database declares NOT NULL. */
   requiredFields?: RequiredField[];
 }
@@ -51,6 +52,35 @@ const TABLES: RefTable[] = [
     ],
     newRowDefaults: { name: "New rack type", total_units: 42 },
     requiredFields: [{ field: "name", label: "Name" }],
+  },
+  {
+    // Phase 5 Task 15 (Req 11.2) — named field types available when
+    // defining custom fields on an Entity_Type_Def (Sub-phase C). The 6
+    // builtin rows (one per storage kind) are seeded and protected from
+    // deletion by the backend; an administrator can add further named
+    // types on top of the same fixed storage kinds here.
+    slug: "field-type-defs",
+    label: "Field Types",
+    description:
+      "Field types available when defining custom fields for a custom entity type. The 6 builtin rows (one per storage kind) can't be deleted, but you can add new named types on top of the same storage kinds — e.g. a \"MAC Address\" type backed by \"text\".",
+    columns: [
+      roCol("id", "ID", 70),
+      textCol("slug", "Slug", 160),
+      textCol("label", "Label", 180),
+      selectCol("storage_kind", "Storage Kind", [...STORAGE_KIND_VALUES]),
+      roCol("builtin", "Builtin", 90),
+      textCol("notes", "Notes", 240),
+    ],
+    newRowDefaults: () => ({
+      slug: `custom-${Math.random().toString(36).slice(2, 6)}`,
+      label: "New field type",
+      storage_kind: "text",
+    }),
+    requiredFields: [
+      { field: "slug", label: "Slug", hint: "Slugs are globally unique." },
+      { field: "label", label: "Label" },
+      { field: "storage_kind", label: "Storage Kind" },
+    ],
   },
 ];
 

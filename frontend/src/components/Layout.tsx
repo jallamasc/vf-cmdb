@@ -23,6 +23,7 @@ import {
   Router,
   Settings2,
   Settings,
+  Layers,
   type LucideIcon,
 } from "lucide-react";
 
@@ -38,6 +39,7 @@ const NAV: {
     items: [
       { to: "/naming", label: "Naming Conventions", icon: Tag },
       { to: "/reference-data", label: "Reference Data", icon: Database },
+      { to: "/entity-types", label: "Entity Type Builder", icon: Layers },
       { to: "/ansible", label: "Ansible Inventory", icon: Workflow },
       { to: "/changelog", label: "Changelog", icon: History },
     ],

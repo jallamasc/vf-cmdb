@@ -203,6 +203,30 @@ export function selectCol(
 }
 
 /**
+ * Phase 5 Task 19 — a true/false column, rendered with the same dropdown
+ * affordance as ``fkCol``/``selectCol`` but formatted as "Yes"/"No" instead
+ * of the literal ``true``/``false`` string ``selectCol`` would show.
+ */
+export function boolCol(
+  field: string,
+  headerName: string,
+  extra: Partial<ColDef> = {}
+): ColDef {
+  return {
+    field,
+    headerName,
+    editable: true,
+    cellEditor: FuzzySelectEditor,
+    cellEditorParams: { values: [true, false], formatOption: (v: unknown) => (v ? "Yes" : "No") },
+    cellEditorPopup: true,
+    valueFormatter: (p) => (p.value == null ? "" : p.value ? "Yes" : "No"),
+    cellRenderer: DropdownCellRenderer,
+    width: 100,
+    ...extra,
+  };
+}
+
+/**
  * Phase 4 Req 9 — an IATA airport-code column with an in-cell search/select
  * editor (AirportCellEditor), instead of a plain typed text cell.
  */

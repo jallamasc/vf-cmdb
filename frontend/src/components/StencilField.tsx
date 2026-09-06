@@ -57,7 +57,13 @@ export default function StencilField({ resource }: Props) {
   );
 }
 
-function StencilRow({
+/**
+ * Phase 5 Task 22 (Req 18.2) — exported so a single Generic_Entity record
+ * (rather than every row of a device-*type* resource, which is what
+ * `StencilField` itself lists) can reuse the exact same stencil + anchor
+ * management UI, e.g. from `GenericEntityView.tsx`'s selection-driven panel.
+ */
+export function StencilRow({
   resource,
   row,
   onChanged,

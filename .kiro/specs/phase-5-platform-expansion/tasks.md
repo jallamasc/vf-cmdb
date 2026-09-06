@@ -135,11 +135,11 @@ capability patterns rather than reinventing them.
   - [x]* 21.2 pytest: a generic entity with rack_placement+network_ports
         capabilities places and cables exactly like a hardcoded device type
 
-- [ ] 22. Capability integration — photo + stencil diagram
-  - [ ] 22.1 New `PhotoField.tsx` + generic photo upload endpoint; reuse
+- [x] 22. Capability integration — photo + stencil diagram
+  - [x] 22.1 New `PhotoField.tsx` + generic photo upload endpoint; reuse
         `StencilField.tsx`/`AnchorEditor.tsx` for `stencil_diagram`
     - _Requirements: 18.1, 18.2_
-  - [ ]* 22.2 pytest upload round-trip; Vitest for `PhotoField`
+  - [x]* 22.2 pytest upload round-trip; Vitest for `PhotoField`
 
 - [ ] 23. Photo/graphic on existing hardcoded device types
   - [ ] 23.1 Add `photo_url` to PhysicalServer/NetworkDevice/Workstation/

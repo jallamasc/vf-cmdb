@@ -1,17 +1,29 @@
 // Phase 5 Task 20 — GenericEntityView against a synthetic type definition.
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import GenericEntityView from "./GenericEntityView";
+import { api } from "../api";
 
 let capturedProps: any[] = [];
 
 vi.mock("../components/EntityGrid", () => ({
   default: (props: any) => {
     capturedProps.push(props);
-    return <div data-testid="entity-grid">{props.resource}</div>;
+    return (
+      <div data-testid="entity-grid">
+        {props.resource}
+        <button
+          data-testid="select-row"
+          onClick={() => props.onSelectionChanged?.([{ id: 1, entity_type_id: 7 }])}
+        >
+          select row
+        </button>
+        {props.panel}
+      </div>
+    );
   },
 }));
 
@@ -161,5 +173,39 @@ describe("GenericEntityView — synthetic type definition (Req 16.1/16.2)", () =
     await waitFor(() =>
       expect(screen.getByText(/No Entity Type found/)).toBeTruthy()
     );
+  });
+});
+
+describe("GenericEntityView — capability panel (Req 18.1/18.2)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    capturedProps = [];
+  });
+
+  it("prompts to select a row before showing the photo manager", async () => {
+    wrap("monitor");
+    await waitFor(() => expect(screen.getByText(/Select a row to manage/)).toBeTruthy());
+  });
+
+  it("shows PhotoField for the selected row when the type has the photo capability", async () => {
+    wrap("monitor");
+    await screen.findByTestId("select-row");
+    fireEvent.click(screen.getByTestId("select-row"));
+    await waitFor(() => expect(screen.getByText("Upload photo")).toBeTruthy());
+    // "monitor"'s capabilities are ["photo"] only — no stencil manager.
+    expect(screen.queryByText("Stencil diagram")).toBeNull();
+  });
+
+  it("renders nothing for a type with neither photo nor stencil_diagram enabled", async () => {
+    (api.list as any).mockImplementation((resource: string) => {
+      if (resource === "entity-type-defs")
+        return Promise.resolve([{ id: 8, slug: "plain", label: "Plain", capabilities: [] }]);
+      if (resource === "entity-field-defs") return Promise.resolve([]);
+      if (resource === "field-type-defs") return Promise.resolve(FIELD_TYPES);
+      return Promise.resolve([]);
+    });
+    wrap("plain");
+    await screen.findByTestId("select-row");
+    expect(screen.queryByText(/Select a row to manage/)).toBeNull();
   });
 });

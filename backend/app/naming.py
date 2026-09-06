@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from sqlalchemy import Integer, select
+from sqlalchemy import Integer, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import models
@@ -238,6 +238,75 @@ async def generate_network_device(session: AsyncSession, d: models.NetworkDevice
     d.vf_long_name = f"{base}{rack_part}{dt}{sub}{brand}{cons}".upper()
 
 
+async def generate_patch_panel(session: AsyncSession, panel: models.PatchPanel) -> None:
+    """Phase 5 Task 3: patch panel identifier, mirroring ``generate_rack``'s
+    site/coordinates composition — previously ``panel_id_label`` had no
+    generator at all, so it was permanently blank for anyone relying on it as
+    a computed field.
+
+    Composition: parent rack's ``vf_long_name`` + ``PP`` + a per-rack sequence
+    number (``rack_unit`` when the panel is already mounted, otherwise the
+    next free sequence among that rack's other patch panels, so multiple
+    unplaced panels still get distinct identifiers).
+    """
+    base = ""
+    if panel.rack_id:
+        rack = await session.get(models.Rack, panel.rack_id)
+        if rack and rack.vf_long_name:
+            base = rack.vf_long_name
+    seq = panel.rack_unit
+    if seq is None:
+        conditions = [models.PatchPanel.id != (panel.id or -1)]
+        if panel.rack_id is not None:
+            conditions.append(models.PatchPanel.rack_id == panel.rack_id)
+        existing = (
+            await session.execute(
+                select(func.count(models.PatchPanel.id)).where(*conditions)
+            )
+        ).scalar_one()
+        seq = existing + 1
+    panel.panel_id_label = f"{base}PP{seq}".upper()
+
+
+async def generate_power_device(session: AsyncSession, dev: models.PowerDevice) -> None:
+    """Phase 5 Task 3: power device identifier, mirroring
+    ``generate_network_device``'s site/rack composition — previously
+    ``vf_long_name`` had no generator at all, yet was rendered read-only (as
+    every other computed name column is), so it could never be populated by
+    anyone.
+
+    Composition: parent site's ``vf_long_name`` + parent rack's grid
+    coordinates (when racked) + the device type (``ups``/``pdu``) + a
+    sequence number (``device_number`` when set, otherwise the next free
+    sequence scoped to the same rack, or the same site when unracked).
+    """
+    base = ""
+    if dev.site_id:
+        site = await session.get(models.Site, dev.site_id)
+        if site and site.vf_long_name:
+            base = site.vf_long_name
+    rack_part = ""
+    if dev.rack_id:
+        rack = await session.get(models.Rack, dev.rack_id)
+        if rack and rack.grid_coordinates:
+            rack_part = rack.grid_coordinates
+    kind = (dev.device_type or "pdu").upper()
+    seq = dev.device_number
+    if seq is None:
+        conditions = [models.PowerDevice.id != (dev.id or -1)]
+        if dev.rack_id is not None:
+            conditions.append(models.PowerDevice.rack_id == dev.rack_id)
+        elif dev.site_id is not None:
+            conditions.append(models.PowerDevice.site_id == dev.site_id)
+        existing = (
+            await session.execute(
+                select(func.count(models.PowerDevice.id)).where(*conditions)
+            )
+        ).scalar_one()
+        seq = existing + 1
+    dev.vf_long_name = f"{base}{rack_part}{kind}{seq}".upper()
+
+
 async def _device_display_name(
     session: AsyncSession, device_type: Optional[str], device_id: Optional[int]
 ) -> str:
@@ -305,6 +374,8 @@ GENERATORS = {
     models.Workstation: generate_workstation,
     models.NetworkDevice: generate_network_device,
     models.Cable: generate_cable,
+    models.PatchPanel: generate_patch_panel,
+    models.PowerDevice: generate_power_device,
 }
 
 

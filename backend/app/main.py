@@ -18,7 +18,19 @@ app = FastAPI(title=settings.app_name, version="1.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
-    allow_credentials=True,
+    # Phase 5 Task 5 (Req 4) — this API has no cookie/session auth anywhere
+    # (confirmed: no set_cookie, no SessionMiddleware, no Authorization
+    # header usage), so there is no real credentialed cross-origin flow.
+    # `allow_credentials=True` together with a wildcard `allow_origins=["*"]`
+    # is an invalid CORS combination per the Fetch spec — Starlette's
+    # CORSMiddleware only avoids emitting the literal `*` when the *request*
+    # carries a Cookie header, so a credentialed request with no cookie still
+    # got back `Access-Control-Allow-Origin: *` PLUS
+    # `Access-Control-Allow-Credentials: true` together, which a strict
+    # browser is entitled to reject. Since nothing here needs credentialed
+    # cross-origin requests, turning this off removes the invalid
+    # combination outright rather than trying to pin origins.
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

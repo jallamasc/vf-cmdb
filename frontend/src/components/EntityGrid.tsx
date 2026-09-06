@@ -232,6 +232,39 @@ export default function EntityGrid({
   });
 
   /**
+   * Req 1 — the rows actually handed to AG-Grid's `rowData` prop.
+   *
+   * A query refetch always produces brand-new row objects. Handing those
+   * straight to `rowData` while ANY cell in the grid is being edited makes
+   * AG-Grid discard that in-progress edit — it treats the arriving row data
+   * as new data superseding the edit, even on an unrelated cell of the same
+   * row. So `gridRowData` only catches up to the latest `data` when nothing
+   * is being edited; otherwise the sync is deferred until editing stops
+   * (`flushPendingRowDataSync`, wired to `onCellEditingStopped` below), so an
+   * unrelated save landing elsewhere in the row/grid never wipes out
+   * whatever the user is still typing.
+   */
+  const [gridRowData, setGridRowData] = useState<Row[] | undefined>(data);
+  const pendingSyncRef = useRef(false);
+
+  useEffect(() => {
+    const editing = (gridRef.current?.api?.getEditingCells()?.length ?? 0) > 0;
+    if (editing) {
+      pendingSyncRef.current = true;
+      return;
+    }
+    setGridRowData(data);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
+
+  const flushPendingRowDataSync = () => {
+    if (pendingSyncRef.current) {
+      pendingSyncRef.current = false;
+      setGridRowData(data);
+    }
+  };
+
+  /**
    * Refresh both the rows on screen and the full table cache. When a device
    * tab is showing a filtered slice, the listing page for the same resource is
    * now stale too — invalidating both keeps them consistent.
@@ -244,7 +277,19 @@ export default function EntityGrid({
   const updateMut = useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: Row }) =>
       api.update(resource, id, payload),
-    onSuccess: refresh,
+    onSuccess: (_res, { id, payload }) => {
+      if (dataSource) {
+        // A filtered slice can have an arbitrary `select` shape layered over
+        // the raw response — safest to refetch rather than guess its shape.
+        refresh();
+        return;
+      }
+      // Req 1.1 — patch just the saved row instead of invalidating (and
+      // refetching) the whole table.
+      qc.setQueryData<Row[]>([resource], (old) =>
+        old?.map((r) => (r.id === id ? { ...r, ...payload } : r))
+      );
+    },
     onError: (e: Error) => {
       fail(e);
       // Roll the cell back to the persisted value.
@@ -490,10 +535,11 @@ export default function EntityGrid({
         <div className="ag-theme-quartz flex-1" style={{ minHeight }}>
           <AgGridReact
             ref={gridRef}
-            rowData={data}
+            rowData={gridRowData}
             columnDefs={columns}
             defaultColDef={defaultColDef}
             onCellValueChanged={onCellValueChanged}
+            onCellEditingStopped={flushPendingRowDataSync}
             onSelectionChanged={publishSelection}
             // Stable ids keep the selection (and any editor panel bound to it)
             // alive across the refetch that follows every save.

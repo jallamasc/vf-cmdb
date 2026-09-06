@@ -300,6 +300,37 @@ npm run dev      # Vite dev server, proxies /api → 127.0.0.1:8000
 
 ---
 
+## Browser compatibility
+
+Both the dev server (Vite, port 5173) and the production container (nginx,
+port 8080) proxy `/api/*` to the backend, so the frontend always talks to the
+API **same-origin** from the browser's point of view — there is no
+cross-origin request in any supported deployment topology, and the app has
+no cookie/session-based auth (every request is a plain, credential-less JSON
+call).
+
+Phase 5 audited and fixed one real issue found during that review: the
+backend's CORS middleware combined `allow_origins=["*"]` with
+`allow_credentials=True`, which is an invalid combination per the Fetch spec
+(a strict/privacy-hardened browser is entitled to reject it). Since nothing
+here needs credentialed cross-origin requests, `allow_credentials` is now
+`False`, which removes the invalid combination outright.
+
+If you still see a problem in a hardened browser profile (e.g. Brave with
+Shields set to aggressive/strict), please report the concrete symptom along
+with:
+1. Any errors in the browser's DevTools **Console** tab.
+2. Any blocked requests visible in DevTools **Network** tab (status, and
+   whether it's blocked by the browser itself vs. a non-2xx server response).
+3. Whether **Shields → "Upgrade connections to HTTPS"** (or the equivalent
+   strict-transport setting) is enabled — if the app is only served over
+   plain HTTP, that setting can force an HTTPS attempt that times out before
+   falling back, which looks like the site being unreachable.
+4. Whether the request is being made against the proxied origin (port
+   5173/8080) rather than the backend's own port (8000) directly — hitting
+   the backend port directly *is* a genuine cross-origin request and isn't
+   the supported access pattern.
+
 ## Project layout
 
 ```

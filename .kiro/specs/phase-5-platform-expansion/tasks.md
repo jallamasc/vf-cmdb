@@ -154,7 +154,7 @@ capability patterns rather than reinventing them.
   - [x]* 24.2 pytest CRUD; Vitest confirming a hidden override removes a
         column live (e.g. NetworkDevices)
 
-- [ ] 25. Checkpoint C — full build + test verification, present for browser
+- [x] 25. Checkpoint C — full build + test verification, present for browser
       testing (highest-risk sub-phase).
 
 ### Sub-phase D — Depth Features

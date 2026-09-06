@@ -647,6 +647,7 @@ async def naming_theme_names(
 async def naming_airport_code(
     city: str = "",
     limit: int = 25,
+    country: str = "",
 ) -> dict[str, Any]:
     """Resolve a city to the IATA code of its main airport.
 
@@ -654,8 +655,12 @@ async def naming_airport_code(
     Tokyo have several airports) and ``matches`` for autocomplete lists. An
     empty ``city`` returns suggestions instead of an error so the field can
     show options before the user types.
+
+    Phase 5 Task 30 (Req 25.2) — an optional ``country`` scopes ``matches``
+    (and the resolved best match) to that country only, so the frontend's
+    City field can offer/accept just the cities that actually belong there.
     """
-    resolved = airports.lookup_city(city) if city else {
+    resolved = airports.lookup_city(city, country) if city else {
         "city": city,
         "iata_code": None,
         "airport": None,
@@ -669,8 +674,18 @@ async def naming_airport_code(
         "airport": resolved["airport"],
         "country": resolved["country"],
         "alternatives": resolved["alternatives"],
-        "matches": airports.search(city, limit),
+        "matches": airports.search(city, limit, country),
     }
+
+
+@router.get("/naming/airport-countries")
+async def naming_airport_countries() -> dict[str, list[str]]:
+    """List every country in the built-in airport catalogue.
+
+    Phase 5 Task 30 (Req 25.1) — powers the "Country" selector the City
+    field now requires before it will accept any input.
+    """
+    return {"countries": airports.countries()}
 
 
 # ---------------------------------------------------------------------------

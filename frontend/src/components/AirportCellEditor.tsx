@@ -19,18 +19,52 @@ export type AirportCellEditorParams = ICellEditorParams;
  * against `GET /naming/airport-code` as the operator types a city or code,
  * and commits the selected airport's IATA code on click/Enter. Implements the
  * same AG Grid ICellEditorComp contract as FuzzySelectEditor.
+ *
+ * Phase 5 Task 30 (Req 25.1/25.2/25.3) — the search input is gated behind a
+ * required Country selector and scoped to it; a manually typed code is only
+ * committed as-typed when "not listed in the catalogue" is checked.
  */
 const AirportCellEditor = forwardRef((props: AirportCellEditorParams, ref) => {
+  const [countries, setCountries] = useState<string[]>([]);
+  const [country, setCountry] = useState("");
+  const [notListed, setNotListed] = useState(false);
   const [query, setQuery] = useState(props.value ?? "");
   const [matches, setMatches] = useState<Airport[]>([]);
   const [loading, setLoading] = useState(false);
   const [committed, setCommitted] = useState<unknown>(props.value ?? null);
   const inputRef = useRef<HTMLInputElement>(null);
   const seq = useRef(0);
+  const initialized = useRef(false);
+
+  useEffect(() => {
+    api
+      .airportCountries()
+      .then((r) => setCountries(r.countries ?? []))
+      .catch(() => setCountries([]));
+  }, []);
+
+  // Req 25.1 — best-effort resolve the Country for a pre-existing code so
+  // re-opening the editor on an already-set cell doesn't start locked out.
+  useEffect(() => {
+    if (initialized.current) return;
+    initialized.current = true;
+    const term = String(props.value ?? "").trim();
+    if (!term) return;
+    api
+      .airportCode(term)
+      .then((r) => {
+        if (r.country) setCountry(r.country);
+        else setNotListed(true);
+      })
+      .catch(() => setNotListed(true));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const disabled = !country && !notListed;
 
   useEffect(() => {
     const term = query.trim();
-    if (term.length < 2) {
+    if (term.length < 2 || disabled) {
       setMatches([]);
       return;
     }
@@ -38,7 +72,7 @@ const AirportCellEditor = forwardRef((props: AirportCellEditorParams, ref) => {
     setLoading(true);
     const timer = setTimeout(() => {
       api
-        .airportCode(term)
+        .airportCode(term, 25, notListed ? "" : country)
         .then((r) => {
           if (seq.current !== mine) return;
           setMatches(r.matches ?? []);
@@ -52,7 +86,7 @@ const AirportCellEditor = forwardRef((props: AirportCellEditorParams, ref) => {
         });
     }, 250);
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [query, country, notListed, disabled]);
 
   useImperativeHandle(ref, () => ({
     getValue: () => committed,
@@ -82,24 +116,53 @@ const AirportCellEditor = forwardRef((props: AirportCellEditorParams, ref) => {
 
   return (
     <div className="vf-fuzzy-editor" data-testid="airport-cell-editor">
+      <select
+        className="vf-fuzzy-editor-input"
+        aria-label="Country"
+        value={country}
+        onChange={(e) => setCountry(e.target.value)}
+      >
+        <option value="">Select a country…</option>
+        {countries.map((c) => (
+          <option key={c} value={c}>
+            {c}
+          </option>
+        ))}
+      </select>
+      <label className="flex items-center gap-1.5 text-xs px-1 py-1">
+        <input
+          type="checkbox"
+          checked={notListed}
+          onChange={(e) => setNotListed(e.target.checked)}
+        />
+        Not listed in the catalogue
+      </label>
       <input
         ref={inputRef}
         className="vf-fuzzy-editor-input"
         value={query}
-        placeholder="City or IATA code…"
+        disabled={disabled}
+        placeholder={disabled ? "Select a country first…" : "City or IATA code…"}
         onChange={(e) => {
           const v = e.target.value;
           setQuery(v);
           // Typing manually (no selection yet) still lets the operator commit
-          // a code the built-in catalogue does not know, uppercased like the
-          // existing CityAirportField behavior.
-          setCommitted(v.toUpperCase().replace(/[^A-Z0-9]/g, ""));
+          // a code the built-in catalogue does not know, uppercased like
+          // before — but only once "not listed" opts out of catalogue
+          // matching (Req 25.2/25.3); otherwise only picking a suggestion
+          // below can commit a value.
+          if (notListed) {
+            setCommitted(v.toUpperCase().replace(/[^A-Z0-9]/g, ""));
+          }
         }}
         onKeyDown={onKeyDown}
       />
       <ul className="vf-fuzzy-editor-list" role="listbox">
         {loading && <li className="vf-fuzzy-editor-empty">Searching…</li>}
-        {!loading && matches.length === 0 && (
+        {!loading && disabled && (
+          <li className="vf-fuzzy-editor-empty">Select a country above…</li>
+        )}
+        {!loading && !disabled && matches.length === 0 && (
           <li className="vf-fuzzy-editor-empty">
             {query.trim().length < 2 ? "Type a city or code…" : "No matches"}
           </li>

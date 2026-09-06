@@ -25,9 +25,10 @@ ENTITY_REGISTRY = {
     "site-addresses": models.SiteAddress,
     "rack-types": models.RackType,
     "stencil-anchors": models.StencilAnchor,
-    # Phase 5 Task 14/16 — generic entity framework metadata.
+    # Phase 5 Task 14/16/17 — generic entity framework metadata.
     "field-type-defs": models.FieldTypeDef,
     "entity-type-defs": models.EntityTypeDef,
+    "entity-field-defs": models.EntityFieldDef,
     # physical
     "sites": models.Site,
     "datacenters": models.Datacenter,

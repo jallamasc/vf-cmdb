@@ -154,7 +154,10 @@ export default function PowerDiagramSVG({
           width={BOX_W}
           height={BOX_H}
           preserveAspectRatio="xMidYMid meet"
-        />
+        >
+          {/* Req 8.2 — hovering the device itself, not just an outlet. */}
+          <title>{deviceLabel}</title>
+        </image>
       ) : (
         <rect
           x={2}
@@ -165,7 +168,9 @@ export default function PowerDiagramSVG({
           stroke="#d97706"
           strokeWidth={1.5}
           rx={4}
-        />
+        >
+          <title>{deviceLabel}</title>
+        </rect>
       )}
       <text x={8} y={14} fontSize={9} fill="#78350f" fontFamily="sans-serif" fontWeight={600}>
         {deviceLabel}

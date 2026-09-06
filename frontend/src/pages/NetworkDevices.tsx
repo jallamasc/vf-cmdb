@@ -13,6 +13,7 @@ import {
   fkCol,
   ipCol,
   deviceLinkCol,
+  deviceTypeIconCol,
 } from "../lib/columns";
 
 const LK = [
@@ -48,6 +49,14 @@ export default function NetworkDevices() {
   const columns = useMemo(
     () => [
       roCol("id", "ID", 70),
+      // Phase 5 Req 6.2/7.1: device-type icon, pulsing when recently active
+      // (last_fact_sync_at within 24h).
+      deviceTypeIconCol(
+        "device_type_id",
+        "",
+        map["network-device-types"],
+        "last_fact_sync_at"
+      ),
       // FEAT-7: the long name opens the device detail dashboard.
       deviceLinkCol("vf_long_name", "VF Long Name", "network_devices", 240),
       textCol("vf_friendly_name", "Friendly Name", 150),

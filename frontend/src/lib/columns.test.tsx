@@ -1,0 +1,75 @@
+// Phase 5 Task 9 — deviceTypeIconCol: icon resolution + animated active dot.
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { render } from "@testing-library/react";
+import { deviceTypeIconCol, flagCol } from "./columns";
+
+const TYPES = [
+  { id: 1, full_name: "24-port switch", abbreviation: "sw24", icon: "Router" },
+  { id: 2, full_name: "Unlabeled type", abbreviation: "unl", icon: null },
+];
+
+function renderCell(col: ReturnType<typeof deviceTypeIconCol>, value: unknown, data: Record<string, unknown>) {
+  const Renderer = col.cellRenderer as (p: any) => JSX.Element;
+  return render(<Renderer value={value} data={data} />);
+}
+
+describe("deviceTypeIconCol", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("renders an svg icon for a known type", () => {
+    const col = deviceTypeIconCol("device_type_id", "", TYPES);
+    const { container } = renderCell(col, 1, { device_type_id: 1 });
+    expect(container.querySelector("svg")).toBeTruthy();
+  });
+
+  it("renders the fallback icon when the type has no icon set", () => {
+    const col = deviceTypeIconCol("device_type_id", "", TYPES);
+    const { container } = renderCell(col, 2, { device_type_id: 2 });
+    expect(container.querySelector("svg")).toBeTruthy();
+    expect(container.querySelector(".animate-pulse")).toBeNull();
+  });
+
+  it("shows the animated dot when activeField is recent", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-02T00:00:00Z"));
+    const col = deviceTypeIconCol("device_type_id", "", TYPES, "last_fact_sync_at");
+    const { container } = renderCell(col, 1, {
+      device_type_id: 1,
+      last_fact_sync_at: new Date("2026-01-01T23:00:00Z").toISOString(),
+    });
+    expect(container.querySelector(".animate-pulse")).toBeTruthy();
+  });
+
+  it("hides the animated dot when activeField is stale", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-02T00:00:00Z"));
+    const col = deviceTypeIconCol("device_type_id", "", TYPES, "last_fact_sync_at");
+    const { container } = renderCell(col, 1, {
+      device_type_id: 1,
+      last_fact_sync_at: new Date("2025-12-01T00:00:00Z").toISOString(),
+    });
+    expect(container.querySelector(".animate-pulse")).toBeNull();
+  });
+});
+
+describe("flagCol", () => {
+  it("uses a distinct colId from the shared field, so it doesn't collide with a textCol", () => {
+    const col = flagCol("country", "🏳");
+    expect(col.colId).toBe("country_flag");
+    expect(col.field).toBe("country");
+  });
+
+  it("reads the country straight off the row by default", () => {
+    const col = flagCol("country", "🏳");
+    const { container } = renderCell(col, "Colombia", { country: "Colombia" });
+    const img = container.querySelector("img");
+    expect(img?.getAttribute("title")).toBe("Colombia");
+  });
+
+  it("uses resolveCountryName when provided instead of the raw field", () => {
+    const col = flagCol("abbreviation", "🏳", () => "Canada");
+    const { container } = renderCell(col, "CAN", { abbreviation: "CAN" });
+    const img = container.querySelector("img");
+    expect(img?.getAttribute("title")).toBe("Canada");
+  });
+});

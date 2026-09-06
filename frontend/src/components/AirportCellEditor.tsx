@@ -7,6 +7,7 @@ import {
 } from "react";
 import type { ICellEditorParams } from "ag-grid-community";
 import { api, Airport } from "../api";
+import CountryFlag from "../lib/countryFlags";
 
 export type AirportCellEditorParams = ICellEditorParams;
 
@@ -114,6 +115,7 @@ const AirportCellEditor = forwardRef((props: AirportCellEditorParams, ref) => {
                 commit(m);
               }}
             >
+              <CountryFlag country={m.country} className="mr-1" />
               <span className="font-mono font-semibold">{m.iata}</span>{" "}
               {m.city}
               {m.country ? `, ${m.country}` : ""} — {m.name}

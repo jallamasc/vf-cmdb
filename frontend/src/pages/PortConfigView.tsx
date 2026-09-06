@@ -236,6 +236,9 @@ export default function PortConfigView() {
     );
 
   const shown = devices.filter(deviceMatchesHierarchy);
+  // Req 5 — don't render every network device in the organization by
+  // default; require the breadcrumb to reach at least Rack level first.
+  const hasDrillDownSelection = rack !== ALL || device !== ALL;
 
   const breadcrumbFor = (d: Row) => {
     const r = d.rack_id != null ? rackById.get(d.rack_id) : undefined;
@@ -324,12 +327,18 @@ export default function PortConfigView() {
           },
         ]}
       />
-      <p className="text-xs text-slate-500 -mt-3 mb-4">
-        Showing <span className="font-semibold">{shown.length}</span> network device
-        {shown.length === 1 ? "" : "s"}
-      </p>
+      {hasDrillDownSelection && (
+        <p className="text-xs text-slate-500 -mt-3 mb-4">
+          Showing <span className="font-semibold">{shown.length}</span> network device
+          {shown.length === 1 ? "" : "s"}
+        </p>
+      )}
 
-      {shown.length === 0 ? (
+      {!hasDrillDownSelection ? (
+        <p className="text-slate-500">
+          Select a rack (or a specific network device) above to view its diagram.
+        </p>
+      ) : shown.length === 0 ? (
         <p className="text-slate-500">No network devices match the selected filters.</p>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

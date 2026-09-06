@@ -5,6 +5,8 @@ import { api, Row } from "../api";
 import type { DeviceTypeKey } from "../api";
 import FuzzySelectEditor from "../components/FuzzySelectEditor";
 import AirportCellEditor from "../components/AirportCellEditor";
+import { resolveDeviceTypeIcon, isRecentlyActive } from "./deviceIcons";
+import CountryFlag from "./countryFlags";
 
 // Load several lookup resources at once and return a map slug -> rows
 export function useLookups(slugs: string[]) {
@@ -214,6 +216,80 @@ export function airportCol(field: string, headerName: string, width = 130): ColD
     cellEditorPopup: true,
     cellRenderer: DropdownCellRenderer,
     valueFormatter: (p) => (p.value == null ? "" : String(p.value)),
+  };
+}
+
+/**
+ * Phase 5 Req 6.2/7.1 — a small, read-only glyph column showing the device
+ * type's icon (from its lookup row's ``icon`` field, set via Naming.tsx) and,
+ * when ``activeField`` names a recent-timestamp column present on the row
+ * (e.g. ``last_fact_sync_at``), an animated dot signalling the device has
+ * recently reported facts.
+ */
+export function deviceTypeIconCol(
+  field: string,
+  headerName: string,
+  options: Row[],
+  activeField?: string
+): ColDef {
+  const iconById = new Map<number, string | null | undefined>();
+  (options ?? []).forEach((o) => iconById.set(o.id, o.icon));
+  return {
+    field,
+    headerName,
+    editable: false,
+    width: 70,
+    sortable: false,
+    filter: false,
+    cellRenderer: (p: ICellRendererParams) => {
+      const typeId = p.value;
+      const Icon = resolveDeviceTypeIcon(
+        typeId == null ? null : iconById.get(Number(typeId))
+      );
+      const active = activeField ? isRecentlyActive(p.data?.[activeField]) : false;
+      return (
+        <span className="relative inline-flex items-center justify-center w-5 h-5">
+          <Icon size={16} aria-hidden="true" />
+          {active && (
+            <span
+              title="Active — recently reported facts"
+              aria-label="Active"
+              className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 animate-pulse"
+            />
+          )}
+        </span>
+      );
+    },
+  };
+}
+
+/**
+ * Phase 5 Task 12 (Req 10) — a small flag column. By default reads the
+ * country name straight off ``row[field]``; pass ``resolveCountryName`` when
+ * the country has to be derived (e.g. a Region's abbreviation -> mapped
+ * country via ``lib/regionGeo.ts``). Renders nothing for an unrecognised or
+ * absent country rather than a broken flag.
+ */
+export function flagCol(
+  field: string,
+  headerName: string,
+  resolveCountryName?: (row: Row) => string | null | undefined,
+  width = 60
+): ColDef {
+  return {
+    // Distinct colId: a flag column is often paired with a plain text column
+    // reading the SAME field (e.g. "country"), and AG Grid needs unique
+    // column ids even when they share a field.
+    colId: `${field}_flag`,
+    field,
+    headerName,
+    editable: false,
+    sortable: false,
+    filter: false,
+    width,
+    cellRenderer: (p: ICellRendererParams) => (
+      <CountryFlag country={resolveCountryName ? resolveCountryName(p.data ?? {}) : p.data?.[field]} />
+    ),
   };
 }
 

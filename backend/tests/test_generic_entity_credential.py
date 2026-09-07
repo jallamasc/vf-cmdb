@@ -14,6 +14,7 @@ import httpx
 import pytest
 
 from app import bitwarden_client, crud, models
+from app.config import settings
 from app.main import app
 
 
@@ -58,6 +59,12 @@ def fake_secrets(monkeypatch):
     fake = FakeSecretsClient()
     monkeypatch.setattr(bitwarden_client, "get_secrets_client", lambda: fake)
     monkeypatch.setattr(bitwarden_client, "generate_password", lambda length=24: "generated-pw-1")
+    # This file only exercises the Bitwarden credential hook — force
+    # Semaphore "not configured" (regardless of whatever a real backend/.env
+    # on this machine sets it to for live dev testing) so `crud.create_item`
+    # creating an ansible_managed record never makes a real Semaphore
+    # network call here; that side is covered by test_lifecycle_sync.py.
+    monkeypatch.setattr(settings, "semaphore_project_id", 0)
     return fake
 
 
@@ -89,6 +96,7 @@ async def test_create_hook_skips_gracefully_when_bitwarden_not_configured(sessio
         raise bitwarden_client.BitwardenNotConfigured("not configured")
 
     monkeypatch.setattr(bitwarden_client, "get_secrets_client", _raise)
+    monkeypatch.setattr(settings, "semaphore_project_id", 0)
     et = await _make_entity_type(session, capabilities=["ansible_managed"])
     # Creation still succeeds — an unconfigured integration must not block
     # the record from being created at all.

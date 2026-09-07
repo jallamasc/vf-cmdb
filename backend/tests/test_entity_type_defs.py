@@ -24,11 +24,12 @@ async def test_create_with_valid_capabilities_round_trips(session):
             "label": "Monitor",
             "icon": "monitor",
             "capabilities": ["photo", "power_ports"],
-            "notes": "A display, not a server.",
+            "description": "A display, not a server.",
         },
     )
     assert row.slug == "monitor"
     assert row.capabilities == ["photo", "power_ports"]
+    assert row.description == "A display, not a server."
 
     fetched = await session.get(models.EntityTypeDef, row.id)
     assert fetched is not None

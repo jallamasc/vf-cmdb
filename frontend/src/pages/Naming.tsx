@@ -108,7 +108,7 @@ const baseColumns = [
   textCol("full_name", "Full Name", 220),
   textCol("abbreviation", "Abbreviation", 150),
   numCol("max_length", "Max Length"),
-  textCol("notes", "Notes", 300),
+  textCol("description", "Description", 300),
 ];
 
 // FEAT-6 (6B): device-type grids also expose the stencil_url column.

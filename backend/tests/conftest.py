@@ -50,6 +50,29 @@ _TABLES = [
 ]
 
 
+@pytest.fixture(autouse=True)
+def _no_real_external_integrations(monkeypatch):
+    """Phase 6 — force every external-integration setting back to its
+    "unconfigured" default for every test, regardless of what a real
+    ``backend/.env`` on this machine sets them to for live dev/browser
+    testing (Bitwarden/Semaphore credentials are routinely written there —
+    see the Phase 5/6 session history). Without this, a test that creates
+    an ``ansible_managed`` record without explicitly mocking
+    ``bitwarden_client``/``semaphore_client`` would silently make a REAL
+    network call against whatever real Bitwarden org / Semaphore instance
+    happens to be configured — slow, flaky, and a real production-adjacent
+    credential risk. A test that needs a specific client mocked as
+    "configured" still does so itself via its own ``monkeypatch`` fixture,
+    which runs after this one and simply overrides these same attributes.
+    """
+    monkeypatch.setattr(settings, "bw_organization_id", "")
+    monkeypatch.setattr(settings, "bw_access_token", "")
+    monkeypatch.setattr(settings, "bw_project_id", "")
+    monkeypatch.setattr(settings, "semaphore_url", "")
+    monkeypatch.setattr(settings, "semaphore_api_token", "")
+    monkeypatch.setattr(settings, "semaphore_project_id", 0)
+
+
 @pytest_asyncio.fixture
 async def db_engine():
     """A fresh NullPool engine bound to the current test's event loop.

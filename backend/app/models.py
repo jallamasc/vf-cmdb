@@ -156,7 +156,9 @@ class LookupMixin:
     full_name: Mapped[str] = mapped_column(String(120), nullable=False)
     abbreviation: Mapped[str] = mapped_column(String(20), nullable=False)
     max_length: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Phase 6 Task 2 (Req 2.1) — renamed from `notes`; every registry now
+    # calls this "Description" for consistent terminology.
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     # Per record-type case enforcement applied to abbreviation + name fields.
     case_enforcement: Mapped[str] = mapped_column(
         _case_enum("case_enforcement"), nullable=False, default="mixed",
@@ -304,7 +306,7 @@ class SiteAddress(Base):
     state_region: Mapped[Optional[str]] = mapped_column(String(120))
     postal_code: Mapped[Optional[str]] = mapped_column(String(40))
     country: Mapped[Optional[str]] = mapped_column(String(120))
-    notes: Mapped[Optional[str]] = mapped_column(Text)
+    description: Mapped[Optional[str]] = mapped_column(Text)
 
 
 # ---------------------------------------------------------------------------
@@ -1064,7 +1066,7 @@ class FieldTypeDef(Base):
     builtin: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
     )
-    notes: Mapped[Optional[str]] = mapped_column(Text)
+    description: Mapped[Optional[str]] = mapped_column(Text)
 
 
 class EntityTypeDef(Base):
@@ -1091,7 +1093,7 @@ class EntityTypeDef(Base):
     capabilities: Mapped[list] = mapped_column(
         JSONB, nullable=False, default=list, server_default="[]"
     )
-    notes: Mapped[Optional[str]] = mapped_column(Text)
+    description: Mapped[Optional[str]] = mapped_column(Text)
 
 
 class EntityFieldDef(Base):

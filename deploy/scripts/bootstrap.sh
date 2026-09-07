@@ -91,11 +91,18 @@ cd "$REPO_DIR"
 
 # --- 4. Environment file ---------------------------------------------------
 if [[ ! -f .env ]]; then
-    log "Creating .env from template with a generated DB password..."
+    log "Creating .env from template with generated secrets..."
     cp .env.example .env
     GEN_PW="$(openssl rand -base64 24 2>/dev/null | tr -d '/+=' | cut -c1-24 || date +%s | sha256sum | cut -c1-24)"
     sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${GEN_PW}/" .env
-    log "Generated POSTGRES_PASSWORD written to .env (review other values!)."
+    # Phase 5 Task 36 (Req 29.1) — Ansible Semaphore requires both of these
+    # and podman-compose.yml has no hardcoded fallback for either, so a
+    # first-time deploy via bootstrap.sh must generate them here too.
+    GEN_SEMAPHORE_PW="$(openssl rand -base64 24 2>/dev/null | tr -d '/+=' | cut -c1-24 || date +%s%N | sha256sum | cut -c1-24)"
+    GEN_SEMAPHORE_KEY="$(openssl rand -base64 32 2>/dev/null || date +%s%N | sha256sum | head -c 44)"
+    sed -i "s/^SEMAPHORE_ADMIN_PASSWORD=.*/SEMAPHORE_ADMIN_PASSWORD=${GEN_SEMAPHORE_PW}/" .env
+    sed -i "s#^SEMAPHORE_ACCESS_KEY_ENCRYPTION=.*#SEMAPHORE_ACCESS_KEY_ENCRYPTION=${GEN_SEMAPHORE_KEY}#" .env
+    log "Generated POSTGRES_PASSWORD, SEMAPHORE_ADMIN_PASSWORD and SEMAPHORE_ACCESS_KEY_ENCRYPTION written to .env (review other values!)."
     echo ">>> Review $REPO_DIR/.env — set CORS_ORIGINS and PGADMIN_DEFAULT_PASSWORD."
 else
     log ".env already present — leaving untouched."
@@ -125,11 +132,12 @@ systemctl --user list-timers 'vf-cmdb-*' --no-pager || true
 
 # --- 7. Firewall -----------------------------------------------------------
 if [[ "$ENABLE_UFW" == "1" ]]; then
-    log "Configuring firewall (ufw): allow SSH, 8080, 8000, 5050..."
+    log "Configuring firewall (ufw): allow SSH, 8080, 8000, 5050, 3000..."
     sudo ufw allow OpenSSH        || sudo ufw allow 22/tcp
     sudo ufw allow 8080/tcp        # Web UI
     sudo ufw allow 8000/tcp        # API / docs
     sudo ufw allow 5050/tcp        # pgAdmin
+    sudo ufw allow 3000/tcp        # Ansible Semaphore
     # 5432 (Postgres) intentionally NOT opened to the LAN by default.
     yes | sudo ufw enable || true
     sudo ufw status verbose || true
@@ -145,6 +153,7 @@ cat <<EOF
   │  Web UI    : http://${IP}:8080
   │  API docs  : http://${IP}:8000/docs
   │  pgAdmin   : http://${IP}:5050
+  │  Semaphore : http://${IP}:3000
   └───────────────────────────────────────────────┘
 
   Auto-update timer : daily 03:30 (git pull + rebuild + health-checked redeploy)

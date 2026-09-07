@@ -1178,7 +1178,12 @@ class GenericEntity(Base):
     integrations that need real relational columns elsewhere in the app
     (rack elevation, stencil rendering) instead of being read out of JSONB:
     ``rack_id``/``rack_unit`` (``rack_placement`` capability), ``photo_url``
-    (``photo``), ``stencil_url``/``stencil_url_back`` (``stencil_diagram``).
+    (``photo``), ``stencil_url``/``stencil_url_back`` (``stencil_diagram``),
+    ``ip_id``/``management_ip_id`` (``ip_assignment`` — Phase 5 Task 32,
+    Req 26.1/26.2). Unlike every other capability hook here, ``ip_assignment``
+    is enforced at the CRUD layer (``crud._validate_generic_entity_ip_assignment``):
+    a record whose Entity_Type_Def carries this capability must have BOTH
+    ``ip_id`` and ``management_ip_id`` set, on every create and update.
     """
 
     __tablename__ = "generic_entities"
@@ -1206,3 +1211,7 @@ class GenericEntity(Base):
     # stencil_diagram capability hook.
     stencil_url: Mapped[Optional[str]] = mapped_column(String(500))
     stencil_url_back: Mapped[Optional[str]] = mapped_column(String(500))
+    # ip_assignment capability hook — usage IP vs. management IP, each its
+    # own IpAssignment row (Phase 5 Task 32).
+    ip_id: Mapped[Optional[int]] = mapped_column(ForeignKey("ip_assignments.id"))
+    management_ip_id: Mapped[Optional[int]] = mapped_column(ForeignKey("ip_assignments.id"))

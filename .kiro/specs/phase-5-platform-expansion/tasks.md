@@ -199,12 +199,12 @@ capability patterns rather than reinventing them.
 
 ### Sub-phase E — IP Assignment & Bitwarden
 
-- [ ] 32. Dual IP assignment (usage + management)
-  - [ ] 32.1 `management_ip_id` FK alongside the existing IP link; extend the
+- [x] 32. Dual IP assignment (usage + management)
+  - [x] 32.1 `management_ip_id` FK alongside the existing IP link; extend the
         device/Generic_Entity create flow to require both when
         `ip_assignment` is enabled
     - _Requirements: 26.1, 26.2_
-  - [ ]* 32.2 pytest: creation without both IPs is rejected; both link
+  - [x]* 32.2 pytest: creation without both IPs is rejected; both link
         correctly
 
 - [ ] 33. Bitwarden Secrets Manager client

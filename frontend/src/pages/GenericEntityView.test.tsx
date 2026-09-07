@@ -96,6 +96,20 @@ vi.mock("../api", async (orig) => {
       // Phase 5 Task 34 — the credential panel's reveal/regenerate actions.
       revealCredential: vi.fn(),
       regenerateCredential: vi.fn(),
+      // Phase 5 Task 39 — the automation tab. Defaults to "not configured"
+      // so tests unrelated to automation (e.g. the credential-only ones,
+      // which share the ansible_managed gate) don't need to care about it.
+      automationStatus: vi.fn().mockResolvedValue({
+        inventory_id: null,
+        has_credential: false,
+        configured: false,
+        semaphore_url: null,
+        project_id: null,
+      }),
+      automationTemplates: vi.fn().mockResolvedValue([]),
+      launchAutomationTask: vi.fn(),
+      getAutomationTask: vi.fn(),
+      getAutomationTaskOutput: vi.fn(),
     },
   };
 });
@@ -339,5 +353,114 @@ describe("GenericEntityView — default admin credential (Req 28.2/28.3)", () =>
     expect(screen.getByText("admin")).toBeTruthy();
     expect(screen.getByText("Reveal")).toBeTruthy();
     expect(screen.getByText("Regenerate")).toBeTruthy();
+  });
+});
+
+describe("GenericEntityView — automation tab (Req 31.1/31.3)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    capturedProps = [];
+    (api.list as any).mockImplementation((resource: string) => {
+      if (resource === "entity-type-defs")
+        return Promise.resolve([
+          { id: 7, slug: "monitor", label: "Monitor", capabilities: ["ansible_managed"] },
+        ]);
+      if (resource === "entity-field-defs") return Promise.resolve([]);
+      if (resource === "field-type-defs") return Promise.resolve(FIELD_TYPES);
+      return Promise.resolve([]);
+    });
+  });
+
+  it("shows an unconfigured message when Semaphore isn't configured", async () => {
+    selectRowPayload = { id: 1, entity_type_id: 7 };
+    wrap("monitor");
+    await screen.findByTestId("select-row");
+    fireEvent.click(screen.getByTestId("select-row"));
+    await waitFor(() => expect(screen.getByText("Automation")).toBeTruthy());
+    expect(
+      await screen.findByText(/Semaphore automation is not configured/),
+    ).toBeTruthy();
+  });
+
+  it("shows the template picker once configured with a linked inventory", async () => {
+    (api.automationStatus as any).mockResolvedValue({
+      inventory_id: 9,
+      has_credential: true,
+      configured: true,
+      semaphore_url: "http://semaphore.test",
+      project_id: 3,
+    });
+    (api.automationTemplates as any).mockResolvedValue([
+      { id: 1, name: "ping" },
+      { id: 2, name: "deploy" },
+    ]);
+    selectRowPayload = { id: 1, entity_type_id: 7 };
+    wrap("monitor");
+    await screen.findByTestId("select-row");
+    fireEvent.click(screen.getByTestId("select-row"));
+    expect(await screen.findByLabelText("Automation template")).toBeTruthy();
+    expect(await screen.findByText("ping")).toBeTruthy();
+    expect(screen.getByText("deploy")).toBeTruthy();
+  });
+
+  it("launches the selected template against this record's inventory and shows it in history", async () => {
+    (api.automationStatus as any).mockResolvedValue({
+      inventory_id: 9,
+      has_credential: true,
+      configured: true,
+      semaphore_url: "http://semaphore.test",
+      project_id: 3,
+    });
+    (api.automationTemplates as any).mockResolvedValue([{ id: 2, name: "deploy" }]);
+    (api.launchAutomationTask as any).mockResolvedValue({
+      id: 42,
+      status: "waiting",
+      template_id: 2,
+    });
+    (api.getAutomationTask as any).mockResolvedValue({ id: 42, status: "success" });
+    (api.getAutomationTaskOutput as any).mockResolvedValue([
+      { task_id: 42, time: "now", output: "done" },
+    ]);
+    selectRowPayload = { id: 1, entity_type_id: 7 };
+    wrap("monitor");
+    await screen.findByTestId("select-row");
+    fireEvent.click(screen.getByTestId("select-row"));
+    const select = await screen.findByLabelText("Automation template");
+    // Wait for the async-loaded <option> to exist before firing change —
+    // otherwise the change silently no-ops (same race learned in Task 30's
+    // AirportCellEditor tests).
+    await screen.findByText("deploy");
+    fireEvent.change(select, { target: { value: "2" } });
+    await waitFor(() => expect(screen.getByText("Launch")).not.toBeDisabled());
+    fireEvent.click(screen.getByText("Launch"));
+
+    await waitFor(() =>
+      expect(api.launchAutomationTask).toHaveBeenCalledWith("generic-entities", 1, 2),
+    );
+    await waitFor(() => expect(screen.getByText("#42")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("success")).toBeTruthy());
+
+    const deepLink = await screen.findByText("Open in Semaphore");
+    expect(deepLink.getAttribute("href")).toBe(
+      "http://semaphore.test/project/3/history?t=42",
+    );
+  });
+
+  it("does not link to Semaphore when no inventory is linked yet", async () => {
+    (api.automationStatus as any).mockResolvedValue({
+      inventory_id: null,
+      has_credential: false,
+      configured: true,
+      semaphore_url: "http://semaphore.test",
+      project_id: 3,
+    });
+    selectRowPayload = { id: 1, entity_type_id: 7 };
+    wrap("monitor");
+    await screen.findByTestId("select-row");
+    fireEvent.click(screen.getByTestId("select-row"));
+    expect(
+      await screen.findByText(/No Semaphore inventory linked for this record yet/),
+    ).toBeTruthy();
+    expect(screen.queryByLabelText("Automation template")).toBeNull();
   });
 });

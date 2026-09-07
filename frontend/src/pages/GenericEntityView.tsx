@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import EntityGrid from "../components/EntityGrid";
 import PhotoField from "../components/PhotoField";
 import CredentialField from "../components/CredentialField";
+import AutomationTab from "../components/AutomationTab";
 import { StencilRow } from "../components/StencilField";
 import { api, Row } from "../api";
 import { useLookups, roCol } from "../lib/columns";
@@ -38,6 +39,11 @@ function CapabilityPanel({
   const hasStencil = capabilities.includes("stencil_diagram");
   const hasIpAssignment = capabilities.includes("ip_assignment");
   const hasCredential = capabilities.includes("ansible_managed");
+  // Task 39 (Req 31.1) — the automation tab shares its capability gate with
+  // the credential section: both are meaningful only once ansible_managed
+  // is on (a device needs a credential AND a Semaphore inventory to be
+  // "Ansible-managed" in this app's sense).
+  const hasAutomation = capabilities.includes("ansible_managed");
 
   const { data: usageIp } = useQuery({
     queryKey: ["ip-assignments", selected?.ip_id],
@@ -50,7 +56,8 @@ function CapabilityPanel({
     enabled: hasIpAssignment && selected?.management_ip_id != null,
   });
 
-  if (!hasPhoto && !hasStencil && !hasIpAssignment && !hasCredential) return null;
+  if (!hasPhoto && !hasStencil && !hasIpAssignment && !hasCredential && !hasAutomation)
+    return null;
 
   if (!selected) {
     return (
@@ -61,6 +68,7 @@ function CapabilityPanel({
           hasStencil && "stencil",
           hasIpAssignment && "IP assignment",
           hasCredential && "credential",
+          hasAutomation && "automation",
         ]
           .filter(Boolean)
           .join(" / ")}
@@ -110,6 +118,14 @@ function CapabilityPanel({
             Default admin credential
           </p>
           <CredentialField resource="generic-entities" row={selected} />
+        </div>
+      )}
+      {hasAutomation && (
+        <div>
+          <p className="text-xs uppercase tracking-wide text-slate-500 mb-1">
+            Automation
+          </p>
+          <AutomationTab resource="generic-entities" row={selected} />
         </div>
       )}
     </div>

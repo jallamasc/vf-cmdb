@@ -243,12 +243,12 @@ capability patterns rather than reinventing them.
     - _Requirements: 29.2_
   - [x]* 37.2 pytest against a mocked HTTP client
 
-- [ ] 38. Three-way sync — device ↔ Bitwarden secret ↔ Semaphore inventory
-  - [ ] 38.1 Extend the create/update/delete hooks (same insertion points as
+- [x] 38. Three-way sync — device ↔ Bitwarden secret ↔ Semaphore inventory
+  - [x] 38.1 Extend the create/update/delete hooks (same insertion points as
         the Phase 4 cable-auto-sync and Task 34's credential hook) to
         upsert/remove a Semaphore inventory host, gated on `ansible_managed`
     - _Requirements: 30.1, 30.2, 30.3_
-  - [ ]* 38.2 pytest with both clients mocked: create/update/delete produce
+  - [x]* 38.2 pytest with both clients mocked: create/update/delete produce
         the expected calls; a non-`ansible_managed` type produces none
 
 - [ ] 39. Automation tab per device

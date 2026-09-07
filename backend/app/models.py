@@ -1188,7 +1188,10 @@ class GenericEntity(Base):
     Task 34, Req 28.1): a default admin credential, auto-provisioned via
     ``crud._provision_credential`` on creation only. The plaintext password
     is never stored here — only the username and the Bitwarden Secrets
-    Manager's own reference to it.
+    Manager's own reference to it. ``semaphore_host_id`` (``ansible_managed``
+    — Phase 5 Task 38, Req 30.1/30.2): the id of the Semaphore Inventory
+    ``lifecycle_sync.py`` upserts for this record on every create/update, and
+    removes (without touching ``bw_secret_id``/Bitwarden) on delete.
     """
 
     __tablename__ = "generic_entities"
@@ -1225,3 +1228,4 @@ class GenericEntity(Base):
     # the plaintext password lives only in Bitwarden (Phase 5 Task 34).
     admin_username: Mapped[Optional[str]] = mapped_column(String(100))
     bw_secret_id: Mapped[Optional[str]] = mapped_column(String(64))
+    semaphore_host_id: Mapped[Optional[str]] = mapped_column(String(64))

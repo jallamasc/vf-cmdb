@@ -258,7 +258,7 @@ capability patterns rather than reinventing them.
     - _Requirements: 31.1, 31.2, 31.3_
   - [x]* 39.2 pytest for the proxy endpoints (mocked); Vitest for the tab
 
-- [ ] 40. Checkpoint F — final full build + test verification of the entire
+- [x] 40. Checkpoint F — final full build + test verification of the entire
       Phase 5 scope; present for browser testing.
 
 ## Notes

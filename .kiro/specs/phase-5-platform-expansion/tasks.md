@@ -195,7 +195,7 @@ capability patterns rather than reinventing them.
   - [x]* 30.2 Vitest: country filters suggestions; non-match blocked; override
         allows it through
 
-- [ ] 31. Checkpoint D — build + test verification.
+- [x] 31. Checkpoint D — build + test verification.
 
 ### Sub-phase E — IP Assignment & Bitwarden
 

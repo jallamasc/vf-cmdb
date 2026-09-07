@@ -463,13 +463,16 @@ type PreviewField =
   | "simple_name"
   | "vf_long_name"
   | "vf_short_name"
-  | "tia606b_name";
+  | "tia606b_name"
+  | "code";
 
 const PREVIEW_LABELS: Record<PreviewField, string> = {
   simple_name: "Site Code",
   vf_long_name: "VF Long",
   vf_short_name: "VF Short",
   tia606b_name: "TIA-606-B",
+  // Phase 6 Task 13/14 — Floor's "F{n}" / Section's "S{n}".
+  code: "Code",
 };
 
 const DEFAULT_PREVIEW_FIELDS: PreviewField[] = [
@@ -481,11 +484,14 @@ const DEFAULT_PREVIEW_FIELDS: PreviewField[] = [
 /**
  * Which generated names a level actually produces. A site also gets the
  * FEAT-1 site code; a datacenter (FEAT-5) only gets a VF long name, so the
- * short / TIA lines are not rendered as perpetually empty for it.
+ * short / TIA lines are not rendered as perpetually empty for it. Floor/
+ * Section (Phase 6 Task 13) only ever generate `code`.
  */
 const PREVIEW_FIELDS: Record<string, PreviewField[]> = {
   site: ["simple_name", ...DEFAULT_PREVIEW_FIELDS],
   datacenter: ["vf_long_name"],
+  datacenter_floor: ["code"],
+  section: ["code"],
 };
 
 /**
@@ -682,16 +688,23 @@ function FloorForm({
   const [dcId, setDcId] = useState("");
   const [floorNo, setFloorNo] = useState("");
   const [valid, setValid] = useState(false);
+  // Phase 6 Task 13/14 (Req 6.1/6.3) — `code` is now auto-generated
+  // ("F{n}" scoped to the parent Datacenter) by default; this Quick Add
+  // form has no grid to make read-only, so the equivalent Code Mode
+  // control here is this toggle — checked (auto) hides the manual code
+  // input entirely and lets the server generate it, matching every other
+  // naming-engine field's default.
+  const [autoCode, setAutoCode] = useState(true);
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
         create.mutate({
           name,
-          code: code || null,
           case_enforcement: caseEnf,
           datacenter_id: dcId ? Number(dcId) : null,
           floor_number: floorNo ? Number(floorNo) : null,
+          ...(autoCode ? {} : { naming_mode: "manual", code: code || null }),
         });
       }}
       className="grid grid-cols-2 gap-3"
@@ -708,26 +721,36 @@ function FloorForm({
       <Field label="Case enforcement">
         <CaseSelect value={caseEnf} onChange={setCaseEnf} />
       </Field>
-      <div className="col-span-2">
-        <AbbrevField
-          value={code}
-          onChange={setCode}
-          fullName={name}
-          trimMode={trim}
-          onTrimModeChange={setTrim}
-          caseEnforcement={caseEnf}
-          entityType="datacenter_floors"
-          onValidityChange={setValid}
+      <label className="col-span-2 flex items-center gap-2 text-sm text-slate-600 vf-mode-toggle-cell px-2 py-1 rounded w-fit">
+        <input
+          type="checkbox"
+          checked={autoCode}
+          onChange={(e) => setAutoCode(e.target.checked)}
         />
-      </div>
+        Auto-generate code (Code Mode)
+      </label>
+      {!autoCode && (
+        <div className="col-span-2">
+          <AbbrevField
+            value={code}
+            onChange={setCode}
+            fullName={name}
+            trimMode={trim}
+            onTrimModeChange={setTrim}
+            caseEnforcement={caseEnf}
+            entityType="datacenter_floors"
+            onValidityChange={setValid}
+          />
+        </div>
+      )}
       <div className="col-span-2">
         <NamePreviewCard
           entityType="datacenter_floor"
-          params={{ datacenter_id: dcId, name, code, floor_number: floorNo }}
+          params={{ datacenter_id: dcId, name, floor_number: floorNo }}
         />
       </div>
       <div className="col-span-2">
-        <SubmitRow disabled={!name || (!!code && !valid)} pending={create.isPending} />
+        <SubmitRow disabled={!name || (!autoCode && !!code && !valid)} pending={create.isPending} />
       </div>
     </form>
   );
@@ -812,15 +835,19 @@ function SectionForm({
   const [caseEnf, setCaseEnf] = useState("mixed");
   const [roomId, setRoomId] = useState("");
   const [valid, setValid] = useState(false);
+  // Phase 6 Task 13/14 (Req 6.2/6.3) — `code` is now auto-generated
+  // ("S{n}" scoped to the parent Room) by default; same Code Mode toggle
+  // idiom as FloorForm above.
+  const [autoCode, setAutoCode] = useState(true);
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
         create.mutate({
           name,
-          code: code || null,
           case_enforcement: caseEnf,
           room_id: roomId ? Number(roomId) : null,
+          ...(autoCode ? {} : { naming_mode: "manual", code: code || null }),
         });
       }}
       className="grid grid-cols-2 gap-3"
@@ -831,23 +858,36 @@ function SectionForm({
       <Field label="Room (parent)">
         <Select value={roomId} onChange={setRoomId} rows={rooms} placeholder="— select room —" />
       </Field>
-      <div className="col-span-2 grid grid-cols-2 gap-3">
-        <AbbrevField
-          value={code}
-          onChange={setCode}
-          fullName={name}
-          trimMode={trim}
-          onTrimModeChange={setTrim}
-          caseEnforcement={caseEnf}
-          entityType="sections"
-          onValidityChange={setValid}
+      <label className="col-span-2 flex items-center gap-2 text-sm text-slate-600 vf-mode-toggle-cell px-2 py-1 rounded w-fit">
+        <input
+          type="checkbox"
+          checked={autoCode}
+          onChange={(e) => setAutoCode(e.target.checked)}
         />
-        <Field label="Case enforcement">
-          <CaseSelect value={caseEnf} onChange={setCaseEnf} />
-        </Field>
+        Auto-generate code (Code Mode)
+      </label>
+      {!autoCode && (
+        <div className="col-span-2 grid grid-cols-2 gap-3">
+          <AbbrevField
+            value={code}
+            onChange={setCode}
+            fullName={name}
+            trimMode={trim}
+            onTrimModeChange={setTrim}
+            caseEnforcement={caseEnf}
+            entityType="sections"
+            onValidityChange={setValid}
+          />
+          <Field label="Case enforcement">
+            <CaseSelect value={caseEnf} onChange={setCaseEnf} />
+          </Field>
+        </div>
+      )}
+      <div className="col-span-2">
+        <NamePreviewCard entityType="section" params={{ room_id: roomId, name }} />
       </div>
       <div className="col-span-2">
-        <SubmitRow disabled={!name || !roomId || (!!code && !valid)} pending={create.isPending} />
+        <SubmitRow disabled={!name || !roomId || (!autoCode && !!code && !valid)} pending={create.isPending} />
       </div>
     </form>
   );

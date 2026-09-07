@@ -93,23 +93,33 @@ sub-phases that reuse them.
 
 ### Sub-phase D — Floor & Section Auto-Naming
 
-- [ ] 13. Naming generators
-  - [ ] 13.1 `generate_floor`/`generate_section` in `naming.py`'s dispatch
+- [x] 13. Naming generators
+  - [x] 13.1 `generate_floor` (`{datacenter.code or DC{id}}-F{n}`, scoped to
+        parent Datacenter) / `generate_section` (`S{n}`, scoped to parent
+        Room) in `naming.py`'s dispatch; new `naming_mode` column (migration
+        0027) on both tables since neither had one before
     - _Requirements: 6.1, 6.2_
-  - [ ]* 13.2 pytest generated + sequential-fallback codes
+  - [x]* 13.2 pytest generated + sequential-fallback codes + naming preview
+        endpoint reports the real code
 
-- [ ] 14. Frontend read-only wiring
-  - [ ] 14.1 Floor/Section code columns → `roCol` + Code_Mode toggle, styled
-        per Task 11
+- [x] 14. Frontend Code Mode wiring
+  - [x] 14.1 Neither table has an editable grid on Hierarchy.tsx (Quick Add
+        forms only) — the equivalent Code_Mode control is a new
+        "Auto-generate code (Code Mode)" checkbox on `FloorForm`/
+        `SectionForm`, styled per Task 11's `vf-mode-toggle-cell`; unchecked
+        reveals the manual `AbbrevField` + sends `naming_mode: "manual"`
     - _Requirements: 6.3_
-  - [ ]* 14.2 Vitest read-only-unless-Code-Mode
+  - [x]* 14.2 Vitest auto-omits-code / manual-reveals-field-and-sends-mode
 
-- [ ] 15. Breadcrumb combination
-  - [ ] 15.1 Room/Rack breadcrumb shows Floor+Section combined
+- [x] 15. Breadcrumb combination
+  - [x] 15.1 `RackView.tsx`'s breadcrumb now resolves Room too and appends
+        the Floor+Section generated codes as one compact tag (e.g.
+        "... / Room1 (DC1-F1 S1)")
     - _Requirements: 6.4_
-  - [ ]* 15.2 Vitest breadcrumb string
+  - [x]* 15.2 Vitest breadcrumb string (room-parented, section-parented,
+        direct-floor no-regression, combined-code-tag)
 
-- [ ] 16. Checkpoint D — build + test verification.
+- [x] 16. Checkpoint D — build + test verification.
 
 ### Sub-phase E — Region Geo-Markers
 

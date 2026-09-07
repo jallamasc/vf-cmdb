@@ -82,6 +82,47 @@ export function StencilRow({
   );
 }
 
+/**
+ * Phase 5 Task 29 (Req 24.1/24.2) / Phase 6 Task 27 (Req 10.2-10.4) —
+ * collapsible "manage this row's stencil" wrapper around `StencilRow`,
+ * driven by whichever single row is currently selected in the caller's
+ * grid (or explicitly passed in, e.g. from a device's own detail page).
+ * Originally local to `Naming.tsx`; promoted here once
+ * `SimpleGridPage.tsx`/`DeviceOverviewForm.tsx`/`RackSlotEditor.tsx` all
+ * needed the exact same "select a row below to manage its stencil" idiom
+ * for the Universal_Stencil_Override (every device/entity instance table
+ * now carries its own stencil_url/stencil_url_back, Req 10.1).
+ */
+export function StencilPanel({
+  resource,
+  label,
+  selected,
+  onChanged,
+}: {
+  resource: string;
+  label: string;
+  selected: Row | null;
+  onChanged: () => void;
+}) {
+  if (!selected) {
+    return (
+      <div className="mb-3 px-3 py-2 border border-dashed border-slate-300 rounded text-sm text-slate-500">
+        Select a {label} row below to manage its stencil.
+      </div>
+    );
+  }
+  return (
+    <details className="mb-3 border border-slate-200 rounded-lg" open>
+      <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-slate-700">
+        Stencil — {selected.full_name ? String(selected.full_name) : `#${selected.id}`}
+      </summary>
+      <div className="px-3 pb-3">
+        <StencilRow resource={resource} row={selected} onChanged={onChanged} />
+      </div>
+    </details>
+  );
+}
+
 /** One URL/upload control for a single face (front or back) of a stencil. */
 function StencilFaceRow({
   resource,

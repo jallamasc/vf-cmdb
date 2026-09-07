@@ -111,6 +111,14 @@ export default function RackView() {
     queryKey: ["power-devices"],
     queryFn: () => api.list("power-devices"),
   });
+  // Phase 6 Task 26/27 (Req 10.2) — PatchPanel now carries its own
+  // Stencil_Override (it never had a device-TYPE stencil concept), so its
+  // rows are needed here the same way the other 3 mountable device tables
+  // already are.
+  const { data: patchPanels } = useQuery({
+    queryKey: ["patch-panels"],
+    queryFn: () => api.list("patch-panels"),
+  });
   const { data: networkDeviceTypes } = useQuery({
     queryKey: ["network-device-types"],
     queryFn: () => api.list("network-device-types"),
@@ -169,10 +177,11 @@ export default function RackView() {
       "physical-servers": new Map((physicalServers ?? []).map((d) => [d.id, d])),
       workstations: new Map((workstations ?? []).map((d) => [d.id, d])),
       "power-devices": new Map((powerDevices ?? []).map((d) => [d.id, d])),
+      "patch-panels": new Map((patchPanels ?? []).map((d) => [d.id, d])),
       "generic-entities": new Map((genericEntities ?? []).map((d) => [d.id, d])),
     };
     return m;
-  }, [networkDevices, physicalServers, workstations, powerDevices, genericEntities]);
+  }, [networkDevices, physicalServers, workstations, powerDevices, patchPanels, genericEntities]);
 
   // Phase 4 Req 20 — display name + rack id for a resolved far end, so the
   // ConnectionInfoPanel can show who it's connected to and jump there.
@@ -245,51 +254,72 @@ export default function RackView() {
     const computeDeviceTypesById = new Map((computeDeviceTypes ?? []).map((t) => [t.id, t]));
     const powerDeviceTypesById = new Map((powerDeviceTypes ?? []).map((t) => [t.id, t]));
 
+    // Phase 6 Task 26/27 (Req 10.2) — resolves BOTH the instance row itself
+    // (so its own Stencil_Override can win) AND its device-type row (the
+    // pre-existing fallback), keyed by the coarse `device_table` string
+    // RackSlotEditor/RackDiagramSVG already use.
     const resolveOwnerAndTypeMap = (
       deviceTable: string | null | undefined,
       deviceId: number | null | undefined
-    ): { resource: string; typeRow: Row | undefined } | null => {
+    ): { instance: Row | undefined; resource: string | null; typeRow: Row | undefined } | null => {
       if (deviceId == null) return null;
       switch (deviceTable) {
-        case "network-devices":
+        case "network-devices": {
+          const instance = ownerById["network-devices"]?.get(deviceId);
           return {
+            instance,
             resource: "network-device-types",
-            typeRow: networkDeviceTypesById.get(
-              ownerById["network-devices"]?.get(deviceId)?.device_type_id
-            ),
+            typeRow: networkDeviceTypesById.get(instance?.device_type_id),
           };
-        case "physical-servers":
+        }
+        case "physical-servers": {
+          const instance = ownerById["physical-servers"]?.get(deviceId);
           return {
+            instance,
             resource: "compute-device-types",
-            typeRow: computeDeviceTypesById.get(
-              ownerById["physical-servers"]?.get(deviceId)?.device_type_id
-            ),
+            typeRow: computeDeviceTypesById.get(instance?.device_type_id),
           };
-        case "workstations":
+        }
+        case "workstations": {
+          const instance = ownerById["workstations"]?.get(deviceId);
           return {
+            instance,
             resource: "compute-device-types",
-            typeRow: computeDeviceTypesById.get(
-              ownerById["workstations"]?.get(deviceId)?.device_type_id
-            ),
+            typeRow: computeDeviceTypesById.get(instance?.device_type_id),
           };
-        case "power-devices":
+        }
+        case "power-devices": {
+          const instance = powerDevicesById.get(deviceId);
           return {
+            instance,
             resource: "power-device-types",
-            typeRow: powerDeviceTypesById.get(
-              powerDevicesById.get(deviceId)?.device_type_id
-            ),
+            typeRow: powerDeviceTypesById.get(instance?.device_type_id),
           };
+        }
+        case "patch-panels":
+          // PatchPanel never had a device-TYPE stencil concept — its own
+          // Stencil_Override (checked below) is the ONLY source.
+          return { instance: ownerById["patch-panels"]?.get(deviceId), resource: null, typeRow: undefined };
         default:
-          return null; // e.g. patch-panels: no device-type/stencil concept
+          return null;
       }
     };
 
     const map: Record<number, string> = {};
     (allUnits ?? []).forEach((u) => {
       const resolved = resolveOwnerAndTypeMap(u.device_table, u.device_id);
-      if (!resolved?.typeRow) return;
-      const url = face === "back" ? resolved.typeRow.stencil_url_back : resolved.typeRow.stencil_url;
-      if (!url) return;
+      if (!resolved) return;
+      // Req 10.2 — a per-record Stencil_Override always wins over the
+      // owning device-type's stencil when both are set.
+      const overrideUrl =
+        face === "back" ? resolved.instance?.stencil_url_back : resolved.instance?.stencil_url;
+      if (overrideUrl && u.device_table && u.device_id != null) {
+        map[u.id] = api.stencilUrl(`${u.device_table}-${u.device_id}`, face);
+        return;
+      }
+      if (!resolved.typeRow || !resolved.resource) return;
+      const typeUrl = face === "back" ? resolved.typeRow.stencil_url_back : resolved.typeRow.stencil_url;
+      if (!typeUrl) return;
       map[u.id] = api.stencilUrl(`${resolved.resource}-${resolved.typeRow.id}`, face);
     });
     return map;

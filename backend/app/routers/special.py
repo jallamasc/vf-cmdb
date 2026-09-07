@@ -886,6 +886,19 @@ STENCIL_RESOURCES = {
     "storage-device-types": models.StorageDeviceType,
     # Phase 4 Req 17: power devices get the same stencil treatment.
     "power-device-types": models.PowerDeviceType,
+    # Phase 6 Task 26 (Req 10.1/10.2) — Universal_Stencil_Override: every
+    # hardcoded device/entity INSTANCE table also carries its own
+    # stencil_url/stencil_url_back now, independent of its device-type's
+    # columns above. Slugs are distinct strings (e.g. "network-devices" vs
+    # "network-device-types") so no prefix collision in _parse_owner_slug.
+    "network-devices": models.NetworkDevice,
+    "physical-servers": models.PhysicalServer,
+    "virtual-machines": models.VirtualMachine,
+    "containers-apps": models.ContainerApp,
+    "workstations": models.Workstation,
+    "power-devices": models.PowerDevice,
+    "patch-panels": models.PatchPanel,
+    "racks": models.Rack,
 }
 
 _SVG_HEADERS = {"Cache-Control": "public, max-age=86400"}

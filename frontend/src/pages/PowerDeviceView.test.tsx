@@ -75,3 +75,52 @@ describe("PowerDeviceView — drill-down gating (Req 5)", () => {
     expect(screen.queryByText(/select a rack.*to view its diagram/i)).toBeNull();
   });
 });
+
+// Phase 6 Task 26/27 (Req 10.2) — a device's own Stencil_Override wins over
+// its type's stencil when both are set.
+describe("PowerDeviceView — stencil override priority (Req 10.2)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("prefers the device's own stencil_url over its device-type's stencil_url", async () => {
+    const withOverride: Record<string, any[]> = {
+      ...FIXTURES,
+      "power-devices": [
+        { id: 1, rack_id: 1, device_type_id: 7, vf_long_name: "PDU1", stencil_url: "https://override.example/pdu.svg" },
+      ],
+      "power-device-types": [{ id: 7, stencil_url: "https://type.example/pdt.svg" }],
+    };
+    (api.list as any).mockImplementation((resource: string) =>
+      Promise.resolve(withOverride[resource] ?? [])
+    );
+    wrap(<PowerDeviceView />);
+    await waitFor(() => expect(screen.getByLabelText("Rack")).toBeTruthy());
+    fireEvent.change(screen.getByLabelText("Rack"), { target: { value: "1" } });
+
+    await waitFor(() => {
+      const image = document.querySelector('image[href*="power-devices-1"]');
+      expect(image).toBeTruthy();
+    });
+    expect(document.querySelector('image[href*="power-device-types-7"]')).toBeNull();
+  });
+
+  it("falls back to the device-type's stencil_url when the device has no override", async () => {
+    const withTypeOnly: Record<string, any[]> = {
+      ...FIXTURES,
+      "power-devices": [
+        { id: 1, rack_id: 1, device_type_id: 7, vf_long_name: "PDU1", stencil_url: null },
+      ],
+      "power-device-types": [{ id: 7, stencil_url: "https://type.example/pdt.svg" }],
+    };
+    (api.list as any).mockImplementation((resource: string) =>
+      Promise.resolve(withTypeOnly[resource] ?? [])
+    );
+    wrap(<PowerDeviceView />);
+    await waitFor(() => expect(screen.getByLabelText("Rack")).toBeTruthy());
+    fireEvent.change(screen.getByLabelText("Rack"), { target: { value: "1" } });
+
+    await waitFor(() => {
+      const image = document.querySelector('image[href*="power-device-types-7"]');
+      expect(image).toBeTruthy();
+    });
+  });
+});

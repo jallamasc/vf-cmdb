@@ -564,6 +564,19 @@ class Rack(Base):
         _naming_mode_enum("rack_naming_mode"), nullable=False,
         default="auto", server_default="auto",
     )
+    # Phase 6 Task 26 (Req 10.1) — Universal_Stencil_Override: an optional
+    # per-RECORD stencil, distinct from every device-TYPE lookup's own
+    # stencil_url above (ComputeDeviceType etc.). When set, diagrams render
+    # THIS device's own graphic instead of falling back to its type's
+    # stencil (Req 10.2). Added to every hardcoded device/entity table that
+    # can be stored in the CMDB, per the user's explicit "apply to
+    # everything" scope decision — including Rack, even though nothing
+    # currently draws a Rack itself as a stencil target (it's the elevation
+    # frame the diagram is drawn INTO, not a mounted item); the column
+    # exists for schema completeness and future use, not wired into
+    # RackDiagramSVG's own rendering.
+    stencil_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    stencil_url_back: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text)
 
 
@@ -605,6 +618,11 @@ class PowerDevice(Base):
         _naming_mode_enum("power_device_naming_mode"), nullable=False,
         default="auto", server_default="auto",
     )
+    # Phase 6 Task 26 (Req 10.1/10.2) — per-record Stencil_Override; see
+    # Rack's own comment above for the full rationale. Wins over
+    # PowerDeviceType.stencil_url when set (PowerDeviceView.tsx).
+    stencil_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    stencil_url_back: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text)
 
 
@@ -638,6 +656,12 @@ class PatchPanel(Base):
         _naming_mode_enum("patch_panel_naming_mode"), nullable=False,
         default="auto", server_default="auto",
     )
+    # Phase 6 Task 26 (Req 10.1/10.2) — per-record Stencil_Override; see
+    # Rack's own comment above. PatchPanel never had a device-TYPE stencil
+    # concept at all (no Device_Type_Lookup for it), so this is the ONLY
+    # stencil source for a patch panel going forward (PatchPanelDiagramSVG).
+    stencil_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    stencil_url_back: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text)
 
 
@@ -825,6 +849,11 @@ class NetworkDevice(Base):
     vf_friendly_name: Mapped[Optional[str]] = mapped_column(String(120))
     # Phase 5 Task 23 (Req 19.1) — an uploaded photo of this specific device.
     photo_url: Mapped[Optional[str]] = mapped_column(String(500))
+    # Phase 6 Task 26 (Req 10.1/10.2) — per-record Stencil_Override; see
+    # Rack's own comment above. Wins over NetworkDeviceType.stencil_url when
+    # set (RackView.tsx's stencilHrefByUnit).
+    stencil_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    stencil_url_back: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text)
     # Phase 4 Req 21 — Ansible-depth facts (see PhysicalServer for the
     # rationale; identical shape on every fact-collectable device type).
@@ -913,6 +942,11 @@ class PhysicalServer(Base):
     bios_settings: Mapped[Optional[dict]] = mapped_column(JSONB)
     # Phase 5 Task 23 (Req 19.1) — an uploaded photo of this specific server.
     photo_url: Mapped[Optional[str]] = mapped_column(String(500))
+    # Phase 6 Task 26 (Req 10.1/10.2) — per-record Stencil_Override; see
+    # Rack's own comment above. Wins over ComputeDeviceType.stencil_url when
+    # set (RackView.tsx's stencilHrefByUnit).
+    stencil_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    stencil_url_back: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text)
     # Phase 4 Req 21 — Ansible-depth facts. `ansible_facts` is the catch-all
     # blob for whatever a fact-gathering run reports; a handful of common
@@ -944,6 +978,12 @@ class VirtualMachine(Base):
     management_ipv4: Mapped[Optional[str]] = mapped_column(INET)
     management_ipv6: Mapped[Optional[str]] = mapped_column(INET)
     management_fqdn: Mapped[Optional[str]] = mapped_column(String(200))
+    # Phase 6 Task 26 (Req 10.1/10.2) — per-record Stencil_Override; see
+    # Rack's own comment above. VirtualMachine has no device-TYPE stencil
+    # concept at all (hosted, no own Device_Type_Lookup), so this is the
+    # only stencil source for a VM going forward.
+    stencil_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    stencil_url_back: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text)
     # Phase 4 Req 21 — Ansible-depth facts (see PhysicalServer for the
     # rationale; identical shape on every fact-collectable device type).
@@ -974,6 +1014,14 @@ class ContainerApp(Base):
     description: Mapped[Optional[str]] = mapped_column(Text)
     ipv4_address: Mapped[Optional[str]] = mapped_column(INET)
     ipv6_address: Mapped[Optional[str]] = mapped_column(INET)
+    # Phase 6 Task 26 (Req 10.1/10.2) — per-record Stencil_Override; see
+    # Rack's own comment above. ContainerApp has no device-TYPE stencil
+    # concept at all and no rack/graphical diagram surface today either —
+    # added for schema completeness per the "apply to everything" scope
+    # decision, exposed via its own detail page (Req 10.4) even without a
+    # diagram consumer yet.
+    stencil_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    stencil_url_back: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text)
     # Phase 4 Req 21 — Ansible-depth facts (see PhysicalServer for the
     # rationale; identical shape on every fact-collectable device type).
@@ -1007,6 +1055,13 @@ class Workstation(Base):
     bitwarden_collection_ref: Mapped[Optional[str]] = mapped_column(String(120))
     # Phase 5 Task 23 (Req 19.1) — an uploaded photo of this specific unit.
     photo_url: Mapped[Optional[str]] = mapped_column(String(500))
+    # Phase 6 Task 26 (Req 10.1/10.2) — per-record Stencil_Override; see
+    # Rack's own comment above. Wins over ComputeDeviceType.stencil_url when
+    # set — Workstation isn't rack-mounted in this app's diagrams today, but
+    # DeviceOverviewForm.tsx exposes the same control as the other 3
+    # DeviceDashboard-covered types (Req 10.4).
+    stencil_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    stencil_url_back: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text)
     # Phase 4 Req 21 — Ansible-depth facts (see PhysicalServer for the
     # rationale; identical shape on every fact-collectable device type).

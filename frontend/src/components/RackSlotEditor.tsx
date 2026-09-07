@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, Row } from "../api";
+import { StencilPanel } from "./StencilField";
 
 interface Props {
   rackId: number;
@@ -269,6 +270,17 @@ function EditOrRemoveForm({
   const [error, setError] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
 
+  // Phase 6 Task 27 (Req 10.2/10.3) — Requirement 10.3: open the stencil
+  // picker for THIS specific device instance directly from the rack
+  // diagram's click flow (RackDiagramSVG's onSlotClick -> here). The device
+  // row itself isn't part of `unit` (rack_units only carries device_table +
+  // device_id pointers), so fetch it separately.
+  const { data: deviceRow } = useQuery({
+    queryKey: [unit.device_table, unit.device_id],
+    queryFn: () => api.get(unit.device_table as string, unit.device_id as number),
+    enabled: unit.device_table != null && unit.device_id != null,
+  });
+
   const save = useMutation({
     mutationFn: () =>
       api.update("rack-units", unit.id, { label: label || null, height_units: height }),
@@ -320,6 +332,18 @@ function EditOrRemoveForm({
           className="mt-1 w-24 border border-slate-300 rounded px-2 py-1.5 text-sm"
         />
       </label>
+
+      {unit.device_table && (
+        <StencilPanel
+          resource={unit.device_table}
+          label="device"
+          selected={deviceRow ?? null}
+          onChanged={() => {
+            qc.invalidateQueries({ queryKey: [unit.device_table, unit.device_id] });
+            qc.invalidateQueries({ queryKey: [unit.device_table] });
+          }}
+        />
+      )}
 
       {error && <p className="text-sm text-rose-600">{error}</p>}
 

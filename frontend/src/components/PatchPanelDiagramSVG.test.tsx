@@ -71,4 +71,29 @@ describe("PatchPanelDiagramSVG", () => {
     const { container } = render(<PatchPanelDiagramSVG panel={panel} ports={many} />);
     expect(container.querySelectorAll("circle").length).toBe(30);
   });
+
+  // Phase 6 Task 26/27 (Req 10.1/10.2) — this panel's own Stencil_Override.
+  describe("stencil override", () => {
+    it("renders a plain frame + fallback icon when no stencil is configured", () => {
+      const { container } = render(<PatchPanelDiagramSVG panel={panel} ports={ports} />);
+      expect(container.querySelector("image")).toBeNull();
+      expect(container.querySelector("rect")).toBeTruthy();
+      // "patchpanel" -> the "Cable" lucide icon (Req 11.1).
+      expect(container.querySelector("svg.lucide-cable")).toBeTruthy();
+      // Untouched by the fallback icon (Req 11.2).
+      expect(container.querySelectorAll("circle").length).toBe(3);
+    });
+
+    it("renders the stencil <image> instead of the frame/icon when stencilHref is given", () => {
+      const { container } = render(
+        <PatchPanelDiagramSVG panel={panel} ports={ports} stencilHref="/api/v1/stencils/patch-panels-5" />
+      );
+      const image = container.querySelector("image");
+      expect(image).toBeTruthy();
+      expect(image!.getAttribute("href")).toContain("/stencils/");
+      expect(container.querySelector("svg.lucide-cable")).toBeNull();
+      // Port dots still draw on top either way.
+      expect(container.querySelectorAll("circle").length).toBe(3);
+    });
+  });
 });

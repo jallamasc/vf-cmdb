@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useMemo, useState } from "react";
-import { useQueries, useQueryClient } from "@tanstack/react-query";
+import { useQueries, useQueryClient, useMutation } from "@tanstack/react-query";
 import EntityGrid from "../components/EntityGrid";
 import { StencilRow } from "../components/StencilField";
 import { api, Row } from "../api";
@@ -191,6 +191,17 @@ export default function Naming() {
   // Phase 5 Task 11 (Req 9) — RegionMap-driven narrowing, only relevant on
   // the "regions" lookup; cleared whenever the operator switches away.
   const [mapCountry, setMapCountry] = useState<string | null>(null);
+  // Phase 6 Task 19 (Req 7.3) — click-to-place mode for the selected
+  // region's real-world location.
+  const [placingLocation, setPlacingLocation] = useState(false);
+  const placeRegionPoint = useMutation({
+    mutationFn: ({ id, lat, lng }: { id: number; lat: number; lng: number }) =>
+      api.update("regions", id, { latitude: lat, longitude: lng }),
+    onSuccess: () => {
+      setPlacingLocation(false);
+      qc.invalidateQueries({ queryKey: ["regions"] });
+    },
+  });
 
   // Fetch every lookup once to show per-category / per-lookup entry counts.
   // Shares the react-query cache with the grid below (same query keys).
@@ -274,6 +285,7 @@ export default function Naming() {
                           setActive(l.slug);
                           setMapCountry(null);
                           setSelected(null);
+                          setPlacingLocation(false);
                         }}
                         className={`w-full flex items-center justify-between pl-6 pr-2 py-1.5 rounded text-sm ${
                           active === l.slug
@@ -312,10 +324,34 @@ export default function Naming() {
             <Suspense
               fallback={<div className="text-sm text-slate-400 mb-3">Loading map…</div>}
             >
+              {/* Phase 6 Task 19 (Req 7.3) — set/edit the selected region's
+                  real-world point by clicking the map. */}
+              {selected && (
+                <div className="mb-2 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPlacingLocation((v) => !v)}
+                    className="px-2.5 py-1 text-sm rounded border border-slate-300 bg-white hover:bg-slate-50"
+                  >
+                    {placingLocation
+                      ? "Cancel"
+                      : `Set location on map for “${selected.full_name ?? selected.abbreviation}”`}
+                  </button>
+                  {placeRegionPoint.isPending && (
+                    <span className="text-xs text-slate-500">Saving…</span>
+                  )}
+                </div>
+              )}
               <RegionMap
                 regions={(results[ALL_LOOKUPS.findIndex((l) => l.slug === "regions")]?.data as Row[]) ?? []}
                 selectedCountry={mapCountry}
                 onSelectCountry={setMapCountry}
+                placementMode={placingLocation}
+                onPlacePoint={
+                  selected
+                    ? (lat, lng) => placeRegionPoint.mutate({ id: selected.id, lat, lng })
+                    : undefined
+                }
               />
             </Suspense>
           )}

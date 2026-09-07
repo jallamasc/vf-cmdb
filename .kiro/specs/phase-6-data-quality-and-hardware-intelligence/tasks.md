@@ -123,20 +123,23 @@ sub-phases that reuse them.
 
 ### Sub-phase E — Region Geo-Markers
 
-- [ ] 17. Migration adding `latitude`/`longitude` to Region
+- [x] 17. Migration adding `latitude`/`longitude` to Region
     - _Requirements: 7.1_
-  - [ ]* pytest round-trip
+  - [x]* pytest round-trip
 
-- [ ] 18. `RegionMap` markers
-  - [ ] 18.1 Render a `<Marker>` per region with coordinates set
+- [x] 18. `RegionMap` markers
+  - [x] 18.1 Render a `<Marker>` per region with coordinates set
     - _Requirements: 7.2_
-  - [ ]* 18.2 Vitest marker position
+  - [x]* 18.2 Vitest marker position
 
-- [ ] 19. Click-to-place
-  - [ ] 19.1 Projection-`invert()`-based click handler populating lat/lng
+- [x] 19. Click-to-place
+  - [x] 19.1 Projection-`invert()`-based click handler populating lat/lng
+        (`ClickToPlaceLayer` using `useMapContext()`, wired via Naming.tsx's
+        new "Set location on map" button for the selected Region row)
     - _Requirements: 7.3_
-  - [ ]* 19.2 Vitest simulated click
-  - [ ] 19.3 Checkpoint E — build + test verification.
+  - [x]* 19.2 Vitest simulated click (real projection math, mocked
+        `getBoundingClientRect`)
+  - [x] 19.3 Checkpoint E — build + test verification.
 
 ### Sub-phase F — Theme + Code Coexistence
 

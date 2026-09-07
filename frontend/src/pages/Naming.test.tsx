@@ -33,9 +33,19 @@ vi.mock("../components/EntityGrid", () => ({
   },
 }));
 
-// `RegionMap` is React.lazy-loaded; keep it out of these tests entirely by
+// `RegionMap` is React.lazy-loaded; most tests below keep it out entirely by
 // never switching to the "regions" lookup, so no Suspense boundary needs to
-// resolve.
+// resolve. The Phase 6 Task 19 tests DO switch to "regions" but mock this
+// module shallowly (same idiom as the EntityGrid mock above) rather than
+// exercise the real map/world-atlas rendering, which RegionMap.test.tsx
+// already covers directly.
+let latestRegionMapProps: any = null;
+vi.mock("../components/RegionMap", () => ({
+  default: (props: any) => {
+    latestRegionMapProps = props;
+    return <div data-testid="region-map" />;
+  },
+}));
 
 vi.mock("../api", async (orig) => {
   const actual = await orig<typeof import("../api")>();
@@ -45,6 +55,7 @@ vi.mock("../api", async (orig) => {
       ...actual.api,
       list: vi.fn(() => Promise.resolve([])),
       stencilUrl: vi.fn((slug: string, face: string) => `/api/v1/stencils/${slug}?face=${face}`),
+      update: vi.fn(),
     },
   };
 });
@@ -123,5 +134,43 @@ describe("Naming — inline stencil panel (Req 24.1/24.2)", () => {
     );
     const props = capturedProps.find((p) => p.resource === "organizations");
     expect(props.panel).toBeUndefined();
+  });
+});
+
+describe("Naming — region geo click-to-place (Phase 6 Task 19, Req 7.3)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    capturedProps = [];
+    latestRegionMapProps = null;
+  });
+
+  async function selectRegions() {
+    const btn = await screen.findByText("Regions");
+    fireEvent.click(btn);
+    await waitFor(() => expect(capturedProps.some((p) => p.resource === "regions")).toBe(true));
+    await waitFor(() => expect(screen.getByTestId("region-map")).toBeTruthy());
+  }
+
+  it("does not offer the 'Set location' button before a region row is selected", async () => {
+    wrap();
+    await selectRegions();
+    expect(screen.queryByText(/Set location on map/)).toBeNull();
+    expect(latestRegionMapProps.placementMode).toBe(false);
+  });
+
+  it("toggles placement mode and calls api.update with the clicked point on placement", async () => {
+    (api.update as any).mockResolvedValue({});
+    wrap();
+    await selectRegions();
+    fireEvent.click(screen.getByTestId("select-row"));
+    const setLocationBtn = await screen.findByText(/Set location on map for “Cisco X”/);
+    fireEvent.click(setLocationBtn);
+    await waitFor(() => expect(latestRegionMapProps.placementMode).toBe(true));
+
+    latestRegionMapProps.onPlacePoint(4.71, -74.07);
+
+    await waitFor(() =>
+      expect(api.update).toHaveBeenCalledWith("regions", 5, { latitude: 4.71, longitude: -74.07 })
+    );
   });
 });

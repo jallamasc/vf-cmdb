@@ -9,6 +9,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     Enum,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -198,6 +199,11 @@ class Region(LookupMixin, Base):
     __tablename__ = "regions"
 
     icon: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+    # Phase 6 Task 17 (Req 7.1) — an optional real-world point for this
+    # region, so Region_Map can plot a marker instead of only highlighting
+    # a whole country (the country-level approximation in regionGeo.ts).
+    latitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
 
 class Campus(LookupMixin, Base):

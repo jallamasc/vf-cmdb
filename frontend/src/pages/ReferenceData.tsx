@@ -50,7 +50,12 @@ const TABLES: RefTable[] = [
       textCol("case_enforcement", "Case Enforcement", 160),
       textCol("description", "Description", 260),
     ],
-    newRowDefaults: { name: "New rack type", total_units: 42 },
+    // Phase 6 Task 4 (Req 3.1/3.3) — `name` is now table-wide unique;
+    // randomize the placeholder so a second "Add row" click doesn't collide.
+    newRowDefaults: () => ({
+      name: `New rack type ${Math.random().toString(36).slice(2, 6)}`,
+      total_units: 42,
+    }),
     requiredFields: [{ field: "name", label: "Name" }],
   },
   {
@@ -73,7 +78,8 @@ const TABLES: RefTable[] = [
     ],
     newRowDefaults: () => ({
       slug: `custom-${Math.random().toString(36).slice(2, 6)}`,
-      label: "New field type",
+      // Phase 6 Task 4 (Req 3.1/3.3) — `label` is now table-wide unique.
+      label: `New field type ${Math.random().toString(36).slice(2, 6)}`,
       storage_kind: "text",
     }),
     requiredFields: [

@@ -26,33 +26,39 @@ sub-phases that reuse them.
 
 ### Sub-phase B — Uniqueness Validation
 
-- [ ] 4. Reusable uniqueness validator
-  - [ ] 4.1 A generic per-parent-scoped, case-insensitive duplicate check in
+- [x] 4. Reusable uniqueness validator
+  - [x] 4.1 A generic per-parent-scoped, case-insensitive duplicate check in
         `crud.py`, returning a 409 with a "already exists — try a different
         value" style message
     - _Requirements: 3.1, 3.4_
-  - [ ]* 4.2 pytest against a representative model
+  - [x]* 4.2 pytest against a representative model
 
-- [ ] 5. Apply to no-parent tables (Organizations, Regions, Clouds, Brands,
-      OsFamily, OsVersion, DeviceRole, ClusterType, AppType) — table-wide scope
-  - [ ] 5.1 Wire each into `_validate_model`
+- [x] 5. Apply to no-parent tables (every `LookupMixin` table, `RackType`,
+      `EntityTypeDef.label`, `FieldTypeDef.label`) — table-wide scope
+  - [x] 5.1 Wire each into `_validate_model` via the `UNIQUE_NAME_FIELDS` map
     - _Requirements: 3.1, 3.3_
-  - [ ]* 5.2 pytest duplicate-rejected/case-insensitive per table
+  - [x]* 5.2 pytest duplicate-rejected/case-insensitive per table
 
-- [ ] 6. Apply to parent-scoped tables (Buildings within Campus, Rooms within
-      Floor, Sections within Room, Racks within Room, other manually-named
-      hierarchical entities)
-  - [ ] 6.1 Wire each into `_validate_model` with its parent field
+- [x] 6. Apply to parent-scoped tables (Datacenter within Site, Floor within
+      Datacenter, Room within Floor, Section within Room — Rack excluded,
+      see design notes: no plain manual name field and three alternate
+      parents)
+  - [x] 6.1 Wire each into `_validate_model` via the same map
     - _Requirements: 3.1, 3.2_
-  - [ ]* 6.2 pytest same name allowed under different parents, rejected under
+  - [x]* 6.2 pytest same name allowed under different parents, rejected under
         the same parent
+  - [x] 6.3 Fix "+ Add row" placeholder defaults that were fixed strings
+        (Naming.tsx lookups, rack-types, field-type-defs, entity-type-defs) —
+        randomize so a second click doesn't immediately 409 itself
 
-- [ ] 7. Frontend duplicate-name error surfacing
-  - [ ] 7.1 Show the 409's suggest-a-change message inline on save failure
+- [x] 7. Frontend duplicate-name error surfacing
+  - [x] 7.1 Already covered by `EntityGrid`'s existing `friendlyError`
+        fallback (strips the "409: " prefix, backend message is already the
+        suggest-a-change sentence) — no code change needed, added tests
     - _Requirements: 3.4_
-  - [ ]* 7.2 Vitest simulating a 409
+  - [x]* 7.2 Vitest simulating both 409 message shapes
 
-- [ ] 8. Checkpoint B — build + test verification.
+- [x] 8. Checkpoint B — build + test verification.
 
 ### Sub-phase C — Icons & Visual Design System
 

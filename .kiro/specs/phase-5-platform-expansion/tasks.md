@@ -236,12 +236,12 @@ capability patterns rather than reinventing them.
   - [x]* 36.2 Live verification: container starts, UI reachable, API token
         can be generated
 
-- [ ] 37. Semaphore API client
-  - [ ] 37.1 `backend/app/semaphore_client.py` wrapping projects/inventories/
+- [x] 37. Semaphore API client
+  - [x] 37.1 `backend/app/semaphore_client.py` wrapping projects/inventories/
         environments/templates/tasks; config via `SEMAPHORE_URL`/
         `SEMAPHORE_API_TOKEN`
     - _Requirements: 29.2_
-  - [ ]* 37.2 pytest against a mocked HTTP client
+  - [x]* 37.2 pytest against a mocked HTTP client
 
 - [ ] 38. Three-way sync — device ↔ Bitwarden secret ↔ Semaphore inventory
   - [ ] 38.1 Extend the create/update/delete hooks (same insertion points as

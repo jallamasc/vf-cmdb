@@ -48,6 +48,39 @@ export function resolveDeviceTypeIcon(name?: string | null): LucideIcon {
   return resolveIcon(name);
 }
 
+// Phase 6 Task 28 (Req 11.1) — Diagram Fallback Icons: the coarse category
+// string every graphical view already colours slots by (`RackDiagramSVG`'s
+// `TYPE_HEX`, `rack_units.device_type`, `RackSlotEditor`'s
+// `STATIC_DEVICE_TABLES.deviceType`) also picks a meaningful default icon
+// for when NEITHER a per-record Stencil_Override NOR a device-type stencil
+// is configured — replacing a bare colored rectangle. Every name below was
+// deliberately checked against lucide-react's own source to confirm it
+// renders ONLY <path>/<line>/<rect> primitives, never a literal <circle> —
+// RackDiagramSVG's back-face connector dots are the only <circle> elements
+// that diagram is allowed to have, so a fallback icon that smuggled in its
+// own <circle> (e.g. "HelpCircle") would silently corrupt that count.
+const CATEGORY_ICON_NAMES: Record<string, string> = {
+  server: "Server",
+  switch: "Network",
+  router: "Router",
+  firewall: "Shield",
+  pdu: "Zap",
+  ups: "BatteryCharging",
+  patchpanel: "Cable",
+  storage: "HardDrive",
+  generic: "Box",
+};
+
+/** A category-appropriate default icon (Req 11.1) — deliberately NOT the
+ * same as `resolveDeviceTypeIcon`'s fallback (HelpCircle), which renders an
+ * actual `<circle>` and would be unsafe to mix into a rack diagram's back
+ * face (see the module-level comment above). Unknown/unmapped categories
+ * fall back to "Box", also circle-free. */
+export function resolveCategoryIcon(deviceType?: string | null): LucideIcon {
+  const name = CATEGORY_ICON_NAMES[(deviceType ?? "").toLowerCase()] ?? "Box";
+  return resolveIcon(name);
+}
+
 /** Req 7.1 — within the last N hours counts as "recently active" (default 24h). */
 export function isRecentlyActive(
   lastFactSyncAt?: string | null,

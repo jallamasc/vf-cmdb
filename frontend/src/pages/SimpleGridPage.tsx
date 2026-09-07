@@ -1,6 +1,8 @@
 import { useCallback, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import EntityGrid from "../components/EntityGrid";
 import DevicePhotoPanel from "../components/DevicePhotoPanel";
+import { StencilPanel } from "../components/StencilField";
 import {
   useLookups,
   textCol,
@@ -27,6 +29,10 @@ interface Config {
   /** Phase 5 Task 23 (Req 19.1) — PowerDevice/PatchPanel support an
    * uploaded photo; Cable/Rack rows don't. */
   photoPanel?: boolean;
+  /** Phase 6 Task 27 (Req 10.2-10.4) — PowerDevice/PatchPanel/Rack now also
+   * carry their own per-record Stencil_Override (Task 26); Cable doesn't
+   * (it isn't a stencil-rendered device). */
+  stencilPanel?: boolean;
 }
 
 const CONFIGS: Record<Kind, Config> = {
@@ -50,6 +56,7 @@ const CONFIGS: Record<Kind, Config> = {
     ],
     defaults: { port_count: 24, side: "front" },
     photoPanel: true,
+    stencilPanel: true,
   },
   power: {
     resource: "power-devices",
@@ -74,6 +81,7 @@ const CONFIGS: Record<Kind, Config> = {
     ],
     defaults: { device_type: "pdu" },
     photoPanel: true,
+    stencilPanel: true,
   },
   cables: {
     resource: "cables",
@@ -122,15 +130,19 @@ const CONFIGS: Record<Kind, Config> = {
       textCol("notes", "Notes"),
     ],
     defaults: { total_units: 42 },
+    stencilPanel: true,
   },
 };
 
 export default function SimpleGridPage({ kind }: { kind: Kind }) {
   const cfg = CONFIGS[kind];
+  const qc = useQueryClient();
   const { map, isLoading } = useLookups(cfg.lookups);
   const columns = useMemo(() => cfg.build(map), [cfg, map]);
   // Phase 5 Task 23 (Req 19.1) — photo manager for the selected row, only on
-  // the two kinds whose model actually has a photo_url column.
+  // the kinds whose model actually has a photo_url column. Phase 6 Task 27
+  // (Req 10.2-10.4) — same selection drives the stencil-override panel too.
+  const needsSelection = cfg.photoPanel || cfg.stencilPanel;
   const [selected, setSelected] = useState<Row | null>(null);
   const handleSelection = useCallback(
     (rows: Row[]) => setSelected(rows.length === 1 ? rows[0] : null),
@@ -146,11 +158,23 @@ export default function SimpleGridPage({ kind }: { kind: Kind }) {
       columns={columns}
       newRowDefaults={cfg.defaults}
       panel={
-        cfg.photoPanel ? (
-          <DevicePhotoPanel resource={cfg.resource} selected={selected} />
+        needsSelection ? (
+          <div className="space-y-3">
+            {cfg.stencilPanel && (
+              <StencilPanel
+                resource={cfg.resource}
+                label={cfg.title.toLowerCase()}
+                selected={selected}
+                onChanged={() => qc.invalidateQueries({ queryKey: [cfg.resource] })}
+              />
+            )}
+            {cfg.photoPanel && (
+              <DevicePhotoPanel resource={cfg.resource} selected={selected} />
+            )}
+          </div>
         ) : undefined
       }
-      onSelectionChanged={cfg.photoPanel ? handleSelection : undefined}
+      onSelectionChanged={needsSelection ? handleSelection : undefined}
     />
   );
 }

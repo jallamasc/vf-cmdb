@@ -4,6 +4,7 @@ import ConnectionDot from "./ConnectionDot";
 import { RackPort } from "./RackDiagramSVG";
 import { CableRow, ConnectionResolution, resolveConnection } from "../lib/connections";
 import { AnchorRow, resolvePortPosition } from "../lib/anchors";
+import { resolveCategoryIcon } from "../lib/deviceIcons";
 
 const BOX_W = 260;
 const BOX_H = 200;
@@ -172,6 +173,15 @@ export default function PowerDiagramSVG({
           <title>{deviceLabel}</title>
         </rect>
       )}
+      {!stencilHref &&
+        (() => {
+          // Phase 6 Task 28 (Req 11.1) — a category-appropriate icon badge
+          // instead of a bare frame when no stencil is configured. Placed
+          // top-right, well clear of the top-left device label and every
+          // outlet dot the anchor/grid layout positions below.
+          const CategoryIcon = resolveCategoryIcon(device.device_type as string | null);
+          return <CategoryIcon x={BOX_W - 22} y={4} size={16} color="#92400e" strokeWidth={1.75} />;
+        })()}
       <text x={8} y={14} fontSize={9} fill="#78350f" fontFamily="sans-serif" fontWeight={600}>
         {deviceLabel}
       </text>

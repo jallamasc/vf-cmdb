@@ -19,6 +19,28 @@ describe("PowerDiagramSVG", () => {
     expect(container.querySelector("rect")).toBeTruthy();
   });
 
+  // Phase 6 Task 28 (Req 11.1/11.2).
+  it("renders a category-appropriate fallback icon when there is no stencil", () => {
+    const { container } = render(
+      <PowerDiagramSVG device={{ ...device, device_type: "pdu" }} outlets={outlets} />
+    );
+    // "pdu" -> the "Zap" lucide icon.
+    expect(container.querySelector("svg.lucide-zap")).toBeTruthy();
+    // Untouched by the fallback icon (Req 11.2).
+    expect(container.querySelectorAll("circle").length).toBe(3);
+  });
+
+  it("does not render the fallback icon once a stencil is configured", () => {
+    const { container } = render(
+      <PowerDiagramSVG
+        device={{ ...device, device_type: "pdu" }}
+        outlets={outlets}
+        stencilHref="/x.svg"
+      />
+    );
+    expect(container.querySelector("svg.lucide-zap")).toBeNull();
+  });
+
   it("renders the stencil <image> when a stencilHref is given", () => {
     const { container } = render(
       <PowerDiagramSVG device={device} outlets={outlets} stencilHref="/api/v1/stencils/power-device-types-1" />

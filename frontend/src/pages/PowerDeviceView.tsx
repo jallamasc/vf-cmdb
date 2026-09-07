@@ -345,8 +345,14 @@ export default function PowerDeviceView() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {shown.map((d) => {
             const type = d.device_type_id != null ? deviceTypeById.get(d.device_type_id) : undefined;
-            const stencilHref =
-              type && type.stencil_url ? api.stencilUrl(`power-device-types-${type.id}`, FACE) : null;
+            // Phase 6 Task 26/27 (Req 10.2) — this device's own
+            // Stencil_Override wins over its type's stencil when both are
+            // set.
+            const stencilHref = d.stencil_url
+              ? api.stencilUrl(`power-devices-${d.id}`, FACE)
+              : type && type.stencil_url
+              ? api.stencilUrl(`power-device-types-${type.id}`, FACE)
+              : null;
             const anchors = (allAnchors ?? []).filter(
               (a) =>
                 a.owner_resource === "power-device-types" &&

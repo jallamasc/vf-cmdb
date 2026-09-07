@@ -341,6 +341,7 @@ export default function PatchPanelView() {
                   ) as PatchPanelPortRow[]
                 }
                 cables={(cables ?? []) as CableRow[]}
+                stencilHref={p.stencil_url ? api.stencilUrl(`patch-panels-${p.id}`, "front") : null}
                 onPortClick={(port, resolution) =>
                   resolution.connected
                     ? setConnectInfo({ port, resolution })

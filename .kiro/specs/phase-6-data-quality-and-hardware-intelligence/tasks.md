@@ -176,24 +176,24 @@ sub-phases that reuse them.
 
 ### Sub-phase H — Universal Stencil Override & Fallback Icons
 
-- [ ] 26. Migration adding `stencil_url`/`stencil_url_back` to every
+- [x] 26. Migration adding `stencil_url`/`stencil_url_back` to every
       hardcoded device/entity table lacking them
     - _Requirements: 10.1_
-  - [ ]* pytest round-trip
+  - [x]* pytest round-trip
 
-- [ ] 27. Per-record override UI
-  - [ ] 27.1 Reusable stencil-override control wired into `RackSlotEditor`'s
+- [x] 27. Per-record override UI
+  - [x] 27.1 Reusable stencil-override control wired into `RackSlotEditor`'s
         click flow and each device page's selection panel
     - _Requirements: 10.2, 10.3, 10.4_
-  - [ ]* 27.2 Vitest override-shown-and-falls-back-correctly
+  - [x]* 27.2 Vitest override-shown-and-falls-back-correctly
 
-- [ ] 28. Diagram fallback icons
-  - [ ] 28.1 Category-default Lucide icon fallback in Rack/Power/Patch-Panel
+- [x] 28. Diagram fallback icons
+  - [x] 28.1 Category-default Lucide icon fallback in Rack/Power/Patch-Panel
         diagrams when no stencil is set; `ConnectionDot` untouched
     - _Requirements: 11.1, 11.2_
-  - [ ]* 28.2 Vitest fallback icon renders
+  - [x]* 28.2 Vitest fallback icon renders
 
-- [ ] 29. Checkpoint H — build + test verification.
+- [x] 29. Checkpoint H — build + test verification.
 
 ### Sub-phase I — External Data Seeding
 

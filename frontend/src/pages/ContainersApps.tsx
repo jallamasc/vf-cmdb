@@ -1,5 +1,7 @@
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import EntityGrid from "../components/EntityGrid";
+import { StencilPanel } from "../components/StencilField";
 import {
   useLookups,
   textCol,
@@ -10,6 +12,7 @@ import {
   selectCol,
   generatedCol,
 } from "../lib/columns";
+import { Row } from "../api";
 
 const LK = [
   "virtual-machines",
@@ -20,7 +23,17 @@ const LK = [
 ];
 
 export default function ContainersApps() {
+  const qc = useQueryClient();
   const { map, isLoading } = useLookups(LK);
+  // Phase 6 Task 27 (Req 10.2-10.4) — ContainerApp has no dedicated per-id
+  // detail page (unlike physical-servers/virtual-machines/etc's
+  // DeviceDashboard route), so its own grid's selection panel is the entry
+  // point for the stencil override this page's model now carries (Task 26).
+  const [selected, setSelected] = useState<Row | null>(null);
+  const handleSelection = useCallback(
+    (rows: Row[]) => setSelected(rows.length === 1 ? rows[0] : null),
+    []
+  );
   const columns = useMemo(
     () => [
       roCol("id", "ID", 70),
@@ -49,6 +62,15 @@ export default function ContainersApps() {
       description="Containerised workloads and applications running on VMs or servers."
       columns={columns}
       newRowDefaults={{ container_type: "cn" }}
+      panel={
+        <StencilPanel
+          resource="containers-apps"
+          label="container/app"
+          selected={selected}
+          onChanged={() => qc.invalidateQueries({ queryKey: ["containers-apps"] })}
+        />
+      }
+      onSelectionChanged={handleSelection}
     />
   );
 }

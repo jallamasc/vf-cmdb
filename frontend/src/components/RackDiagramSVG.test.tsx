@@ -138,6 +138,32 @@ describe("RackDiagramSVG", () => {
     expect(onPortClick).toHaveBeenCalledTimes(1);
   });
 
+  // Phase 6 Task 28 (Req 11.1/11.2) — Diagram Fallback Icons.
+  describe("fallback category icon when no stencil is configured", () => {
+    it("renders a category-appropriate icon badge for an occupied slot with no stencil", () => {
+      const { container } = render(<RackDiagramSVG rack={rack} units={units} face="front" />);
+      // units[0].device_type === "switch" -> the "Network" lucide icon.
+      expect(container.querySelector("svg.lucide-network")).toBeTruthy();
+    });
+
+    it("does not render the fallback icon once a stencil is configured for that unit", () => {
+      const { container } = render(
+        <RackDiagramSVG
+          rack={rack}
+          units={units}
+          face="front"
+          stencilHrefByUnit={{ 10: "/api/v1/stencils/network-device-types-1" }}
+        />
+      );
+      expect(container.querySelector("svg.lucide-network")).toBeNull();
+    });
+
+    it("never adds a <circle> via the fallback icon, keeping the front-face circle count at zero", () => {
+      const { container } = render(<RackDiagramSVG rack={rack} units={units} face="front" ports={ports} />);
+      expect(container.querySelectorAll("circle").length).toBe(0);
+    });
+  });
+
   it("renders a stencil <image> on the front face when provided", () => {
     const { container } = render(
       <RackDiagramSVG

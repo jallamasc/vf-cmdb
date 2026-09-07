@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Row } from "../api";
 import ConnectionDot from "./ConnectionDot";
 import { CableRow, ConnectionResolution, resolveConnection } from "../lib/connections";
+import { resolveCategoryIcon } from "../lib/deviceIcons";
 
 // Hex colour map for SVG fills, keyed by device type. Mirrors the Tailwind
 // TYPE_COLORS used elsewhere in the app but expressed as concrete hex codes so
@@ -251,17 +252,37 @@ export default function RackDiagramSVG({
           />
         )}
         {!stencil && (
-          <text
-            x={RAIL_X + DEVICE_W / 2}
-            y={y + rectH / 2 + 3}
-            fontSize={9}
-            textAnchor="middle"
-            fill="#1e293b"
-            fontFamily="sans-serif"
-          >
-            {label}
-            {h > 1 ? ` (${h}U)` : ""}
-          </text>
+          <>
+            {/* Phase 6 Task 28 (Req 11.1) — a category-appropriate icon
+                badge instead of a bare rectangle, when NEITHER a per-record
+                Stencil_Override nor a device-type stencil is configured.
+                Small corner badge, deliberately not overlapping the
+                centered label below (Req 11.2 — ConnectionDot/back-face
+                port dots are untouched by this change). */}
+            {(() => {
+              const CategoryIcon = resolveCategoryIcon(u.device_type);
+              return (
+                <CategoryIcon
+                  x={RAIL_X + 4}
+                  y={y + 3}
+                  size={12}
+                  color="#475569"
+                  strokeWidth={1.75}
+                />
+              );
+            })()}
+            <text
+              x={RAIL_X + DEVICE_W / 2}
+              y={y + rectH / 2 + 3}
+              fontSize={9}
+              textAnchor="middle"
+              fill="#1e293b"
+              fontFamily="sans-serif"
+            >
+              {label}
+              {h > 1 ? ` (${h}U)` : ""}
+            </text>
+          </>
         )}
       </g>
     );

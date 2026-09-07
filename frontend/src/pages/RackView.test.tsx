@@ -79,6 +79,67 @@ describe("RackView — Room/Section-aware breadcrumb resolution (Req 21.1/22.1)"
     expect(screen.getAllByText("Site1 / DC1 / Floor1").length).toBe(1);
   });
 
+  // Phase 6 Task 26/27 (Req 10.2) — a device's own Stencil_Override wins
+  // over its type's stencil when both are set.
+  it("prefers a mounted device's own stencil_url over its device-type's stencil_url", async () => {
+    const withOverride: Record<string, any[]> = {
+      ...FIXTURES,
+      "rack-units": [
+        {
+          id: 500,
+          rack_id: 1,
+          unit_number: 1,
+          device_type: "switch",
+          device_id: 99,
+          device_table: "network-devices",
+          height_units: 1,
+        },
+      ],
+      "network-devices": [
+        { id: 99, device_type_id: 1, stencil_url: "https://override.example/nd.svg" },
+      ],
+      "network-device-types": [{ id: 1, stencil_url: "https://type.example/ndt.svg" }],
+    };
+    (await import("../api")).api.list = vi.fn((resource: string) =>
+      Promise.resolve(withOverride[resource] ?? [])
+    ) as any;
+    wrap(<RackView />);
+    await waitFor(() => expect(screen.getAllByText("RACK-FLOOR").length).toBeGreaterThan(0));
+    await waitFor(() => {
+      const image = document.querySelector('image[href*="network-devices-99"]');
+      expect(image).toBeTruthy();
+    });
+    expect(document.querySelector('image[href*="network-device-types-1"]')).toBeNull();
+  });
+
+  it("falls back to the device-type's stencil_url when the device has no override of its own", async () => {
+    const withTypeOnly: Record<string, any[]> = {
+      ...FIXTURES,
+      "rack-units": [
+        {
+          id: 501,
+          rack_id: 1,
+          unit_number: 1,
+          device_type: "switch",
+          device_id: 98,
+          device_table: "network-devices",
+          height_units: 1,
+        },
+      ],
+      "network-devices": [{ id: 98, device_type_id: 1, stencil_url: null }],
+      "network-device-types": [{ id: 1, stencil_url: "https://type.example/ndt.svg" }],
+    };
+    (await import("../api")).api.list = vi.fn((resource: string) =>
+      Promise.resolve(withTypeOnly[resource] ?? [])
+    ) as any;
+    wrap(<RackView />);
+    await waitFor(() => expect(screen.getAllByText("RACK-FLOOR").length).toBeGreaterThan(0));
+    await waitFor(() => {
+      const image = document.querySelector('image[href*="network-device-types-1"]');
+      expect(image).toBeTruthy();
+    });
+  });
+
   it("Phase 6 Task 15 (Req 6.4): combines Floor+Section generated codes into one tag", async () => {
     const withCodes: Record<string, any[]> = {
       ...FIXTURES,

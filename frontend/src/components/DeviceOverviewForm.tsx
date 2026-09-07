@@ -15,6 +15,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, Row } from "../api";
 import type { DeviceDetail } from "../api";
 import { friendlyError } from "./EntityGrid";
+import { StencilPanel } from "./StencilField";
 import { useLookups, lookupLabel } from "../lib/columns";
 import {
   DEVICE_SCHEMAS,
@@ -255,6 +256,21 @@ export default function DeviceOverviewForm({ detail }: Props) {
           </div>
         </div>
       </section>
+
+      {/* Phase 6 Task 27 (Req 10.2-10.4) — this device's own per-record
+          Stencil_Override (Task 26), exposed on its own detail page
+          exactly as Requirement 10.4 asks — reuses the SAME `StencilPanel`
+          the Naming/SimpleGridPage/ContainersApps grids use, just always
+          "selected" since this page is already scoped to one record. */}
+      <StencilPanel
+        resource={schema.resource}
+        label={detail.device_type}
+        selected={detail.record}
+        onChanged={() => {
+          qc.invalidateQueries({ queryKey: ["device", detail.device_type, detail.id] });
+          qc.invalidateQueries({ queryKey: [schema.resource] });
+        }}
+      />
 
       <p className="text-xs text-slate-400">
         Click a field to edit · changes save on blur (dropdowns save immediately)

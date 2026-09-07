@@ -15,6 +15,7 @@ vi.mock("../api", async (orig) => {
       create: vi.fn(),
       update: vi.fn(),
       remove: vi.fn(),
+      get: vi.fn(),
     },
   };
 });
@@ -160,7 +161,10 @@ describe("RackSlotEditor — Generic_Entity placement (Phase 5 Task 21, Req 17.1
 });
 
 describe("RackSlotEditor — occupied slot (edit / remove)", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (api.get as any).mockResolvedValue({ id: 42, stencil_url: null, stencil_url_back: null });
+  });
 
   const unit = {
     id: 55,
@@ -207,5 +211,27 @@ describe("RackSlotEditor — occupied slot (edit / remove)", () => {
     );
     expect(api.remove).toHaveBeenCalledWith("rack-units", 55);
     await waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
+
+  // Phase 6 Task 27 (Req 10.2/10.3) — opening the stencil picker for THIS
+  // specific device instance directly from the rack diagram's click flow.
+  it("fetches the full device row and shows its stencil override panel", async () => {
+    (api.get as any).mockResolvedValue({
+      id: 42,
+      full_name: "SRV-A",
+      stencil_url: "https://x/srv.svg",
+      stencil_url_back: null,
+    });
+    wrap(<RackSlotEditor rackId={1} unitNumber={12} unit={unit} onClose={vi.fn()} />);
+
+    await waitFor(() => expect(api.get).toHaveBeenCalledWith("physical-servers", 42));
+    expect(await screen.findByText(/Stencil — SRV-A/)).toBeInTheDocument();
+  });
+
+  it("shows a 'select a row' placeholder while the device row is still loading", async () => {
+    (api.get as any).mockImplementation(() => new Promise(() => {})); // never resolves
+    wrap(<RackSlotEditor rackId={1} unitNumber={12} unit={unit} onClose={vi.fn()} />);
+
+    expect(await screen.findByText(/Select a device row below/)).toBeInTheDocument();
   });
 });

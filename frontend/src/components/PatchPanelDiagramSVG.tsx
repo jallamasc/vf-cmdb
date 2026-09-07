@@ -3,12 +3,16 @@ import { Row } from "../api";
 import ConnectionDot from "./ConnectionDot";
 import { RackPort } from "./RackDiagramSVG";
 import { CableRow, ConnectionResolution, resolveConnection } from "../lib/connections";
+import { resolveCategoryIcon } from "../lib/deviceIcons";
 
 // Geometry constants for the patch-panel grid (Convention_Layout — Phase 4
-// Req 16.2). Patch panels don't have a per-model stencil/anchor concept in
-// this schema (no Device_Type_Lookup for them), so every panel renders as a
-// simple numbered port grid, wrapping at MAX_PER_ROW the way a physical
-// 24-port panel wraps to a second row at 48 ports.
+// Req 16.2). Patch panels never had a device-TYPE stencil/anchor concept in
+// this schema (no Device_Type_Lookup for them) — Phase 6 Task 26 gave
+// PatchPanel its own per-record Stencil_Override instead (Req 10.1), so a
+// panel now renders it (via the `stencilHref` prop below) when set, or a
+// numbered port grid on a plain frame + category icon otherwise, wrapping
+// at MAX_PER_ROW the way a physical 24-port panel wraps to a second row at
+// 48 ports.
 const MAX_PER_ROW = 24;
 const COL_W = 22; // px between port centers
 const ROW_H = 46; // px between row centers
@@ -29,6 +33,14 @@ interface Props {
   ports: PatchPanelPortRow[];
   /** Every cable in scope, so each dot can resolve connected/unconnected. */
   cables?: CableRow[];
+  /**
+   * Phase 6 Task 26/27 (Req 10.1/10.2) — this panel's own Stencil_Override
+   * href for the current face (there's no device-TYPE stencil to fall back
+   * to for a patch panel, so this is the only stencil source). Port dots
+   * still draw on top either way — a stencil is purely a visual behind
+   * them, exactly like `PowerDiagramSVG`'s `stencilHref`.
+   */
+  stencilHref?: string | null;
   /** Clicking a port dot; resolution is that port's resolveConnection result. */
   onPortClick?: (port: RackPort, resolution: ConnectionResolution) => void;
 }
@@ -44,7 +56,7 @@ interface Props {
  * `candidate_ports()` — so `resolveConnection` disambiguates by the port's
  * own label, exactly like a multi-outlet PDU.
  */
-export default function PatchPanelDiagramSVG({ panel, ports, cables = [], onPortClick }: Props) {
+export default function PatchPanelDiagramSVG({ panel, ports, cables = [], stencilHref, onPortClick }: Props) {
   const [hovered, setHovered] = useState<PatchPanelPortRow | null>(null);
 
   const sorted = useMemo(
@@ -157,16 +169,39 @@ export default function PatchPanelDiagramSVG({ panel, ports, cables = [], onPort
       role="img"
       aria-label={`Patch panel ${panelLabel}, ${sorted.length} ports`}
     >
-      <rect
-        x={4}
-        y={4}
-        width={width - 8}
-        height={height - 8}
-        fill="#f1f5f9"
-        stroke="#475569"
-        strokeWidth={1.5}
-        rx={4}
-      />
+      {stencilHref ? (
+        // Phase 6 Task 26/27 (Req 10.1/10.2) — this panel's own override.
+        <image
+          href={stencilHref}
+          x={4}
+          y={4}
+          width={width - 8}
+          height={height - 8}
+          preserveAspectRatio="xMidYMid meet"
+        >
+          <title>{panelLabel}</title>
+        </image>
+      ) : (
+        <rect
+          x={4}
+          y={4}
+          width={width - 8}
+          height={height - 8}
+          fill="#f1f5f9"
+          stroke="#475569"
+          strokeWidth={1.5}
+          rx={4}
+        >
+          <title>{panelLabel}</title>
+        </rect>
+      )}
+      {!stencilHref &&
+        (() => {
+          // Phase 6 Task 28 (Req 11.1) — a category-appropriate icon badge
+          // instead of a bare frame when no override is configured.
+          const CategoryIcon = resolveCategoryIcon("patchpanel");
+          return <CategoryIcon x={width - 20} y={6} size={14} color="#475569" strokeWidth={1.75} />;
+        })()}
       <text x={12} y={16} fontSize={9} fill="#334155" fontFamily="sans-serif" fontWeight={600}>
         {panelLabel}
       </text>

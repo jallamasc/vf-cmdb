@@ -12,7 +12,7 @@ import { Row } from "../api";
  * 14/16/17/18 together.
  *
  * Follows `Sites.tsx`'s master/detail shape: the main `EntityGrid` lists
- * every Entity_Type_Def (slug/label/icon/notes are plain editable cells —
+ * every Entity_Type_Def (slug/label/icon/description are plain editable cells —
  * `capabilities` is not a grid column here since it is a JSONB array, not a
  * scalar; it is edited exclusively through the detail panel's toggle
  * group), and `onSelectionChanged` drives `EntityTypeDetailPanel` the same
@@ -47,7 +47,7 @@ const columns = [
   textCol("slug", "Slug", 170),
   textCol("label", "Label", 200),
   textCol("icon", "Icon (lucide name)", 180),
-  textCol("notes", "Notes"),
+  textCol("description", "Description"),
   recordsLinkCol(),
 ];
 

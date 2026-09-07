@@ -32,7 +32,7 @@ const TABLES: RefTable[] = [
       textCol("postal_code", "Postal Code", 130),
       textCol("country", "Country", 140),
       flagCol("country", "🏳", undefined, 50),
-      textCol("notes", "Notes", 240),
+      textCol("description", "Description", 240),
     ],
     newRowDefaults: { label: "New address" },
     requiredFields: [{ field: "label", label: "Label" }],
@@ -69,7 +69,7 @@ const TABLES: RefTable[] = [
       textCol("label", "Label", 180),
       selectCol("storage_kind", "Storage Kind", [...STORAGE_KIND_VALUES]),
       roCol("builtin", "Builtin", 90),
-      textCol("notes", "Notes", 240),
+      textCol("description", "Description", 240),
     ],
     newRowDefaults: () => ({
       slug: `custom-${Math.random().toString(36).slice(2, 6)}`,

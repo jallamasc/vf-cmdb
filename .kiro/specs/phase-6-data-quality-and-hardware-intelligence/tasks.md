@@ -10,18 +10,19 @@ sub-phases that reuse them.
 
 ### Sub-phase A — Quick Independent Fixes
 
-- [ ] 1. VLANs site visibility
-  - [ ] 1.1 Site column + site filter on `frontend/src/pages/Vlans.tsx`
+- [x] 1. VLANs site visibility
+  - [x] 1.1 Site column + site filter on `frontend/src/pages/Vlans.tsx`
     - _Requirements: 1.1, 1.2_
-  - [ ]* 1.2 Vitest for the filter narrowing rows
+  - [x]* 1.2 Vitest for the filter narrowing rows
 
-- [ ] 2. `notes` → `description` rename
-  - [ ] 2.1 Migration renaming the column on every `LookupMixin` table,
-        `SiteAddress`, `FieldTypeDef`; relabel every frontend reference
+- [x] 2. `notes` → `description` rename
+  - [x] 2.1 Migration renaming the column on every `LookupMixin` table,
+        `SiteAddress`, `FieldTypeDef` (also `EntityTypeDef`, same registry
+        rationale); relabel every frontend reference
     - _Requirements: 2.1, 2.2_
-  - [ ]* 2.2 pytest round-trip on renamed tables; Vitest for relabeled columns
+  - [x]* 2.2 pytest round-trip on renamed tables; Vitest for relabeled columns
 
-- [ ] 3. Checkpoint A — build + test verification.
+- [x] 3. Checkpoint A — build + test verification.
 
 ### Sub-phase B — Uniqueness Validation
 

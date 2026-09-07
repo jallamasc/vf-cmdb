@@ -234,7 +234,7 @@ async def seed() -> None:
             city="Bogota",
             state_region="Cundinamarca",
             country="Colombia",
-            notes="Primary home lab location",
+            description="Primary home lab location",
         )
         session.add(home_address)
         await session.flush()

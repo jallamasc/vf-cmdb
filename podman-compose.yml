@@ -53,6 +53,23 @@ services:
       POSTGRES_PORT: 5432
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
       API_PREFIX: ${API_PREFIX:-/api/v1}
+      # Phase 5 Task 33/37/38 — Bitwarden Secrets Manager + Ansible Semaphore.
+      # Both feature sets stay silently disabled (graceful degradation,
+      # already covered by tests) until these are set in .env; empty
+      # defaults here match config.py's own empty-string/0 defaults.
+      BW_ORGANIZATION_ID: ${BW_ORGANIZATION_ID:-}
+      BW_ACCESS_TOKEN: ${BW_ACCESS_TOKEN:-}
+      BW_PROJECT_ID: ${BW_PROJECT_ID:-}
+      BW_API_URL: ${BW_API_URL:-https://api.bitwarden.com}
+      BW_IDENTITY_URL: ${BW_IDENTITY_URL:-https://identity.bitwarden.com}
+      # SEMAPHORE_URL is also returned as-is to the frontend to build the
+      # "Open in Semaphore" deep link (Req 31.3) — it must be reachable from
+      # the operator's own browser, so use the same externally-published
+      # address as SEMAPHORE_PORT below (e.g. http://<this-host>:3000), not
+      # the internal "semaphore" container hostname.
+      SEMAPHORE_URL: ${SEMAPHORE_URL:-}
+      SEMAPHORE_API_TOKEN: ${SEMAPHORE_API_TOKEN:-}
+      SEMAPHORE_PROJECT_ID: ${SEMAPHORE_PROJECT_ID:-0}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     networks:

@@ -311,6 +311,37 @@ npm install
 npm run dev      # Vite dev server, proxies /api → 127.0.0.1:8000
 ```
 
+**Backend, containerized (needed for stencil conversion)**
+
+The bare host `uvicorn` flow above is fine for almost everything, but the
+stencil-import feature (`POST /api/v1/stencil-library/fetch`) shells out to
+`vss2svg-conv`, a CLI built from source in `backend/Containerfile` (see that
+file's Phase 4 Sub-phase E comment). It can't be installed on macOS, and
+isn't installed on a bare Linux host either — only inside the built image.
+Calling that endpoint from the host `uvicorn` process above always returns
+`503 vss2svg-conv is not installed on this host`.
+
+`backend/dev-container.sh` runs the backend inside that image instead, with
+a live-reload loop over `backend/app/`, while still talking to whatever
+Postgres container you already run for day-to-day dev:
+
+```bash
+cd backend
+./dev-container.sh up      # build (first run only) + start, serves :8001
+./dev-container.sh logs    # follow logs
+./dev-container.sh down    # stop; leaves Postgres/the shared network alone
+```
+
+By default it targets a Postgres container named `vf_cmdb_dev` and serves
+on `http://localhost:8001` (override via `PG_CONTAINER` / `DEV_BACKEND_PORT`
+env vars — see `./dev-container.sh --help`). On Podman Desktop for macOS, a
+checkout living outside the Podman machine VM's default shared paths (e.g.
+on a secondary/external volume) can't use a normal bind mount; the script
+detects this and transparently falls back to a `podman cp` + `fswatch`
+push loop that gives the same "edit on host, backend reloads" behavior
+without needing to recreate the Podman machine (which would wipe its disk —
+every existing container and volume on it).
+
 ---
 
 ## Browser compatibility
@@ -359,6 +390,7 @@ vf_cmdb/
 │   │   └── seed_subnets.json
 │   ├── alembic/            migrations
 │   ├── Containerfile · entrypoint.sh · requirements.txt
+│   ├── dev-container.sh   containerized dev loop (stencil conversion needs it)
 ├── frontend/           React + Vite + AG Grid UI
 │   ├── src/pages/          Dashboard, Sites, RackView, compute, IPAM, …
 │   ├── src/components/      Layout, EntityGrid

@@ -211,6 +211,27 @@ export interface StencilLibraryFetchResult {
   shapes: StencilLibraryShape[];
 }
 
+/** Phase 6 Req 9.2/9.3 — one vendor in the curated ZIP registry. */
+export interface StencilVendor {
+  key: string;
+  label: string;
+}
+
+/** Phase 6 Req 9.2/9.3 — one product line (its own ZIP) for a vendor. */
+export interface StencilVendorProductLine {
+  key: string;
+  label: string;
+}
+
+/** Phase 6 Req 9.2 — result of POST .../product-lines/{line}/convert. */
+export interface StencilVendorConvertResult {
+  token: string;
+  vendor: string;
+  product_line: string;
+  file: string;
+  shapes: StencilLibraryShape[];
+}
+
 /** FEAT-6 (6C) / Phase 4 Task 21 — a source port handed to the Connect panel. */
 export interface SourcePort {
   source_type: string;
@@ -586,6 +607,46 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ source, category, file }),
     }).then(handle),
+  /** Phase 6 Req 9.2 — vendors available in the curated ZIP registry. */
+  stencilVendors: (): Promise<StencilVendor[]> =>
+    fetch(`${BASE}/stencil-library/vendors`).then(handle),
+  /** Phase 6 Req 9.2 — product lines (each its own ZIP) for one vendor. */
+  stencilVendorProductLines: (vendor: string): Promise<StencilVendorProductLine[]> =>
+    fetch(
+      `${BASE}/stencil-library/vendors/${encodeURIComponent(vendor)}/product-lines`,
+    ).then(handle),
+  /**
+   * Phase 6 Req 9.3 — download+extract ONLY this product line's ZIP (a
+   * cache hit with no further network calls on repeat selection) and list
+   * the .vss/.vssx files found inside it.
+   */
+  stencilVendorFiles: (vendor: string, productLine: string): Promise<string[]> =>
+    fetch(
+      `${BASE}/stencil-library/vendors/${encodeURIComponent(vendor)}/product-lines/${encodeURIComponent(
+        productLine,
+      )}/files`,
+      { method: "POST" },
+    ).then(handle),
+  /**
+   * Phase 6 Req 9.2 — convert one already-extracted vendor file into
+   * per-shape SVG previews, through the SAME pipeline as
+   * `stencilLibraryFetch()`.
+   */
+  stencilVendorConvert: (
+    vendor: string,
+    productLine: string,
+    file: string,
+  ): Promise<StencilVendorConvertResult> =>
+    fetch(
+      `${BASE}/stencil-library/vendors/${encodeURIComponent(vendor)}/product-lines/${encodeURIComponent(
+        productLine,
+      )}/convert`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file }),
+      },
+    ).then(handle),
   /**
    * FEAT-6 (6C) — connectable destination ports for a source port. Scoped to
    * the same rack, else datacenter, else site (fallback).

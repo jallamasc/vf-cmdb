@@ -15,6 +15,10 @@ vi.mock("../api", async (orig) => {
       stencilLibraryCategories: vi.fn(),
       stencilLibraryFiles: vi.fn(),
       stencilLibraryFetch: vi.fn(),
+      stencilVendors: vi.fn(),
+      stencilVendorProductLines: vi.fn(),
+      stencilVendorFiles: vi.fn(),
+      stencilVendorConvert: vi.fn(),
       uploadStencil: vi.fn(),
     },
   };
@@ -147,5 +151,110 @@ describe("StencilLibraryPicker", () => {
 
     expect(await screen.findByText(/produced no shapes/)).toBeInTheDocument();
     expect(api.uploadStencil).not.toHaveBeenCalled();
+  });
+
+  // Phase 6 Task 24 (Req 9.2/9.3) — the 3rd "Vendor ZIP" source: vendor ->
+  // product line -> file-inside-a-ZIP, reusing the same preview/apply UI.
+  describe("Vendor ZIP source", () => {
+    it("lists vendors, then product lines after picking one", async () => {
+      (api.stencilVendors as any).mockResolvedValue([{ key: "Microsoft", label: "Microsoft" }]);
+      (api.stencilVendorProductLines as any).mockResolvedValue([
+        { key: "network-equipment-shapes", label: "Network Equipment Shapes" },
+      ]);
+      wrap(
+        <StencilLibraryPicker modelSlug="power-device-types-1" face="front" onApplied={vi.fn()} onClose={vi.fn()} />
+      );
+      fireEvent.change(screen.getByRole("combobox"), { target: { value: "vendor" } });
+      expect(await screen.findByText("Microsoft")).toBeInTheDocument();
+      expect(api.stencilVendors).toHaveBeenCalledTimes(1);
+
+      fireEvent.click(screen.getByText("Microsoft"));
+      expect(await screen.findByText("Network Equipment Shapes")).toBeInTheDocument();
+      expect(api.stencilVendorProductLines).toHaveBeenCalledWith("Microsoft");
+    });
+
+    it("downloads+extracts ONLY the picked product line's ZIP and lists its files", async () => {
+      (api.stencilVendors as any).mockResolvedValue([{ key: "Microsoft", label: "Microsoft" }]);
+      (api.stencilVendorProductLines as any).mockResolvedValue([
+        { key: "network-equipment-shapes", label: "Network Equipment Shapes" },
+      ]);
+      (api.stencilVendorFiles as any).mockResolvedValue(["APC AP7516.vss", "Cisco Rack.vss"]);
+      wrap(
+        <StencilLibraryPicker modelSlug="power-device-types-1" face="front" onApplied={vi.fn()} onClose={vi.fn()} />
+      );
+      fireEvent.change(screen.getByRole("combobox"), { target: { value: "vendor" } });
+      fireEvent.click(await screen.findByText("Microsoft"));
+      fireEvent.click(await screen.findByText("Network Equipment Shapes"));
+
+      await waitFor(() =>
+        expect(api.stencilVendorFiles).toHaveBeenCalledWith("Microsoft", "network-equipment-shapes")
+      );
+      expect(await screen.findByText("APC AP7516.vss")).toBeInTheDocument();
+      expect(screen.getByText("Cisco Rack.vss")).toBeInTheDocument();
+      // Only ONE product line's files were fetched — no bulk pre-fetch.
+      expect(api.stencilVendorFiles).toHaveBeenCalledTimes(1);
+    });
+
+    it("converts a picked vendor file through the same preview/apply flow", async () => {
+      (api.stencilVendors as any).mockResolvedValue([{ key: "Microsoft", label: "Microsoft" }]);
+      (api.stencilVendorProductLines as any).mockResolvedValue([
+        { key: "network-equipment-shapes", label: "Network Equipment Shapes" },
+      ]);
+      (api.stencilVendorFiles as any).mockResolvedValue(["APC AP7516.vss"]);
+      (api.stencilVendorConvert as any).mockResolvedValue({
+        token: "vend123",
+        vendor: "Microsoft",
+        product_line: "network-equipment-shapes",
+        file: "APC AP7516.vss",
+        shapes: [
+          { title: "AP7516 - Front View", preview_url: "/api/v1/stencil-library/previews/vend123/front.svg" },
+        ],
+      });
+      (api.uploadStencil as any).mockResolvedValue({ stored: true });
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        blob: () => Promise.resolve(new Blob(["<svg/>"], { type: "image/svg+xml" })),
+      }) as any;
+
+      const onApplied = vi.fn();
+      const onClose = vi.fn();
+      wrap(
+        <StencilLibraryPicker modelSlug="power-device-types-1" face="front" onApplied={onApplied} onClose={onClose} />
+      );
+      fireEvent.change(screen.getByRole("combobox"), { target: { value: "vendor" } });
+      fireEvent.click(await screen.findByText("Microsoft"));
+      fireEvent.click(await screen.findByText("Network Equipment Shapes"));
+      fireEvent.click(await screen.findByText("APC AP7516.vss"));
+
+      await waitFor(() =>
+        expect(api.stencilVendorConvert).toHaveBeenCalledWith(
+          "Microsoft",
+          "network-equipment-shapes",
+          "APC AP7516.vss"
+        )
+      );
+      fireEvent.click(await screen.findByText("AP7516 - Front View"));
+
+      await waitFor(() => expect(api.uploadStencil).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(onApplied).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    });
+
+    it("switching sources resets vendor/product-line state and never mixes flows", async () => {
+      (api.stencilLibraryCategories as any).mockResolvedValue([{ key: "Computer Racks", label: "Computer Racks" }]);
+      (api.stencilVendors as any).mockResolvedValue([{ key: "Microsoft", label: "Microsoft" }]);
+      wrap(
+        <StencilLibraryPicker modelSlug="power-device-types-1" face="front" onApplied={vi.fn()} onClose={vi.fn()} />
+      );
+      expect(await screen.findByText("Computer Racks")).toBeInTheDocument();
+
+      fireEvent.change(screen.getByRole("combobox"), { target: { value: "vendor" } });
+      expect(await screen.findByText("Microsoft")).toBeInTheDocument();
+      expect(screen.queryByText("Computer Racks")).not.toBeInTheDocument();
+
+      fireEvent.change(screen.getByRole("combobox"), { target: { value: "github" } });
+      expect(await screen.findByText("Computer Racks")).toBeInTheDocument();
+      expect(screen.queryByText("Microsoft")).not.toBeInTheDocument();
+    });
   });
 });

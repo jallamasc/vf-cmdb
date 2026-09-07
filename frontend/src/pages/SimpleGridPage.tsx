@@ -9,6 +9,7 @@ import {
   fkCol,
   selectCol,
   namingComputedCol,
+  modeToggleCol,
 } from "../lib/columns";
 import { NAMING_MODE_VALUES } from "../lib/namingMode";
 import { Row } from "../api";
@@ -43,7 +44,7 @@ const CONFIGS: Record<Kind, Config> = {
       namingComputedCol("panel_id_label", "Panel ID", 160),
       // Phase 5 Task 28 (Req 23.1) — switch to "manual" to type a Panel ID
       // directly.
-      selectCol("naming_mode", "Naming Mode", [...NAMING_MODE_VALUES]),
+      modeToggleCol("naming_mode", "Naming Mode", [...NAMING_MODE_VALUES]),
       selectCol("side", "Side", ["front", "rear", "both"]),
       textCol("notes", "Notes"),
     ],
@@ -68,7 +69,7 @@ const CONFIGS: Record<Kind, Config> = {
       namingComputedCol("vf_long_name", "VF Long Name", 200),
       // Phase 5 Task 28 (Req 23.1) — switch to "manual" to type a VF Long
       // Name directly.
-      selectCol("naming_mode", "Naming Mode", [...NAMING_MODE_VALUES]),
+      modeToggleCol("naming_mode", "Naming Mode", [...NAMING_MODE_VALUES]),
       textCol("notes", "Notes"),
     ],
     defaults: { device_type: "pdu" },
@@ -109,7 +110,7 @@ const CONFIGS: Record<Kind, Config> = {
       namingComputedCol("vf_long_name", "VF Long Name", 220),
       // Phase 5 Task 28 (Req 23.1) — switch to "manual" to type a VF Long
       // Name directly.
-      selectCol("naming_mode", "Naming Mode", [...NAMING_MODE_VALUES]),
+      modeToggleCol("naming_mode", "Naming Mode", [...NAMING_MODE_VALUES]),
       fkCol("site_id", "Site", l.sites),
       fkCol("datacenter_floor_id", "Floor", l["datacenter-floors"]),
       fkCol("room_id", "Room", l.rooms),

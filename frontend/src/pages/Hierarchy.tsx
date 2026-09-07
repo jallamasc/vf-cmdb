@@ -10,8 +10,8 @@ import {
   roCol,
   textCol,
   airportCol,
-  selectCol,
   namingComputedCol,
+  modeToggleCol,
 } from "../lib/columns";
 import { NAMING_MODE_VALUES } from "../lib/namingMode";
 import { useNamePreview } from "../lib/useNamePreview";
@@ -233,7 +233,7 @@ const DATACENTER_COLUMNS = [
   namingComputedCol("vf_long_name", "VF Long Name", 220),
   // Phase 5 Task 28 (Req 23.1) — switch to "manual" to type a value into
   // VF Long Name directly.
-  selectCol("naming_mode", "Naming Mode", [...NAMING_MODE_VALUES]),
+  modeToggleCol("naming_mode", "Naming Mode", [...NAMING_MODE_VALUES]),
 ];
 
 // ---------------------------------------------------------------------------

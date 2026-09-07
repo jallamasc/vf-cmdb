@@ -1,7 +1,7 @@
 // Phase 5 Task 9 — deviceTypeIconCol: icon resolution + animated active dot.
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render } from "@testing-library/react";
-import { deviceTypeIconCol, flagCol, namingComputedCol } from "./columns";
+import { deviceTypeIconCol, flagCol, namingComputedCol, generatedCol, modeToggleCol } from "./columns";
 
 const TYPES = [
   { id: 1, full_name: "24-port switch", abbreviation: "sw24", icon: "Router" },
@@ -75,14 +75,14 @@ describe("flagCol", () => {
 });
 
 describe("namingComputedCol (Phase 5 Task 28, Req 23.1/23.2/23.3)", () => {
-  it("is read-only (roCol-styled) on a row in auto mode", () => {
+  it("is read-only and Phase 6 Task 11 generated-cell-styled on a row in auto mode", () => {
     const col = namingComputedCol("vf_long_name", "VF Long Name");
     const params = { data: { naming_mode: "auto" } } as any;
     expect((col.editable as (p: any) => boolean)(params)).toBe(false);
-    expect((col.cellClass as (p: any) => string)(params)).toBe("text-slate-500 italic");
+    expect((col.cellClass as (p: any) => string)(params)).toBe("vf-generated-cell");
   });
 
-  it("is editable and unstyled-italic on a row in manual mode", () => {
+  it("is editable and unstyled on a row in manual mode", () => {
     const col = namingComputedCol("vf_long_name", "VF Long Name");
     const params = { data: { naming_mode: "manual" } } as any;
     expect((col.editable as (p: any) => boolean)(params)).toBe(true);
@@ -93,5 +93,20 @@ describe("namingComputedCol (Phase 5 Task 28, Req 23.1/23.2/23.3)", () => {
     const col = namingComputedCol("vf_long_name", "VF Long Name");
     const params = { data: {} } as any;
     expect((col.editable as (p: any) => boolean)(params)).toBe(false);
+  });
+});
+
+describe("generatedCol / modeToggleCol (Phase 6 Task 11, Req 5.2)", () => {
+  it("generatedCol is always read-only with the amber generated-cell style", () => {
+    const col = generatedCol("simple_name", "Site Code", 160);
+    expect(col.editable).toBe(false);
+    expect(col.cellClass).toBe("vf-generated-cell");
+    expect(col.width).toBe(160);
+  });
+
+  it("modeToggleCol keeps selectCol's editor but styles the cell distinctly", () => {
+    const col = modeToggleCol("site_code_type", "Code Mode", ["auto", "custom", "theme"]);
+    expect(col.cellClass).toBe("vf-mode-toggle-cell");
+    expect(col.cellEditorParams).toEqual({ values: ["auto", "custom", "theme"] });
   });
 });

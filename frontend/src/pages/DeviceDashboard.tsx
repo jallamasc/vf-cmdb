@@ -31,6 +31,7 @@ import {
   fkCol,
   ipCol,
   selectCol,
+  generatedCol,
 } from "../lib/columns";
 import { DEVICE_SCHEMAS } from "../lib/deviceSchema";
 
@@ -307,7 +308,7 @@ function GuestsTab({ detail }: { detail: DeviceDetail }) {
   const vmColumns = useMemo<ColDef[]>(
     () => [
       roCol("id", "ID", 70),
-      roCol("vf_short_name", "Short name", 140),
+      generatedCol("vf_short_name", "Short name", 140),
       textCol("friendly_name", "Friendly name", 160),
       fkCol("site_id", "Site", map["sites"]),
       fkCol("cluster_type_id", "Cluster", map["cluster-types"]),
@@ -327,7 +328,7 @@ function GuestsTab({ detail }: { detail: DeviceDetail }) {
   const containerColumns = useMemo<ColDef[]>(
     () => [
       roCol("id", "ID", 70),
-      roCol("vf_short_name", "Short name", 140),
+      generatedCol("vf_short_name", "Short name", 140),
       textCol("friendly_name", "Friendly name", 160),
       selectCol("container_type", "Type", ["cn", "ap"], { width: 120 }),
       fkCol("app_type_id", "App type", map["app-types"]),

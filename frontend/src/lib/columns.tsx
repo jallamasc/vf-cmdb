@@ -5,8 +5,32 @@ import { api, Row } from "../api";
 import type { DeviceTypeKey } from "../api";
 import FuzzySelectEditor from "../components/FuzzySelectEditor";
 import AirportCellEditor from "../components/AirportCellEditor";
+import IconPickerEditor from "../components/IconPickerEditor";
 import { resolveDeviceTypeIcon, isRecentlyActive } from "./deviceIcons";
+import { resolveIcon } from "./iconLibrary";
 import CountryFlag from "./countryFlags";
+
+/**
+ * Phase 6 Task 11 (Req 5.1) — the column-ordering convention every grid in
+ * this app should follow, so a control is always roughly where an operator
+ * expects it rather than in a random position per page:
+ *
+ *   1. `id` (roCol)
+ *   2. `icon` (iconCol), when the resource has one
+ *   3. The primary generated/name field(s) (generatedCol / namingComputedCol
+ *      / deviceLinkCol) and, immediately after each one, its own Code Mode
+ *      toggle (modeToggleCol) if it has one — the toggle always sits right
+ *      next to the field it governs, never elsewhere in the row.
+ *   4. Other identifiers (code, serial number, slug, ...).
+ *   5. Relational fields (fkCol / selectCol for FKs and enums).
+ *   6. `description`.
+ *   7. Anything free-form/secondary (notes, custom fields).
+ *
+ * Not every grid has every one of these — the convention is about relative
+ * order among the sections a given grid *does* have, not a fixed column
+ * count. See `generatedCol`/`modeToggleCol`/`namingComputedCol` below for
+ * the matching Req 5.2 visual treatment.
+ */
 
 /**
  * Phase 5 Task 24 (Req 20.1/20.2) — the set of field/column keys an
@@ -167,11 +191,46 @@ export const roCol = (field: string, headerName?: string, width?: number): ColDe
 });
 
 /**
+ * Phase 6 Task 11 (Req 5.2) — a naming-engine-generated field that has no
+ * per-row Code Mode toggle in this grid (always read-only, e.g.
+ * Site.simple_name outside the tri-mode panel, or a device's vf_short_name
+ * where the grid doesn't also show naming_mode). Styled the same
+ * amber/monospace `vf-generated-cell` as `namingComputedCol` below, so
+ * every naming-engine output reads the same way whether or not its own
+ * toggle happens to be visible in that particular grid.
+ */
+export const generatedCol = (field: string, headerName?: string, width?: number): ColDef => ({
+  field,
+  headerName: headerName ?? field,
+  editable: false,
+  cellClass: "vf-generated-cell",
+  width,
+});
+
+/**
+ * Phase 6 Task 11 (Req 5.2) — the Code Mode toggle itself (`naming_mode` /
+ * `site_code_type`), styled to visually read as part of the same control
+ * group as the `namingComputedCol` field(s) it governs — a distinct,
+ * consistent color across every grid that has one, so it's never the
+ * "field I might have missed" among a row of plain columns.
+ */
+export const modeToggleCol = (
+  field: string,
+  headerName: string,
+  values: unknown[],
+  extra: Partial<ColDef> = {}
+): ColDef => {
+  const base = selectCol(field, headerName, values, extra);
+  return { ...base, cellClass: "vf-mode-toggle-cell" };
+};
+
+/**
  * Phase 5 Task 28 (Req 23.1/23.2/23.3) — a naming-engine-computed column
  * (e.g. Site.vf_long_name, Rack.vf_long_name, PatchPanel.panel_id_label)
  * that becomes a normal editable cell exactly when the row's `naming_mode`
  * is "manual" (the whole point of manual mode), and stays read-only
- * (styled like `roCol`) under "auto" — unlike `roCol`, this can't be a
+ * (styled like `roCol`, but with the distinct Phase 6 Task 11 `vf-generated-
+ * cell` treatment — Req 5.2) under "auto" — unlike `roCol`, this can't be a
  * fixed `editable: false`, since editability now depends on another field
  * on the same row.
  */
@@ -183,7 +242,8 @@ export const namingComputedCol = (
   field,
   headerName: headerName ?? field,
   editable: (p) => p.data?.naming_mode === "manual",
-  cellClass: (p) => (p.data?.naming_mode === "manual" ? "" : "text-slate-500 italic"),
+  cellClass: (p) =>
+    p.data?.naming_mode === "manual" ? "" : "vf-generated-cell",
   width,
 });
 
@@ -274,6 +334,45 @@ export function boolCol(
     valueFormatter: (p) => (p.value == null ? "" : p.value ? "Yes" : "No"),
     cellRenderer: DropdownCellRenderer,
     width: 100,
+    ...extra,
+  };
+}
+
+/**
+ * Phase 6 Task 10 (Req 4.1/4.2) — the icon column every registry now has:
+ * shows the currently-picked icon's live SVG preview + its name (falling
+ * back to the generic HelpCircle glyph via `resolveIcon` for an
+ * unrecognised/legacy value), with the same ▼ dropdown affordance as
+ * `fkCol`/`selectCol`. Editing opens `IconPickerEditor`'s fuzzy-searchable,
+ * preview-showing picker (Req 4.2's "chevron-triggered, fuzzy-searchable,
+ * with a live preview of each candidate").
+ */
+export function iconCol(
+  field = "icon",
+  headerName = "Icon",
+  extra: Partial<ColDef> = {}
+): ColDef {
+  return {
+    field,
+    headerName,
+    editable: true,
+    width: 130,
+    cellEditor: IconPickerEditor,
+    cellEditorPopup: true,
+    cellRenderer: (p: ICellRendererParams) => {
+      const Icon = resolveIcon(p.value as string | null);
+      return (
+        <span className="vf-dd-cell">
+          <span className="vf-dd-text flex items-center gap-1.5">
+            <Icon size={16} aria-hidden="true" />
+            {p.value ? String(p.value) : <span className="vf-dd-empty">— none —</span>}
+          </span>
+          <span className="vf-dd-caret" aria-hidden="true">
+            ▼
+          </span>
+        </span>
+      );
+    },
     ...extra,
   };
 }

@@ -147,3 +147,50 @@ body {
   color: #94a3b8;
   font-style: italic;
 }
+
+/* ---------------------------------------------------------------------------
+   Phase 6 Task 11 (Req 5.2) — a consistent, distinct visual treatment for
+   naming-engine-generated/read-only fields and their Code Mode toggle,
+   applied via `generatedCol()`/`namingComputedCol()`/`modeToggleCol()`
+   (lib/columns.tsx) so it looks the same in every grid that has one: a
+   warm amber tint (distinguishes it from plain read-only grey `roCol`
+   cells, which stay neutral) plus a monospace typeface (reads as "this
+   value came from a machine, not free text").
+--------------------------------------------------------------------------- */
+.vf-generated-cell {
+  background: #fffbeb;
+  color: #92400e;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-style: normal;
+}
+
+.vf-generated-cell.vf-generated-manual {
+  /* Code Mode switched to manual: back to a plain editable look — the
+     amber tint/monospace are specifically "this is machine-generated". */
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+}
+
+/* The Code Mode toggle control itself (naming_mode / site_code_type select
+   cells) — same family/tint as the field(s) it governs, so an operator
+   recognizes it as part of the same control group at a glance. */
+.vf-mode-toggle-cell {
+  background: #fef3c7;
+  color: #92400e;
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------------------------
+   Phase 6 Task 10 (Req 4.2) — Icon_Picker preview list (IconPickerEditor).
+--------------------------------------------------------------------------- */
+.vf-icon-picker-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.vf-icon-picker-preview {
+  flex: 0 0 auto;
+  color: #475569;
+}

@@ -183,25 +183,39 @@ class LookupMixin:
 class Organization(LookupMixin, Base):
     __tablename__ = "organizations"
 
+    # Phase 6 Task 9 (Req 4.1) — lucide-react icon name, same shape as the
+    # 4 device-type lookups' own `icon` column below.
+    icon: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+
 
 class Cloud(LookupMixin, Base):
     __tablename__ = "clouds"
+
+    icon: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
 
 
 class Region(LookupMixin, Base):
     __tablename__ = "regions"
 
+    icon: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+
 
 class Campus(LookupMixin, Base):
     __tablename__ = "campuses"
+
+    icon: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
 
 
 class Building(LookupMixin, Base):
     __tablename__ = "buildings"
 
+    icon: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+
 
 class FloorSection(LookupMixin, Base):
     __tablename__ = "floor_sections"
+
+    icon: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
 
 
 class ComputeDeviceType(LookupMixin, Base):
@@ -221,9 +235,13 @@ class ComputeDeviceType(LookupMixin, Base):
 class Brand(LookupMixin, Base):
     __tablename__ = "brands"
 
+    icon: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+
 
 class DeviceRole(LookupMixin, Base):
     __tablename__ = "device_roles"
+
+    icon: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
 
 
 class NetworkDeviceType(LookupMixin, Base):
@@ -240,21 +258,31 @@ class NetworkDeviceType(LookupMixin, Base):
 class NetworkSubtype(LookupMixin, Base):
     __tablename__ = "network_subtypes"
 
+    icon: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+
 
 class OsFamily(LookupMixin, Base):
     __tablename__ = "os_families"
+
+    icon: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
 
 
 class OsVersion(LookupMixin, Base):
     __tablename__ = "os_versions"
 
+    icon: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+
 
 class AppType(LookupMixin, Base):
     __tablename__ = "app_types"
 
+    icon: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+
 
 class ClusterType(LookupMixin, Base):
     __tablename__ = "cluster_types"
+
+    icon: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
 
 
 class StorageDeviceType(LookupMixin, Base):
@@ -286,6 +314,8 @@ class PowerDeviceType(LookupMixin, Base):
 
 class NetworkIdType(LookupMixin, Base):
     __tablename__ = "network_id_types"
+
+    icon: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
 
 
 # ---------------------------------------------------------------------------
@@ -482,6 +512,8 @@ class RackType(Base):
         server_default="mixed",
     )
     description: Mapped[Optional[str]] = mapped_column(Text)
+    # Phase 6 Task 9 (Req 4.1) — lucide-react icon name.
+    icon: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
 
 
 class Rack(Base):
@@ -1067,6 +1099,8 @@ class FieldTypeDef(Base):
         Boolean, nullable=False, default=False, server_default="false"
     )
     description: Mapped[Optional[str]] = mapped_column(Text)
+    # Phase 6 Task 9 (Req 4.1) — lucide-react icon name.
+    icon: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
 
 
 class EntityTypeDef(Base):

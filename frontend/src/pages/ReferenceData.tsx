@@ -1,7 +1,7 @@
 import { useState } from "react";
 import EntityGrid from "../components/EntityGrid";
 import type { RequiredField } from "../components/EntityGrid";
-import { textCol, roCol, flagCol, selectCol, boolCol } from "../lib/columns";
+import { textCol, roCol, flagCol, selectCol, boolCol, iconCol } from "../lib/columns";
 import { STORAGE_KIND_VALUES } from "../lib/fieldTypes";
 
 interface RefTable {
@@ -44,6 +44,7 @@ const TABLES: RefTable[] = [
       "Reusable rack models (height in U, code) picked when creating racks on the Physical Hierarchy page.",
     columns: [
       roCol("id", "ID", 70),
+      iconCol(),
       textCol("name", "Name", 200),
       textCol("code", "Code", 120),
       textCol("total_units", "Height (U)", 120),
@@ -70,6 +71,7 @@ const TABLES: RefTable[] = [
       "Field types available when defining custom fields for a custom entity type. The 6 builtin rows (one per storage kind) can't be deleted, but you can add new named types on top of the same storage kinds — e.g. a \"MAC Address\" type backed by \"text\".",
     columns: [
       roCol("id", "ID", 70),
+      iconCol(),
       textCol("slug", "Slug", 160),
       textCol("label", "Label", 180),
       selectCol("storage_kind", "Storage Kind", [...STORAGE_KIND_VALUES]),

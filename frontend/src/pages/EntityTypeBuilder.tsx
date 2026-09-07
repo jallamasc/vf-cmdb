@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import type { ICellRendererParams } from "ag-grid-community";
 import EntityGrid from "../components/EntityGrid";
 import EntityTypeDetailPanel from "../components/EntityTypeDetailPanel";
-import { roCol, textCol } from "../lib/columns";
+import { roCol, textCol, iconCol } from "../lib/columns";
 import { Row } from "../api";
 
 /**
@@ -46,7 +46,10 @@ const columns = [
   roCol("id", "ID", 60),
   textCol("slug", "Slug", 170),
   textCol("label", "Label", 200),
-  textCol("icon", "Icon (lucide name)", 180),
+  // Phase 6 Task 10 (Req 4.1/4.2) — was a plain free-text field; now the
+  // same fuzzy-searchable, preview-showing Icon_Picker as every other
+  // registry.
+  iconCol(),
   textCol("description", "Description"),
   recordsLinkCol(),
 ];

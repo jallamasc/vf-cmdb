@@ -5,24 +5,32 @@ import ThemeNamePicker, { ThemeSelection } from "./ThemeNamePicker";
 import { friendlyError } from "./EntityGrid";
 
 /**
- * FEAT-1 — tri-mode editor for a site's ``simple_name`` (the "site code").
+ * FEAT-1 / Phase 6 Task 20 (Req 8.1/8.2/8.3) — a Site's real code and its
+ * fun themed name are now shown and edited SIMULTANEOUSLY, not as mutually
+ * exclusive modes.
  *
- * The site code can be produced three ways:
+ * The "Site Code" section is still two-way (auto/custom — which of THOSE
+ * two computes ``simple_name`` is a genuine either/or, since it's a single
+ * column):
  *
  * * **auto**   — ``org + campus + region + sequence`` (e.g. ``vfhmcc1``),
  *                computed by the backend and refreshed whenever the lookups
  *                change. Read-only here.
  * * **custom** — whatever the operator types.
- * * **theme**  — a name picked from the built-in themed catalogues (FEAT-3);
- *                stored in ``theme_name`` / ``theme_category`` and mirrored
- *                into ``simple_name``.
  *
- * The panel edits the row currently selected in the Sites grid. Nothing is
- * written until "Save site code" is pressed, so switching modes to compare the
- * resulting code is free.
+ * The "Theme Name" section is a fully independent control, always visible,
+ * saved through its own mutation that only ever touches ``theme_name`` /
+ * ``theme_category`` — it deliberately never sets ``site_code_type`` to
+ * ``"theme"`` anymore (the backend's ``generate_site()`` only mirrors
+ * ``theme_name`` into ``simple_name`` when ``site_code_type === "theme"`` —
+ * see naming.py — so simply never sending that value keeps the two
+ * genuinely independent: picking a theme name can no longer silently
+ * overwrite whatever real code Auto/Custom produced, and vice versa).
+ * ``"theme"`` remains a valid stored value for old rows (never migrated
+ * away, out of scope for this task) but is no longer offered as a UI mode.
  */
 
-const MODES: { value: SiteCodeType; label: string; blurb: string }[] = [
+const CODE_MODES: { value: SiteCodeType; label: string; blurb: string }[] = [
   {
     value: "auto",
     label: "Auto",
@@ -32,11 +40,6 @@ const MODES: { value: SiteCodeType; label: string; blurb: string }[] = [
     value: "custom",
     label: "Custom",
     blurb: "Type any code you like — it is stored verbatim.",
-  },
-  {
-    value: "theme",
-    label: "Theme",
-    blurb: "Pick a memorable name from a themed catalogue.",
   },
 ];
 
@@ -55,6 +58,7 @@ export default function SiteCodePanel({ site }: Props) {
   const [autoMissing, setAutoMissing] = useState<string[]>([]);
   const [autoLoading, setAutoLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [themeMessage, setThemeMessage] = useState("");
   // Guards against an older /naming/site-code answer landing last.
   const seq = useRef(0);
 
@@ -64,13 +68,19 @@ export default function SiteCodePanel({ site }: Props) {
   // grid refetches the current one.
   useEffect(() => {
     setMessage("");
+    setThemeMessage("");
     if (!site) {
       setMode("auto");
       setCustom("");
       setTheme(null);
       return;
     }
-    setMode((site.site_code_type as SiteCodeType) || "auto");
+    // Phase 6 Task 20 — "theme" is no longer offered as a UI mode (the
+    // Theme Name section below is independent now); a legacy row still
+    // carrying that value just displays/edits its current simple_name as
+    // a custom code going forward, same as any other pre-existing value.
+    const storedMode = (site.site_code_type as SiteCodeType) || "auto";
+    setMode(storedMode === "theme" ? "custom" : storedMode);
     setCustom(site.simple_name ?? "");
     setTheme(
       site.theme_name
@@ -126,144 +136,185 @@ export default function SiteCodePanel({ site }: Props) {
     onError: (e: Error) => setMessage(friendlyError(e.message)),
   });
 
+  // Phase 6 Task 20 (Req 8.1/8.2) — the Theme Name section's own, fully
+  // independent save path: only ever patches theme_name/theme_category,
+  // never site_code_type or simple_name, so it can never clobber (or be
+  // clobbered by) whatever the Site Code section above currently holds.
+  const themeMut = useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: Row }) =>
+      api.update("sites", id, payload),
+    onSuccess: (row: Row) => {
+      qc.invalidateQueries({ queryKey: ["sites"] });
+      setThemeMessage(
+        row?.theme_name ? `Saved — theme name is now “${row.theme_name}”.` : "Theme name cleared."
+      );
+    },
+    onError: (e: Error) => setThemeMessage(friendlyError(e.message)),
+  });
+
   if (!site) {
     return (
       <div className="mb-2 px-3 py-2 border border-dashed border-slate-300 rounded text-sm text-slate-500">
         <span className="font-medium text-slate-600">Site code</span> — select a
-        row to choose how its code is generated (auto, custom or themed).
+        row to set its code and its theme name (both can be set at once).
       </div>
     );
   }
 
-  const effective =
-    mode === "auto" ? autoCode : mode === "theme" ? theme?.name ?? "" : custom.trim();
+  const effective = mode === "auto" ? autoCode : custom.trim();
 
   const dirty =
-    mode !== ((site.site_code_type as SiteCodeType) || "auto") ||
-    (mode === "custom" && custom.trim() !== (site.simple_name ?? "")) ||
-    (mode === "theme" && (theme?.name ?? "") !== (site.theme_name ?? ""));
+    mode !== ((site.site_code_type as SiteCodeType) === "theme"
+      ? "custom"
+      : (site.site_code_type as SiteCodeType) || "auto") ||
+    (mode === "custom" && custom.trim() !== (site.simple_name ?? ""));
 
   const blocked =
-    (mode === "custom" && custom.trim() === "") ||
-    (mode === "theme" && !theme) ||
-    (mode === "auto" && autoCode === "");
+    (mode === "custom" && custom.trim() === "") || (mode === "auto" && autoCode === "");
 
   const handleSave = () => {
     setMessage("");
     const payload: Row = { site_code_type: mode };
     if (mode === "custom") {
       payload.simple_name = custom.trim();
-    } else if (mode === "theme" && theme) {
-      // generate_site() mirrors theme_name into simple_name server-side; send
-      // it too so the change is recorded even if naming is a no-op.
-      payload.theme_name = theme.name;
-      payload.theme_category = theme.category;
-      payload.simple_name = theme.name;
     }
     saveMut.mutate({ id: site.id, payload });
   };
 
-  const active = MODES.find((m) => m.value === mode);
+  const active = CODE_MODES.find((m) => m.value === mode);
+
+  const handleThemeSelect = (sel: ThemeSelection) => {
+    setTheme(sel);
+    setPickerOpen(false);
+    setThemeMessage("");
+    themeMut.mutate({
+      id: site.id,
+      payload: { theme_name: sel.name, theme_category: sel.category },
+    });
+  };
+
+  const handleThemeClear = () => {
+    setTheme(null);
+    setThemeMessage("");
+    themeMut.mutate({ id: site.id, payload: { theme_name: null, theme_category: null } });
+  };
 
   return (
-    <div className="mb-2 px-3 py-2.5 border border-slate-200 bg-slate-50 rounded">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <span className="text-sm font-medium text-slate-700">
-          Site code for #{site.id}
-        </span>
+    <div className="mb-2 px-3 py-2.5 border border-slate-200 bg-slate-50 rounded space-y-2.5">
+      {/* --- Site Code (auto/custom) --- */}
+      <div>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <span className="text-sm font-medium text-slate-700">
+            Site code for #{site.id}
+          </span>
 
-        <div className="flex gap-3">
-          {MODES.map((m) => (
-            <label
-              key={m.value}
-              className="flex items-center gap-1.5 text-sm text-slate-700 cursor-pointer"
-              title={m.blurb}
-            >
-              <input
-                type="radio"
-                name="site-code-mode"
-                checked={mode === m.value}
-                onChange={() => {
-                  setMode(m.value);
-                  setMessage("");
-                }}
-              />
-              {m.label}
-            </label>
-          ))}
+          <div className="flex gap-3">
+            {CODE_MODES.map((m) => (
+              <label
+                key={m.value}
+                className="flex items-center gap-1.5 text-sm text-slate-700 cursor-pointer"
+                title={m.blurb}
+              >
+                <input
+                  type="radio"
+                  name="site-code-mode"
+                  checked={mode === m.value}
+                  onChange={() => {
+                    setMode(m.value);
+                    setMessage("");
+                  }}
+                />
+                {m.label}
+              </label>
+            ))}
+          </div>
+
+          {mode === "auto" && (
+            <span className="text-sm">
+              <code className="px-2 py-1 bg-white border border-slate-300 rounded text-slate-800">
+                {autoLoading ? "…" : autoCode || "—"}
+              </code>
+              {!autoLoading && autoMissing.length > 0 && (
+                <span className="ml-2 text-xs text-amber-700">
+                  needs {autoMissing.join(", ")}
+                </span>
+              )}
+            </span>
+          )}
+
+          {mode === "custom" && (
+            <input
+              value={custom}
+              onChange={(e) => setCustom(e.target.value)}
+              placeholder="e.g. hq-bogota-1"
+              className="border border-slate-300 rounded px-2 py-1 text-sm w-56"
+            />
+          )}
+
+          <button
+            onClick={handleSave}
+            disabled={!dirty || blocked || saveMut.isPending}
+            className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {saveMut.isPending ? "Saving…" : "Save site code"}
+          </button>
         </div>
 
-        {mode === "auto" && (
-          <span className="text-sm">
-            <code className="px-2 py-1 bg-white border border-slate-300 rounded text-slate-800">
-              {autoLoading ? "…" : autoCode || "—"}
-            </code>
-            {!autoLoading && autoMissing.length > 0 && (
-              <span className="ml-2 text-xs text-amber-700">
-                needs {autoMissing.join(", ")}
-              </span>
-            )}
-          </span>
-        )}
+        <p className="text-xs text-slate-500 mt-1.5">
+          {active?.blurb} Resulting code:{" "}
+          <span className="font-medium text-slate-700">{effective || "—"}</span>.
+          The VF long / short / TIA-606-B names are generated separately and are
+          not affected by this choice.
+        </p>
 
-        {mode === "custom" && (
-          <input
-            value={custom}
-            onChange={(e) => setCustom(e.target.value)}
-            placeholder="e.g. hq-bogota-1"
-            className="border border-slate-300 rounded px-2 py-1 text-sm w-56"
-          />
+        {message && (
+          <p className={`text-xs mt-1 ${saveMut.isError ? "text-red-700" : "text-green-700"}`}>
+            {message}
+          </p>
         )}
-
-        {mode === "theme" && (
-          <span className="flex items-center gap-2 text-sm">
-            <button
-              onClick={() => setPickerOpen(true)}
-              className="px-3 py-1 border border-slate-300 bg-white rounded text-sm hover:bg-slate-100"
-            >
-              {theme ? "Change…" : "Pick a name…"}
-            </button>
-            <code className="px-2 py-1 bg-white border border-slate-300 rounded text-slate-800">
-              {theme?.name ?? "—"}
-            </code>
-          </span>
-        )}
-
-        <button
-          onClick={handleSave}
-          disabled={!dirty || blocked || saveMut.isPending}
-          className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          {saveMut.isPending ? "Saving…" : "Save site code"}
-        </button>
       </div>
 
-      <p className="text-xs text-slate-500 mt-1.5">
-        {active?.blurb} Resulting code:{" "}
-        <span className="font-medium text-slate-700">{effective || "—"}</span>.
-        The VF long / short / TIA-606-B names are generated separately and are
-        not affected by this choice.
-      </p>
-
-      {message && (
-        <p
-          className={`text-xs mt-1 ${
-            saveMut.isError ? "text-red-700" : "text-green-700"
-          }`}
-        >
-          {message}
+      {/* --- Theme Name — always visible, independent of the code above --- */}
+      <div className="pt-2 border-t border-slate-200">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium text-slate-700">Theme name</span>
+          <code className="px-2 py-1 bg-white border border-slate-300 rounded text-slate-800 text-sm">
+            {theme?.name ?? "— none —"}
+          </code>
+          <button
+            onClick={() => setPickerOpen(true)}
+            disabled={themeMut.isPending}
+            className="px-3 py-1 border border-slate-300 bg-white rounded text-sm hover:bg-slate-100 disabled:opacity-40"
+          >
+            {theme ? "Change…" : "Pick a name…"}
+          </button>
+          {theme && (
+            <button
+              onClick={handleThemeClear}
+              disabled={themeMut.isPending}
+              className="px-3 py-1 border border-slate-300 bg-white rounded text-sm text-red-700 hover:bg-red-50 disabled:opacity-40"
+            >
+              Clear
+            </button>
+          )}
+          {themeMut.isPending && <span className="text-xs text-slate-500">Saving…</span>}
+        </div>
+        <p className="text-xs text-slate-500 mt-1">
+          A memorable name picked from a themed catalogue, kept alongside the
+          site code above — setting one never changes the other.
         </p>
-      )}
+        {themeMessage && (
+          <p className={`text-xs mt-1 ${themeMut.isError ? "text-red-700" : "text-green-700"}`}>
+            {themeMessage}
+          </p>
+        )}
+      </div>
 
       <ThemeNamePicker
         open={pickerOpen}
         initialCategory={theme?.category}
         selectedName={theme?.name ?? null}
-        onSelect={(sel) => {
-          setTheme(sel);
-          setPickerOpen(false);
-          setMessage("");
-        }}
+        onSelect={handleThemeSelect}
         onClose={() => setPickerOpen(false)}
       />
     </div>

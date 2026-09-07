@@ -24,6 +24,7 @@ from .. import (
     naming,
     photos,
     ports,
+    endoflife_client,
     semaphore_client,
     stencil_library,
     stencil_sources,
@@ -1636,3 +1637,24 @@ async def ingest_facts(
     if obj is None:
         raise HTTPException(status_code=404, detail="Device not found")
     return crud.to_dict(obj)
+
+
+# ---------------------------------------------------------------------------
+# Phase 6 Task 30 (Requirement 12.1) — endoflife.date sync: manual trigger.
+# The automatic side (seed-time, first-run-only) lives in seed.py; this is
+# the "manual trigger" half of Requirement 12.1's "at seed time and via a
+# manual trigger" wording, for refreshing OsFamily/OsVersion data on demand
+# (new product releases, or a product added to CURATED_PRODUCTS later)
+# without needing to wipe and re-seed the database.
+# ---------------------------------------------------------------------------
+@router.post("/os-data/sync")
+async def sync_os_data(
+    products: Optional[list[str]] = Body(None, embed=True),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Populate OsFamily/OsVersion from endoflife.date. ``products`` lets an
+    administrator resync just one or a few slugs; omitted/null defaults to
+    the full curated list (`endoflife_client.CURATED_PRODUCTS`)."""
+    result = await endoflife_client.sync_products(session, products)
+    await session.commit()
+    return result.as_dict()

@@ -232,6 +232,14 @@ export interface StencilVendorConvertResult {
   shapes: StencilLibraryShape[];
 }
 
+/** Phase 6 Task 30 (Req 12.1) — result of POST /os-data/sync. */
+export interface OsDataSyncResult {
+  families_created: string[];
+  versions_created: string[];
+  skipped_conflicts: string[];
+  products_unreachable: string[];
+}
+
 /** FEAT-6 (6C) / Phase 4 Task 21 — a source port handed to the Connect panel. */
 export interface SourcePort {
   source_type: string;
@@ -647,6 +655,18 @@ export const api = {
         body: JSON.stringify({ file }),
       },
     ).then(handle),
+  /**
+   * Phase 6 Task 30 (Req 12.1) — manual trigger for the endoflife.date sync
+   * (the automatic side runs once, at first seed — see seed.py). `products`
+   * lets an administrator resync just one or a few slugs; omitted syncs the
+   * full curated list.
+   */
+  syncOsData: (products?: string[]): Promise<OsDataSyncResult> =>
+    fetch(`${BASE}/os-data/sync`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ products: products ?? null }),
+    }).then(handle),
   /**
    * FEAT-6 (6C) — connectable destination ports for a source port. Scoped to
    * the same rack, else datacenter, else site (fallback).

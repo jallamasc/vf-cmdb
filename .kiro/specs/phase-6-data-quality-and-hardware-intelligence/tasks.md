@@ -197,18 +197,18 @@ sub-phases that reuse them.
 
 ### Sub-phase I — External Data Seeding
 
-- [ ] 30. `endoflife.date` sync
-  - [ ] 30.1 Sync module fetching a defined product list, upserting
+- [x] 30. `endoflife.date` sync
+  - [x] 30.1 Sync module fetching a defined product list, upserting
         OsFamily/OsVersion; seed-time + manual "Sync now" action
     - _Requirements: 12.1_
-  - [ ]* 30.2 pytest against a mocked HTTP client
+  - [x]* 30.2 pytest against a mocked HTTP client
 
-- [ ] 31. Curated hardware Brand seed list
-  - [ ] 31.1 Research + seed ~25-30 well-known IT hardware vendors
+- [x] 31. Curated hardware Brand seed list
+  - [x] 31.1 Research + seed ~25-30 well-known IT hardware vendors
     - _Requirements: 12.2_
-  - [ ]* 31.2 pytest seed rows exist
+  - [x]* 31.2 pytest seed rows exist
 
-- [ ] 32. Checkpoint I — build + test verification.
+- [x] 32. Checkpoint I — build + test verification.
 
 ### Sub-phase J — Hardware Spec Detail Pages
 

@@ -56,6 +56,7 @@ vi.mock("../api", async (orig) => {
       list: vi.fn(() => Promise.resolve([])),
       stencilUrl: vi.fn((slug: string, face: string) => `/api/v1/stencils/${slug}?face=${face}`),
       update: vi.fn(),
+      syncOsData: vi.fn(),
     },
   };
 });
@@ -172,5 +173,63 @@ describe("Naming — region geo click-to-place (Phase 6 Task 19, Req 7.3)", () =
     await waitFor(() =>
       expect(api.update).toHaveBeenCalledWith("regions", 5, { latitude: 4.71, longitude: -74.07 })
     );
+  });
+});
+
+// Phase 6 Task 30 (Req 12.1) — manual "Sync now" endoflife.date trigger.
+describe("Naming — endoflife.date manual sync (Task 30, Req 12.1)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    capturedProps = [];
+  });
+
+  it("shows no sync button for a non-OS lookup (e.g. the default 'organizations')", async () => {
+    wrap();
+    await waitFor(() =>
+      expect(capturedProps.some((p) => p.resource === "organizations")).toBe(true)
+    );
+    expect(screen.queryByText(/Sync now/)).toBeNull();
+  });
+
+  it("shows the sync button on OS Families and triggers api.syncOsData on click", async () => {
+    (api.syncOsData as any).mockResolvedValue({
+      families_created: ["Ubuntu"],
+      versions_created: ["Ubuntu 24.04", "Ubuntu 22.04"],
+      skipped_conflicts: [],
+      products_unreachable: [],
+    });
+    wrap();
+    const btn = await screen.findByText("OS Families");
+    fireEvent.click(btn);
+    await waitFor(() =>
+      expect(capturedProps.some((p) => p.resource === "os-families")).toBe(true)
+    );
+
+    fireEvent.click(screen.getByText("Sync now (endoflife.date)"));
+    await waitFor(() => expect(api.syncOsData).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText(/\+1 family, \+2 versions/)).toBeTruthy();
+  });
+
+  it("also shows the sync button on OS Versions", async () => {
+    wrap();
+    const btn = await screen.findByText("OS Versions");
+    fireEvent.click(btn);
+    await waitFor(() =>
+      expect(capturedProps.some((p) => p.resource === "os-versions")).toBe(true)
+    );
+    expect(screen.getByText("Sync now (endoflife.date)")).toBeTruthy();
+  });
+
+  it("surfaces a sync error without crashing", async () => {
+    (api.syncOsData as any).mockRejectedValue(new Error("502: endoflife.date unreachable"));
+    wrap();
+    const btn = await screen.findByText("OS Families");
+    fireEvent.click(btn);
+    await waitFor(() =>
+      expect(capturedProps.some((p) => p.resource === "os-families")).toBe(true)
+    );
+
+    fireEvent.click(screen.getByText("Sync now (endoflife.date)"));
+    expect(await screen.findByText(/endoflife.date unreachable/)).toBeTruthy();
   });
 });

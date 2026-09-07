@@ -143,13 +143,13 @@ sub-phases that reuse them.
 
 ### Sub-phase F — Theme + Code Coexistence
 
-- [ ] 20. `SiteCodePanel` redesign
-  - [ ] 20.1 Show code input + theme picker simultaneously everywhere
+- [x] 20. `SiteCodePanel` redesign
+  - [x] 20.1 Show code input + theme picker simultaneously everywhere
         `ThemeNamePicker` appears
     - _Requirements: 8.1, 8.2, 8.3_
-  - [ ]* 20.2 Vitest both sections render/save independently
+  - [x]* 20.2 Vitest both sections render/save independently
 
-- [ ] 21. Checkpoint F — build + test verification.
+- [x] 21. Checkpoint F — build + test verification.
 
 ### Sub-phase G — Stencil Pipeline: Dev Workflow & Vendor ZIPs
 

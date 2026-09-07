@@ -251,12 +251,12 @@ capability patterns rather than reinventing them.
   - [x]* 38.2 pytest with both clients mocked: create/update/delete produce
         the expected calls; a non-`ansible_managed` type produces none
 
-- [ ] 39. Automation tab per device
-  - [ ] 39.1 `frontend/src/components/AutomationTab.tsx` (sync status, launch
+- [x] 39. Automation tab per device
+  - [x] 39.1 `frontend/src/components/AutomationTab.tsx` (sync status, launch
         job template, inline output/history, deep link to Semaphore); backend
         proxy endpoints for task-launch/task-output
     - _Requirements: 31.1, 31.2, 31.3_
-  - [ ]* 39.2 pytest for the proxy endpoints (mocked); Vitest for the tab
+  - [x]* 39.2 pytest for the proxy endpoints (mocked); Vitest for the tab
 
 - [ ] 40. Checkpoint F — final full build + test verification of the entire
       Phase 5 scope; present for browser testing.

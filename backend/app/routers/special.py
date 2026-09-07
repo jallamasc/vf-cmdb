@@ -24,6 +24,7 @@ from .. import (
     naming,
     photos,
     ports,
+    semaphore_client,
     stencil_library,
     stencil_sources,
     stencils,
@@ -1218,6 +1219,141 @@ async def regenerate_credential(
     except bitwarden_client.BitwardenNotConfigured:
         raise HTTPException(status_code=503, detail="Bitwarden is not configured.")
     return {"username": row.admin_username, "password": secret["value"]}
+
+
+# ---------------------------------------------------------------------------
+# Phase 5 Task 39 — Automation_Tab proxy endpoints (Requirement 31).
+#
+# Resource-agnostic (ENTITY_REGISTRY-driven), same `hasattr` idiom as
+# `_credential_model`/`_photo_model` above — today only `generic_entities`
+# carries `semaphore_host_id` (Task 38's lifecycle sync), but nothing here
+# is Generic_Entity-specific. Semaphore's task-launch API needs a
+# `template_id` the operator picks each time (nothing in the schema stores
+# a "default template" per Entity_Type_Def — design.md's Sub-phase F adds
+# no new vf-cmdb tables), so `/templates` lists what's available and
+# `/launch` takes the chosen one. Task "history" (Req 31.2) is intentionally
+# NOT persisted server-side for the same no-new-tables reason — the frontend
+# keeps a session-local list of tasks it has launched.
+# ---------------------------------------------------------------------------
+def _automation_model(resource: str):
+    model = ENTITY_REGISTRY.get(resource)
+    if model is None:
+        raise HTTPException(status_code=404, detail=f"Unknown resource '{resource}'.")
+    if not hasattr(model, "semaphore_host_id"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"'{resource}' records are not Ansible-managed.",
+        )
+    return model
+
+
+async def _automation_row(session: AsyncSession, resource: str, item_id: int):
+    model = _automation_model(resource)
+    row = await session.get(model, item_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"'{resource}' #{item_id} not found.")
+    return row
+
+
+def _automation_project_id() -> Optional[int]:
+    return settings.semaphore_project_id or None
+
+
+@router.get("/automation/{resource}/{item_id}")
+async def automation_status(
+    resource: str, item_id: int, session: AsyncSession = Depends(get_session)
+) -> dict[str, Any]:
+    """Req 31.1 — the record's sync status, plus what the frontend needs to
+    build the "open in Semaphore" deep link (Req 31.3) without hardcoding
+    non-secret config itself."""
+    row = await _automation_row(session, resource, item_id)
+    project_id = _automation_project_id()
+    return {
+        "inventory_id": int(row.semaphore_host_id) if row.semaphore_host_id else None,
+        "has_credential": bool(getattr(row, "bw_secret_id", None)),
+        "configured": bool(settings.semaphore_url and settings.semaphore_api_token and project_id),
+        "semaphore_url": settings.semaphore_url or None,
+        "project_id": project_id,
+    }
+
+
+@router.get("/automation/{resource}/{item_id}/templates")
+async def automation_templates(
+    resource: str, item_id: int, session: AsyncSession = Depends(get_session)
+) -> list[dict[str, Any]]:
+    """Templates the operator can launch (Req 31.2) — Semaphore's own task
+    catalogue for the configured project, unfiltered by inventory."""
+    await _automation_row(session, resource, item_id)  # 404 if resource/row invalid
+    project_id = _automation_project_id()
+    if project_id is None:
+        raise HTTPException(status_code=503, detail="Semaphore project is not configured.")
+    try:
+        client = semaphore_client.get_semaphore_client()
+    except semaphore_client.SemaphoreNotConfigured:
+        raise HTTPException(status_code=503, detail="Semaphore is not configured.")
+    return await client.list_templates(project_id)
+
+
+@router.post("/automation/{resource}/{item_id}/launch")
+async def automation_launch(
+    resource: str,
+    item_id: int,
+    body: dict[str, Any] = Body(...),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Launch a job template against this record's own Semaphore inventory
+    (Req 31.2) — `inventory_id` is always this record's, never whatever the
+    template itself defaults to, so the job runs against the right host."""
+    row = await _automation_row(session, resource, item_id)
+    if not row.semaphore_host_id:
+        raise HTTPException(
+            status_code=400, detail="This record has no Semaphore inventory linked yet."
+        )
+    template_id = body.get("template_id")
+    if not template_id:
+        raise HTTPException(status_code=422, detail="'template_id' is required.")
+    project_id = _automation_project_id()
+    if project_id is None:
+        raise HTTPException(status_code=503, detail="Semaphore project is not configured.")
+    try:
+        client = semaphore_client.get_semaphore_client()
+    except semaphore_client.SemaphoreNotConfigured:
+        raise HTTPException(status_code=503, detail="Semaphore is not configured.")
+    return await client.launch_task(
+        project_id, int(template_id), inventory_id=int(row.semaphore_host_id)
+    )
+
+
+@router.get("/automation/{resource}/{item_id}/tasks/{task_id}")
+async def automation_task_status(
+    resource: str, item_id: int, task_id: int, session: AsyncSession = Depends(get_session)
+) -> dict[str, Any]:
+    """Poll a launched task's status (Req 31.2)."""
+    await _automation_row(session, resource, item_id)
+    project_id = _automation_project_id()
+    if project_id is None:
+        raise HTTPException(status_code=503, detail="Semaphore project is not configured.")
+    try:
+        client = semaphore_client.get_semaphore_client()
+    except semaphore_client.SemaphoreNotConfigured:
+        raise HTTPException(status_code=503, detail="Semaphore is not configured.")
+    return await client.get_task(project_id, task_id)
+
+
+@router.get("/automation/{resource}/{item_id}/tasks/{task_id}/output")
+async def automation_task_output(
+    resource: str, item_id: int, task_id: int, session: AsyncSession = Depends(get_session)
+) -> list[dict[str, Any]]:
+    """A launched task's live output lines (Req 31.2)."""
+    await _automation_row(session, resource, item_id)
+    project_id = _automation_project_id()
+    if project_id is None:
+        raise HTTPException(status_code=503, detail="Semaphore project is not configured.")
+    try:
+        client = semaphore_client.get_semaphore_client()
+    except semaphore_client.SemaphoreNotConfigured:
+        raise HTTPException(status_code=503, detail="Semaphore is not configured.")
+    return await client.get_task_output(project_id, task_id)
 
 
 # ---------------------------------------------------------------------------

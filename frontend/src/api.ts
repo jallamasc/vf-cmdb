@@ -217,6 +217,54 @@ export interface SourcePort {
   source_port_id: number;
 }
 
+/**
+ * Phase 5 Task 39 (Req 31.1/31.3) — result of GET /automation/{resource}/{id}.
+ * `configured` is true only when SEMAPHORE_URL/SEMAPHORE_API_TOKEN/project
+ * are all set server-side; `semaphore_url`/`project_id` are exposed (as
+ * non-secret config) so the frontend can build a deep link without
+ * hardcoding them.
+ */
+export interface AutomationStatus {
+  inventory_id: number | null;
+  has_credential: boolean;
+  configured: boolean;
+  semaphore_url: string | null;
+  project_id: number | null;
+}
+
+/**
+ * Phase 5 Task 39 (Req 31.2) — one entry of GET /automation/{resource}/{id}/templates.
+ * Passed through as-is from Semaphore's own `/project/{id}/templates`
+ * response, which carries more fields than this — only `id`/`name` are
+ * relied on here.
+ */
+export interface SemaphoreTemplate {
+  id: number;
+  name: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Phase 5 Task 39 (Req 31.2) — a launched (or polled) Semaphore task, as
+ * returned by POST .../launch and GET .../tasks/{id}. Passed through as-is
+ * from Semaphore; `status` is one of Semaphore's own task states
+ * (e.g. "waiting" | "running" | "success" | "error" | "stopped").
+ */
+export interface SemaphoreTask {
+  id: number;
+  status: string;
+  template_id?: number;
+  [key: string]: unknown;
+}
+
+/** Phase 5 Task 39 (Req 31.2) — one line of GET .../tasks/{id}/output. */
+export interface SemaphoreTaskOutputLine {
+  task_id: number;
+  time: string;
+  output: string;
+  [key: string]: unknown;
+}
+
 async function handle(res: Response) {
   if (!res.ok) {
     let detail = res.statusText;
@@ -335,6 +383,33 @@ export const api = {
   /** Rotate a record's default admin credential's value in place. */
   regenerateCredential: (resource: string, id: number): Promise<{ username: string; password: string }> =>
     fetch(`${BASE}/credentials/${resource}/${id}/regenerate`, { method: "POST" }).then(handle),
+  /**
+   * Phase 5 Task 39 (Req 31.1/31.3) — a record's automation sync status
+   * plus the non-secret Semaphore config the frontend needs to build a
+   * deep link, without hardcoding it.
+   */
+  automationStatus: (resource: string, id: number): Promise<AutomationStatus> =>
+    fetch(`${BASE}/automation/${resource}/${id}`).then(handle),
+  /** Semaphore templates available to launch against this record (Req 31.2). */
+  automationTemplates: (resource: string, id: number): Promise<SemaphoreTemplate[]> =>
+    fetch(`${BASE}/automation/${resource}/${id}/templates`).then(handle),
+  /** Launch a template against this record's own Semaphore inventory. */
+  launchAutomationTask: (resource: string, id: number, templateId: number): Promise<SemaphoreTask> =>
+    fetch(`${BASE}/automation/${resource}/${id}/launch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ template_id: templateId }),
+    }).then(handle),
+  /** Poll a launched task's status. */
+  getAutomationTask: (resource: string, id: number, taskId: number): Promise<SemaphoreTask> =>
+    fetch(`${BASE}/automation/${resource}/${id}/tasks/${taskId}`).then(handle),
+  /** A launched task's live output lines. */
+  getAutomationTaskOutput: (
+    resource: string,
+    id: number,
+    taskId: number,
+  ): Promise<SemaphoreTaskOutputLine[]> =>
+    fetch(`${BASE}/automation/${resource}/${id}/tasks/${taskId}/output`).then(handle),
   /**
    * FEAT-5 — resolve a city to the IATA code of its main airport, with
    * ``matches`` for autocomplete and ``alternatives`` for multi-airport cities.

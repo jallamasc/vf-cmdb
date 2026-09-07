@@ -1,4 +1,4 @@
-import { ComposableMap, Geographies, Geography } from "react-simple-maps";
+import { ComposableMap, Geographies, Geography, Marker, useMapContext } from "react-simple-maps";
 // world-atlas is bundled locally (not fetched from a CDN at runtime) so the
 // map keeps working on a fully offline/home-lab deployment.
 import worldTopoJson from "world-atlas/countries-110m.json";
@@ -9,6 +9,55 @@ interface Props {
   regions: Row[];
   selectedCountry: string | null;
   onSelectCountry: (country: string | null) => void;
+  /** Phase 6 Task 19 (Req 7.3) — when set, clicking the map reports the
+   * clicked point's [lat, lng] instead of selecting a country. Used while
+   * placing/editing one region's real-world location. */
+  placementMode?: boolean;
+  onPlacePoint?: (lat: number, lng: number) => void;
+}
+
+/**
+ * Phase 6 Task 19 (Req 7.3) — must be rendered INSIDE `ComposableMap` (it
+ * reads the current `projection` via `useMapContext`, which only exists in
+ * that context) so a click's SVG-space coordinates can be inverted back to
+ * real [lng, lat] — the same projection every `<Marker>`/`<Geography>` on
+ * this map already renders with, so a placed point lines up exactly with
+ * where the operator clicked.
+ */
+function ClickToPlaceLayer({
+  width,
+  height,
+  onPlacePoint,
+}: {
+  width: number;
+  height: number;
+  onPlacePoint: (lat: number, lng: number) => void;
+}) {
+  const { projection } = useMapContext();
+  return (
+    <rect
+      x={0}
+      y={0}
+      width={width}
+      height={height}
+      fill="transparent"
+      style={{ cursor: "crosshair" }}
+      onClick={(e) => {
+        const svg = e.currentTarget.ownerSVGElement;
+        if (!svg) return;
+        const rect = svg.getBoundingClientRect();
+        // Scale the click's page position into the SVG's own width/height
+        // user-space (ComposableMap's viewBox), since the rendered element
+        // is normally CSS-scaled to fill its container.
+        const x = ((e.clientX - rect.left) / rect.width) * width;
+        const y = ((e.clientY - rect.top) / rect.height) * height;
+        const inverted = projection.invert?.([x, y]);
+        if (!inverted) return;
+        const [lng, lat] = inverted;
+        onPlacePoint(lat, lng);
+      }}
+    />
+  );
 }
 
 /**
@@ -18,9 +67,22 @@ interface Props {
  * country/countries — see `lib/regionGeo.ts` for the exact, documented
  * mapping and its country-level-only limitation).
  */
-export default function RegionMap({ regions, selectedCountry, onSelectCountry }: Props) {
+const MAP_WIDTH = 640;
+const MAP_HEIGHT = 340;
+
+export default function RegionMap({
+  regions,
+  selectedCountry,
+  onSelectCountry,
+  placementMode = false,
+  onPlacePoint,
+}: Props) {
   const highlighted = new Set(
     regions.flatMap((r) => countriesForRegion(String(r.abbreviation ?? "")))
+  );
+  // Phase 6 Task 18 (Req 7.2) — one marker per region that has a real point.
+  const markers = regions.filter(
+    (r) => typeof r.latitude === "number" && typeof r.longitude === "number"
   );
 
   return (
@@ -28,8 +90,8 @@ export default function RegionMap({ regions, selectedCountry, onSelectCountry }:
       <ComposableMap
         projection="geoAzimuthalEqualArea"
         projectionConfig={{ rotate: [90, -15, 0], scale: 350 }}
-        width={640}
-        height={340}
+        width={MAP_WIDTH}
+        height={MAP_HEIGHT}
         role="img"
         aria-label="Map of regions covered by the seeded Region list"
       >
@@ -76,18 +138,38 @@ export default function RegionMap({ regions, selectedCountry, onSelectCountry }:
             })
           }
         </Geographies>
+        {/* Phase 6 Task 18 (Req 7.2) — a marker per region with a real point. */}
+        {!placementMode &&
+          markers.map((r) => (
+            <Marker key={r.id} coordinates={[r.longitude as number, r.latitude as number]}>
+              <circle r={4} fill="#dc2626" stroke="#fff" strokeWidth={1} />
+              <title>{String(r.full_name ?? r.abbreviation ?? `Region #${r.id}`)}</title>
+            </Marker>
+          ))}
+        {/* Phase 6 Task 19 (Req 7.3) — click-to-place overlay, drawn last so
+            it sits on top and captures the click regardless of what's under
+            the cursor. */}
+        {placementMode && onPlacePoint && (
+          <ClickToPlaceLayer width={MAP_WIDTH} height={MAP_HEIGHT} onPlacePoint={onPlacePoint} />
+        )}
       </ComposableMap>
       <p className="text-xs text-slate-500 px-1">
-        Click a highlighted country to narrow the list below to its region(s).
-        Country-level detail only — Colombia's 6 natural regions all resolve
-        to Colombia.
-        {selectedCountry && (
-          <button
-            onClick={() => onSelectCountry(null)}
-            className="ml-2 text-blue-600 hover:underline"
-          >
-            Clear ({selectedCountry})
-          </button>
+        {placementMode ? (
+          "Click anywhere on the map to set this region's location."
+        ) : (
+          <>
+            Click a highlighted country to narrow the list below to its
+            region(s). Country-level detail only — Colombia's 6 natural
+            regions all resolve to Colombia.
+            {selectedCountry && (
+              <button
+                onClick={() => onSelectCountry(null)}
+                className="ml-2 text-blue-600 hover:underline"
+              >
+                Clear ({selectedCountry})
+              </button>
+            )}
+          </>
         )}
       </p>
     </div>

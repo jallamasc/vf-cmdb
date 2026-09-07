@@ -222,7 +222,7 @@ capability patterns rather than reinventing them.
   - [x]* 34.2 pytest for the create-hook and reveal/regenerate endpoints
         (mocked client)
 
-- [ ] 35. Checkpoint E — build + test verification; flag that live Bitwarden
+- [x] 35. Checkpoint E — build + test verification; flag that live Bitwarden
       verification needs the user's real Organization ID/Project ID/Access
       Token before it can be exercised end-to-end.
 

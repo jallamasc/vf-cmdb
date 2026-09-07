@@ -228,12 +228,12 @@ capability patterns rather than reinventing them.
 
 ### Sub-phase F — Ansible Semaphore Deployment & Automation Module
 
-- [ ] 36. Deploy Ansible Semaphore via Podman
-  - [ ] 36.1 Add a `semaphore` service to `podman-compose.yml`
+- [x] 36. Deploy Ansible Semaphore via Podman
+  - [x] 36.1 Add a `semaphore` service to `podman-compose.yml`
         (`semaphoreui/semaphore:latest`, SQLite backend, generated —
         not hardcoded — admin bootstrap env vars)
     - _Requirements: 29.1_
-  - [ ]* 36.2 Live verification: container starts, UI reachable, API token
+  - [x]* 36.2 Live verification: container starts, UI reachable, API token
         can be generated
 
 - [ ] 37. Semaphore API client

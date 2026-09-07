@@ -89,6 +89,34 @@ services:
     networks:
       - cmdb
 
+  # Phase 5 Task 36 (Req 29.1) — Ansible Semaphore: the Automation_Client
+  # engine device automation runs against. SQLite-backed (single-host dev
+  # deployment, no separate DB service needed — design.md's Sub-phase F
+  # explicitly keeps Semaphore's own inventory/project data out of vf-cmdb's
+  # Postgres). SEMAPHORE_ADMIN_PASSWORD / SEMAPHORE_ACCESS_KEY_ENCRYPTION
+  # have NO hardcoded fallback here on purpose (unlike POSTGRES_PASSWORD's
+  # ":-vfcmdb" dev-convenience default) — they must be generated once into
+  # .env before first start; see README.md's Quick start section and
+  # deploy/scripts/bootstrap.sh (which generates both automatically).
+  semaphore:
+    image: docker.io/semaphoreui/semaphore:latest
+    container_name: vf_cmdb_semaphore
+    restart: unless-stopped
+    environment:
+      SEMAPHORE_DB_DIALECT: sqlite
+      SEMAPHORE_DB: /etc/semaphore/semaphore.sqlite
+      SEMAPHORE_ADMIN: ${SEMAPHORE_ADMIN:-admin}
+      SEMAPHORE_ADMIN_NAME: ${SEMAPHORE_ADMIN_NAME:-Admin}
+      SEMAPHORE_ADMIN_EMAIL: ${SEMAPHORE_ADMIN_EMAIL:-admin@virtualfactor.local}
+      SEMAPHORE_ADMIN_PASSWORD: ${SEMAPHORE_ADMIN_PASSWORD:?Generate one — see README.md Quick start (e.g. openssl rand -base64 24)}
+      SEMAPHORE_ACCESS_KEY_ENCRYPTION: ${SEMAPHORE_ACCESS_KEY_ENCRYPTION:?Generate one — see README.md Quick start (openssl rand -base64 32)}
+    volumes:
+      - semaphore:/etc/semaphore:Z
+    ports:
+      - "${SEMAPHORE_PORT:-3000}:3000"
+    networks:
+      - cmdb
+
 volumes:
   # Explicit, fixed volume names so podman-compose does NOT auto-prefix with the
   # project name. This keeps the compose path and the Quadlet path (deploy/quadlet/)
@@ -99,6 +127,8 @@ volumes:
     name: ${PGDATA_VOLUME:-vf-cmdb_pgdata}
   pgadmin:
     name: ${PGADMIN_VOLUME:-vf-cmdb_pgadmin}
+  semaphore:
+    name: ${SEMAPHORE_VOLUME:-vf-cmdb_semaphore}
 
 networks:
   cmdb:

@@ -79,6 +79,12 @@ cd vf_cmdb
 cp .env.example .env
 # edit .env and set a real POSTGRES_PASSWORD
 
+# Ansible Semaphore (Phase 5) has no hardcoded default password/key — podman
+# compose refuses to start it until both are generated into .env:
+openssl rand -base64 24 | tr -d '/+=' | cut -c1-24   # -> SEMAPHORE_ADMIN_PASSWORD
+openssl rand -base64 32                              # -> SEMAPHORE_ACCESS_KEY_ENCRYPTION
+# paste each into the matching line in .env
+
 # easiest — the helper script picks up podman compose / podman-compose for you:
 ./deploy-podman.sh up
 
@@ -99,6 +105,8 @@ Then open:
 * **Web UI**  → http://localhost:8080
 * **API docs** → http://localhost:8000/docs
 * **pgAdmin**  → http://localhost:5050
+* **Semaphore** → http://localhost:3000 (log in with `SEMAPHORE_ADMIN` /
+  `SEMAPHORE_ADMIN_PASSWORD` from `.env`)
 
 ### Two ways to run on Podman
 
@@ -122,9 +130,14 @@ systemd supervision. See "Production: Quadlet + systemd" below.
    ```
    (On Fedora/Rocky/RHEL: `sudo dnf install -y podman podman-compose`.)
 2. Copy this project onto the VM (git clone or `scp`).
-3. `cp .env.example .env`, set a strong `POSTGRES_PASSWORD`, and (recommended)
-   set `CORS_ORIGINS` to the UI URL, e.g. `http://cmdb.home.lan:8080`.
-4. `./deploy-podman.sh up` (or the Quadlet path for always-on).
+3. `cp .env.example .env`, set a strong `POSTGRES_PASSWORD`, generate
+   `SEMAPHORE_ADMIN_PASSWORD`/`SEMAPHORE_ACCESS_KEY_ENCRYPTION` (see Quick
+   start above — no default is shipped for either), and (recommended) set
+   `CORS_ORIGINS` to the UI URL, e.g. `http://cmdb.home.lan:8080`.
+4. `./deploy-podman.sh up` (or the Quadlet path for always-on). Note:
+   `deploy/scripts/bootstrap.sh` generates all three secrets automatically
+   if `.env` doesn't exist yet — this manual walkthrough is for when you
+   want to control the values yourself.
 5. Point a DNS record (e.g. `cmdb.home.lan`) at the VM, or use its IP.
 
 Everything runs rootless — no `sudo` needed for day-to-day operation.

@@ -8,6 +8,9 @@ import GenericEntityView from "./GenericEntityView";
 import { api } from "../api";
 
 let capturedProps: any[] = [];
+// Phase 5 Task 32 — configurable per-test so the ip_assignment tests can
+// select a row that actually carries ip_id/management_ip_id.
+let selectRowPayload: any = { id: 1, entity_type_id: 7 };
 
 vi.mock("../components/EntityGrid", () => ({
   default: (props: any) => {
@@ -17,7 +20,7 @@ vi.mock("../components/EntityGrid", () => ({
         {props.resource}
         <button
           data-testid="select-row"
-          onClick={() => props.onSelectionChanged?.([{ id: 1, entity_type_id: 7 }])}
+          onClick={() => props.onSelectionChanged?.([selectRowPayload])}
         >
           select row
         </button>
@@ -85,6 +88,11 @@ vi.mock("../api", async (orig) => {
         if (resource === "sites") return Promise.resolve(SITES);
         return Promise.resolve([]);
       }),
+      // Phase 5 Task 32 — the ip_assignment create/link flow and the
+      // capability panel's read-only IP display exercise these.
+      get: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
     },
   };
 });
@@ -101,6 +109,10 @@ function wrap(typeSlug: string) {
     </QueryClientProvider>
   );
 }
+
+beforeEach(() => {
+  selectRowPayload = { id: 1, entity_type_id: 7 };
+});
 
 describe("GenericEntityView — synthetic type definition (Req 16.1/16.2)", () => {
   beforeEach(() => {
@@ -207,5 +219,84 @@ describe("GenericEntityView — capability panel (Req 18.1/18.2)", () => {
     wrap("plain");
     await screen.findByTestId("select-row");
     expect(screen.queryByText(/Select a row to manage/)).toBeNull();
+  });
+});
+
+describe("GenericEntityView — dual IP assignment (Req 26.1/26.2)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    capturedProps = [];
+    (api.list as any).mockImplementation((resource: string) => {
+      if (resource === "entity-type-defs")
+        return Promise.resolve([
+          { id: 7, slug: "monitor", label: "Monitor", capabilities: ["ip_assignment"] },
+        ]);
+      if (resource === "entity-field-defs") return Promise.resolve([]);
+      if (resource === "field-type-defs") return Promise.resolve(FIELD_TYPES);
+      return Promise.resolve([]);
+    });
+  });
+
+  it("hides EntityGrid's own '+ Add row' and shows the dual-IP create form instead", async () => {
+    wrap("monitor");
+    await waitFor(() =>
+      expect(capturedProps.some((p) => p.resource === "generic-entities")).toBe(true)
+    );
+    const props = capturedProps.find((p) => p.resource === "generic-entities");
+    expect(props.allowAdd).toBe(false);
+    expect(await screen.findByPlaceholderText("Usage IP, e.g. 10.0.0.5")).toBeTruthy();
+    expect(screen.getByPlaceholderText("Management IP, e.g. 10.0.1.5")).toBeTruthy();
+  });
+
+  it("creates both IP assignments, links them to a new record, and points them back at it", async () => {
+    (api.create as any).mockImplementation((resource: string, payload: any) => {
+      if (resource === "ip-assignments") {
+        return Promise.resolve({ id: payload.is_primary ? 101 : 102, ...payload });
+      }
+      if (resource === "generic-entities") {
+        return Promise.resolve({ id: 55, ...payload });
+      }
+      return Promise.resolve({});
+    });
+    (api.update as any).mockResolvedValue({});
+    wrap("monitor");
+    const usageInput = await screen.findByPlaceholderText("Usage IP, e.g. 10.0.0.5");
+    const managementInput = screen.getByPlaceholderText("Management IP, e.g. 10.0.1.5");
+    fireEvent.change(usageInput, { target: { value: "10.0.0.5" } });
+    fireEvent.change(managementInput, { target: { value: "10.0.1.5" } });
+    fireEvent.click(screen.getByText("Create record"));
+
+    await waitFor(() =>
+      expect(api.create).toHaveBeenCalledWith(
+        "generic-entities",
+        expect.objectContaining({ entity_type_id: 7, ip_id: 101, management_ip_id: 102 }),
+      ),
+    );
+    await waitFor(() =>
+      expect(api.update).toHaveBeenCalledWith("ip-assignments", 101, {
+        assigned_to_type: "generic-entities",
+        assigned_to_id: 55,
+      }),
+    );
+    await waitFor(() =>
+      expect(api.update).toHaveBeenCalledWith("ip-assignments", 102, {
+        assigned_to_type: "generic-entities",
+        assigned_to_id: 55,
+      }),
+    );
+  });
+
+  it("shows the selected record's linked usage/management IP addresses", async () => {
+    (api.get as any).mockImplementation((_resource: string, id: number) => {
+      if (id === 201) return Promise.resolve({ id: 201, ipv4_address: "10.0.0.5" });
+      if (id === 202) return Promise.resolve({ id: 202, ipv4_address: "10.0.1.5" });
+      return Promise.resolve(null);
+    });
+    selectRowPayload = { id: 1, entity_type_id: 7, ip_id: 201, management_ip_id: 202 };
+    wrap("monitor");
+    await screen.findByTestId("select-row");
+    fireEvent.click(screen.getByTestId("select-row"));
+    await waitFor(() => expect(screen.getByText("10.0.0.5")).toBeTruthy());
+    expect(screen.getByText("10.0.1.5")).toBeTruthy();
   });
 });

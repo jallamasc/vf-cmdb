@@ -349,6 +349,37 @@ def _validate_generic_entity(obj) -> None:
         )
 
 
+async def _validate_generic_entity_ip_assignment(session: AsyncSession, obj) -> None:
+    """Phase 5 Task 32 (Req 26.1/26.2) — a Generic_Entity whose
+    Entity_Type_Def carries the ip_assignment Capability must have BOTH a
+    usage IP (``ip_id``) and a management IP (``management_ip_id``) linked,
+    on every create and update. This is the first Capability this app
+    actually enforces at the CRUD layer — every other one (rack_placement,
+    photo, stencil_diagram, ...) only gates what the frontend chooses to
+    show/require (see ``test_generic_entities.py``'s
+    ``test_rack_placement_fields_round_trip``, which explicitly allows
+    ``rack_id`` to stay unset even with that capability on)."""
+    from fastapi import HTTPException
+
+    entity_type = await session.get(models.EntityTypeDef, obj.entity_type_id)
+    caps = (entity_type.capabilities if entity_type else None) or []
+    if "ip_assignment" not in caps:
+        return
+    missing = [
+        label
+        for field, label in (("ip_id", "a usage IP"), ("management_ip_id", "a management IP"))
+        if getattr(obj, field, None) is None
+    ]
+    if missing:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "This Entity Type requires " + " and ".join(missing) +
+                " assignment on every record."
+            ),
+        )
+
+
 async def _validate_model(session: AsyncSession, obj, entity_id) -> None:
     """Model-specific validation dispatch (beyond abbrev + IPAM)."""
     if isinstance(obj, models.Cable):
@@ -357,6 +388,7 @@ async def _validate_model(session: AsyncSession, obj, entity_id) -> None:
         _validate_entity_type_def(obj)
     elif isinstance(obj, models.GenericEntity):
         _validate_generic_entity(obj)
+        await _validate_generic_entity_ip_assignment(session, obj)
     elif isinstance(obj, models.Rack):
         _validate_rack(obj)
 

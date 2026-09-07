@@ -28,6 +28,12 @@ class Settings(BaseSettings):
     bw_api_url: str = "https://api.bitwarden.com"
     bw_identity_url: str = "https://identity.bitwarden.com"
 
+    # Ansible Semaphore (Phase 5 Task 37, Req 29.2) — the Automation_Client's
+    # own URL + API token. Empty by default: automation features simply
+    # aren't available until configured.
+    semaphore_url: str = ""
+    semaphore_api_token: str = ""
+
     @property
     def database_url(self) -> str:
         return (

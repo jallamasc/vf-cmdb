@@ -62,25 +62,34 @@ sub-phases that reuse them.
 
 ### Sub-phase C — Icons & Visual Design System
 
-- [ ] 9. Icon column migration
-  - [ ] 9.1 Add `icon` to every lookup table lacking one
+- [x] 9. Icon column migration
+  - [x] 9.1 Add `icon` to every lookup table lacking one (also `rack_types`
+        and `field_type_defs`)
     - _Requirements: 4.1_
-  - [ ]* 9.2 pytest column round-trip
+  - [x]* 9.2 pytest column round-trip
 
-- [ ] 10. IconPicker component
-  - [ ] 10.1 Fuzzy-searchable, preview-showing Lucide icon picker
-        (`frontend/src/components/IconPicker.tsx`) + `iconCol()` helper; wire
-        into every lookup grid
+- [x] 10. IconPicker component
+  - [x] 10.1 Fuzzy-searchable, preview-showing Lucide icon picker
+        (`frontend/src/components/IconPickerEditor.tsx`, catalogue in
+        `frontend/src/lib/iconLibrary.ts`) + `iconCol()` helper; wired into
+        every lookup grid, including the 4 device-type lookups (their old
+        narrower allow-list is now a subset, `resolveDeviceTypeIcon`
+        delegates to the wider catalogue so nothing regresses)
     - _Requirements: 4.2, 4.3_
-  - [ ]* 10.2 Vitest search-narrows/select-commits
+  - [x]* 10.2 Vitest search-narrows/select-commits/live-preview
 
-- [ ] 11. Design system pass
-  - [ ] 11.1 Document the column-order convention and the generated-field/
-        Code_Mode visual treatment; apply to every registry grid
+- [x] 11. Design system pass
+  - [x] 11.1 Documented the column-order convention (`lib/columns.tsx`
+        comment block) and a consistent amber/monospace visual treatment
+        (`vf-generated-cell`/`vf-mode-toggle-cell`) for generated fields +
+        Code_Mode toggles via `generatedCol()`/`modeToggleCol()`/updated
+        `namingComputedCol()`; applied across Sites/SimpleGridPage/
+        Hierarchy/PhysicalServers/Workstations/ContainersApps/
+        DeviceDashboard
     - _Requirements: 5.1, 5.2_
-  - [ ]* 11.2 Vitest order/style assertions on representative grids
+  - [x]* 11.2 Vitest order/style assertions on representative grids
 
-- [ ] 12. Checkpoint C — build + test verification.
+- [x] 12. Checkpoint C — build + test verification.
 
 ### Sub-phase D — Floor & Section Auto-Naming
 

@@ -9,6 +9,7 @@ import {
   fkCol,
   ipCol,
   deviceLinkCol,
+  generatedCol,
 } from "../lib/columns";
 import { Row } from "../api";
 
@@ -34,7 +35,7 @@ export default function PhysicalServers() {
   const columns = useMemo(
     () => [
       roCol("id", "ID", 70),
-      roCol("vf_short_name", "Short Name", 130),
+      generatedCol("vf_short_name", "Short Name", 130),
       // FEAT-7: the long name opens the device detail dashboard.
       deviceLinkCol("vf_long_name", "VF Long Name", "physical_servers", 240),
       fkCol("site_id", "Site", map["sites"]),

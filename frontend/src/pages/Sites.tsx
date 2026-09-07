@@ -11,8 +11,9 @@ import {
   roCol,
   fkCol,
   customCol,
-  selectCol,
   namingComputedCol,
+  generatedCol,
+  modeToggleCol,
 } from "../lib/columns";
 import { NAMING_MODE_VALUES } from "../lib/namingMode";
 import { Row } from "../api";
@@ -65,8 +66,12 @@ export default function Sites() {
       roCol("id", "ID", 70),
       // FEAT-1: the site code is owned by the tri-mode panel above the grid,
       // because in "auto" and "theme" mode the server rewrites it on save.
-      roCol("simple_name", "Site Code", 160),
-      roCol("site_code_type", "Code Mode", 120),
+      // Phase 6 Task 11 (Req 5.2) — generatedCol/vf-mode-toggle-cell give
+      // these the same distinct amber treatment every other naming-engine
+      // output + its mode toggle gets, so the tri-mode panel's own output
+      // is recognizable here too even though it's read-only in the grid.
+      generatedCol("simple_name", "Site Code", 160),
+      { ...roCol("site_code_type", "Code Mode", 120), cellClass: "vf-mode-toggle-cell" },
       roCol("theme_name", "Theme Name", 150),
       fkCol("organization_id", "Org", map["organizations"] ?? []),
       fkCol("cloud_id", "Cloud", map["clouds"] ?? []),
@@ -80,7 +85,7 @@ export default function Sites() {
       // Phase 5 Task 28 (Req 23.1) — switch to "manual" to type a value
       // into VF Long/Short/TIA-606-B Name directly; unrelated to
       // site_code_type above, which is Simple Name's own separate mode.
-      selectCol("naming_mode", "Naming Mode", [...NAMING_MODE_VALUES]),
+      modeToggleCol("naming_mode", "Naming Mode", [...NAMING_MODE_VALUES]),
       textCol("description", "Description", 200),
       textCol("notes", "Notes"),
       // User-defined dynamic columns.

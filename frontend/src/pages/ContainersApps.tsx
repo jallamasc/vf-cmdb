@@ -8,6 +8,7 @@ import {
   fkCol,
   ipCol,
   selectCol,
+  generatedCol,
 } from "../lib/columns";
 
 const LK = [
@@ -23,7 +24,7 @@ export default function ContainersApps() {
   const columns = useMemo(
     () => [
       roCol("id", "ID", 70),
-      roCol("vf_short_name", "Short Name", 130),
+      generatedCol("vf_short_name", "Short Name", 130),
       textCol("friendly_name", "Friendly Name", 160),
       selectCol("container_type", "Type", ["cn", "ap"], { width: 120 }),
       fkCol("host_vm_id", "Host VM", map["virtual-machines"]),

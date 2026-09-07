@@ -3,8 +3,7 @@ import { useQueries, useQueryClient } from "@tanstack/react-query";
 import EntityGrid from "../components/EntityGrid";
 import { StencilRow } from "../components/StencilField";
 import { api, Row } from "../api";
-import { textCol, roCol, numCol, selectCol, flagCol } from "../lib/columns";
-import { DEVICE_TYPE_ICON_NAMES } from "../lib/deviceIcons";
+import { textCol, roCol, numCol, selectCol, flagCol, iconCol } from "../lib/columns";
 import { regionAbbreviationsForCountry, countriesForRegion } from "../lib/regionGeo";
 
 // FEAT-6 (6B) / Phase 4 Task 22: device-type resources that carry a
@@ -107,8 +106,12 @@ const newLookupDefaults = () => ({
   abbreviation: `new-${Math.random().toString(36).slice(2, 6)}`,
 });
 
+// Phase 6 Task 10 (Req 4.1/4.2) — every lookup now has an `icon` column,
+// picked via the wide fuzzy-searchable Icon_Picker (`iconCol`), not just
+// the 4 device-type lookups' old narrower allow-list.
 const baseColumns = [
   roCol("id", "ID", 70),
+  iconCol(),
   textCol("full_name", "Full Name", 220),
   textCol("abbreviation", "Abbreviation", 150),
   numCol("max_length", "Max Length"),
@@ -116,19 +119,12 @@ const baseColumns = [
 ];
 
 // FEAT-6 (6B): device-type grids also expose the stencil_url column.
-// Phase 5 Task 9: ...and an "Icon" picker (Req 6.2) constrained to the
-// lucide-react names `deviceTypeIconCol` (lib/columns.tsx) knows how to
-// render, so a typo can never silently produce a missing icon elsewhere.
 // Phase 5 Task 12 (Req 10): the regions lookup gets a flag column, derived
 // from its abbreviation via `regionGeo`'s country mapping (see Task 11's
 // documented country-level-only approximation).
 const columnsFor = (slug: string) => {
   if (STENCIL_RESOURCES.has(slug)) {
-    return [
-      ...baseColumns,
-      textCol("stencil_url", "Stencil URL", 260),
-      selectCol("icon", "Icon", [null, ...DEVICE_TYPE_ICON_NAMES]),
-    ];
+    return [...baseColumns, textCol("stencil_url", "Stencil URL", 260)];
   }
   if (slug === "regions") {
     return [

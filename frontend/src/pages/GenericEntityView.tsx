@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import EntityGrid from "../components/EntityGrid";
 import PhotoField from "../components/PhotoField";
+import CredentialField from "../components/CredentialField";
 import { StencilRow } from "../components/StencilField";
 import { api, Row } from "../api";
 import { useLookups, roCol } from "../lib/columns";
@@ -36,6 +37,7 @@ function CapabilityPanel({
   const hasPhoto = capabilities.includes("photo");
   const hasStencil = capabilities.includes("stencil_diagram");
   const hasIpAssignment = capabilities.includes("ip_assignment");
+  const hasCredential = capabilities.includes("ansible_managed");
 
   const { data: usageIp } = useQuery({
     queryKey: ["ip-assignments", selected?.ip_id],
@@ -48,13 +50,18 @@ function CapabilityPanel({
     enabled: hasIpAssignment && selected?.management_ip_id != null,
   });
 
-  if (!hasPhoto && !hasStencil && !hasIpAssignment) return null;
+  if (!hasPhoto && !hasStencil && !hasIpAssignment && !hasCredential) return null;
 
   if (!selected) {
     return (
       <div className="mb-3 px-3 py-2 border border-dashed border-slate-300 rounded text-sm text-slate-500">
         Select a row to manage its{" "}
-        {[hasPhoto && "photo", hasStencil && "stencil", hasIpAssignment && "IP assignment"]
+        {[
+          hasPhoto && "photo",
+          hasStencil && "stencil",
+          hasIpAssignment && "IP assignment",
+          hasCredential && "credential",
+        ]
           .filter(Boolean)
           .join(" / ")}
         .
@@ -95,6 +102,14 @@ function CapabilityPanel({
             {"  ·  "}
             Management: <span className="font-mono">{addressOf(managementIp)}</span>
           </p>
+        </div>
+      )}
+      {hasCredential && (
+        <div>
+          <p className="text-xs uppercase tracking-wide text-slate-500 mb-1">
+            Default admin credential
+          </p>
+          <CredentialField resource="generic-entities" row={selected} />
         </div>
       )}
     </div>

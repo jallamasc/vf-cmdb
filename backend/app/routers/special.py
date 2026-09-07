@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .. import (
     abbrev,
     airports,
+    bitwarden_client,
     crud,
     devices,
     models,
@@ -1152,6 +1153,71 @@ async def upload_blueprint(
     row.blueprint_url = blueprint_url
     await session.commit()
     return {"resource": resource, "id": item_id, "blueprint_url": blueprint_url}
+
+
+# ---------------------------------------------------------------------------
+# Phase 5 Task 34 — default admin credential reveal/regenerate
+# (Requirement 28.2/28.3). Resource-agnostic (ENTITY_REGISTRY-driven), same
+# idiom as `_photo_model`/`_blueprint_model` above — today only
+# `generic_entities` has `bw_secret_id` (`crud._provision_credential`), but
+# nothing here is Generic_Entity-specific.
+# ---------------------------------------------------------------------------
+def _credential_model(resource: str):
+    model = ENTITY_REGISTRY.get(resource)
+    if model is None:
+        raise HTTPException(status_code=404, detail=f"Unknown resource '{resource}'.")
+    if not hasattr(model, "bw_secret_id"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"'{resource}' records do not carry a managed credential.",
+        )
+    return model
+
+
+async def _credential_row(session: AsyncSession, resource: str, item_id: int):
+    model = _credential_model(resource)
+    row = await session.get(model, item_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"'{resource}' #{item_id} not found.")
+    if not row.bw_secret_id:
+        raise HTTPException(
+            status_code=404, detail="No credential provisioned for this record."
+        )
+    return row
+
+
+@router.get("/credentials/{resource}/{item_id}/reveal")
+async def reveal_credential(
+    resource: str, item_id: int, session: AsyncSession = Depends(get_session)
+) -> dict[str, Any]:
+    """Fetch a record's default admin credential on demand (Req 28.2/28.3).
+    Nothing is persisted here beyond the existing `bw_secret_id` reference —
+    the plaintext password is only ever returned in this response, never
+    written to this app's database (and the frontend must not persist it
+    client-side either)."""
+    row = await _credential_row(session, resource, item_id)
+    try:
+        secret = bitwarden_client.get_secrets_client().get_secret(row.bw_secret_id)
+    except bitwarden_client.BitwardenNotConfigured:
+        raise HTTPException(status_code=503, detail="Bitwarden is not configured.")
+    return {"username": row.admin_username, "password": secret["value"]}
+
+
+@router.post("/credentials/{resource}/{item_id}/regenerate")
+async def regenerate_credential(
+    resource: str, item_id: int, session: AsyncSession = Depends(get_session)
+) -> dict[str, Any]:
+    """Rotate a record's default admin credential's value IN PLACE — the
+    Secrets_Client reference (`bw_secret_id`) never changes, and the old
+    secret is never deleted, only overwritten (Req 27.2)."""
+    row = await _credential_row(session, resource, item_id)
+    try:
+        client = bitwarden_client.get_secrets_client()
+        new_value = bitwarden_client.generate_password()
+        secret = client.regenerate_secret(row.bw_secret_id, new_value)
+    except bitwarden_client.BitwardenNotConfigured:
+        raise HTTPException(status_code=503, detail="Bitwarden is not configured.")
+    return {"username": row.admin_username, "password": secret["value"]}
 
 
 # ---------------------------------------------------------------------------

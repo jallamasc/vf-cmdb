@@ -19,7 +19,7 @@ import os
 
 from sqlalchemy import func, select
 
-from . import abbrev, models, naming
+from . import abbrev, endoflife_client, models, naming
 from .database import AsyncSessionLocal
 
 HERE = os.path.dirname(__file__)
@@ -88,6 +88,18 @@ LOOKUPS: dict = {
         ("Combodo", "cm", 3), ("Oracle", "or", 3), ("Generic", "ge", 3),
         ("Arista", "ar", 3), ("Aruba", "arb", 3), ("3Com", "3c", 3),
         ("TP-Link", "tp", 3), ("Xiaomi", "xi", 3),
+        # Phase 6 Task 31 (Req 12.2) — curated, hand-verified additions to
+        # bring the Brand list up to a realistic ~25-30 well-known IT
+        # hardware vendor catalogue. Every abbreviation below was checked
+        # against the rest of this file for a global-registry collision
+        # before being picked (see `abbrev.sync_registry` — the SAME
+        # cross-table uniqueness namespace every abbreviation/code in this
+        # app shares).
+        ("Dell", "dl", 3), ("Cisco", "cs", 3), ("NetApp", "ntap", 3),
+        ("IBM", "ibm", 3), ("Supermicro", "smc", 3), ("Fortinet", "ftnt", 3),
+        ("Ubiquiti", "ubnt", 3), ("Netgear", "ntgr", 3), ("Synology", "syn", 3),
+        ("QNAP", "qnap", 3), ("Juniper Networks", "jnpr", 3),
+        ("Vertiv", "vrt", 3), ("Eaton", "etn", 3),
     ],
     models.DeviceRole: [
         ("Working Machine", "wm", 3), ("Backup Disk", "bd", 3),
@@ -220,6 +232,29 @@ async def seed() -> None:
                 print("Lookups already up to date; nothing to add.")
             print("Demo topology already present; skipping.")
             return
+
+        # Phase 6 Task 30 (Req 12.1) — populate real OsFamily/OsVersion data
+        # from endoflife.date on the FIRST seed only (not on every restart —
+        # entrypoint.sh runs `python -m app.seed` unconditionally, and a
+        # container startup path must never depend on reaching an external
+        # network to complete; the manual-trigger endpoint
+        # `POST /api/v1/os-data/sync` covers any later refresh). Never
+        # fatal to the rest of seeding — a fully offline/air-gapped install
+        # just ends up without this optional extra reference data.
+        try:
+            eol_result = await endoflife_client.sync_products(session)
+            if eol_result.families_created or eol_result.versions_created:
+                print(
+                    f"endoflife.date sync: +{len(eol_result.families_created)} OS "
+                    f"famil(y/ies), +{len(eol_result.versions_created)} OS version(s)"
+                )
+            if eol_result.products_unreachable:
+                print(
+                    "endoflife.date sync: could not reach "
+                    f"{', '.join(eol_result.products_unreachable)} (skipped, non-fatal)"
+                )
+        except Exception as exc:  # pragma: no cover - defensive; must never block seeding
+            print(f"endoflife.date sync failed non-fatally: {exc}")
 
         ORG = m[models.Organization]; CLOUD = m[models.Cloud]; REGION = m[models.Region]
         CAMPUS = m[models.Campus]; BUILDING = m[models.Building]; FS = m[models.FloorSection]

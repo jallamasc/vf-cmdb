@@ -174,6 +174,25 @@ export default function Naming() {
     },
   });
 
+  // Phase 6 Task 30 (Req 12.1) — manual "Sync now" trigger for the
+  // endoflife.date sync, shown only on the OS Families/Versions lookups.
+  const [syncStatus, setSyncStatus] = useState<string | null>(null);
+  const syncOsData = useMutation({
+    mutationFn: () => api.syncOsData(),
+    onSuccess: (result) => {
+      const parts = [
+        `+${result.families_created.length} famil${result.families_created.length === 1 ? "y" : "ies"}`,
+        `+${result.versions_created.length} version${result.versions_created.length === 1 ? "" : "s"}`,
+      ];
+      if (result.skipped_conflicts.length) parts.push(`${result.skipped_conflicts.length} skipped (name conflict)`);
+      if (result.products_unreachable.length) parts.push(`${result.products_unreachable.length} unreachable`);
+      setSyncStatus(parts.join(", "));
+      qc.invalidateQueries({ queryKey: ["os-families"] });
+      qc.invalidateQueries({ queryKey: ["os-versions"] });
+    },
+    onError: (e: unknown) => setSyncStatus(e instanceof Error ? e.message : "Sync failed"),
+  });
+
   // Fetch every lookup once to show per-category / per-lookup entry counts.
   // Shares the react-query cache with the grid below (same query keys).
   const results = useQueries({
@@ -290,6 +309,24 @@ export default function Naming() {
 
         {/* Active lookup grid */}
         <div className="flex-1 min-w-0 flex flex-col">
+          {/* Phase 6 Task 30 (Req 12.1) — manual endoflife.date sync,
+              only on the OS Families/Versions lookups. */}
+          {(active === "os-families" || active === "os-versions") && (
+            <div className="mb-2 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setSyncStatus(null);
+                  syncOsData.mutate();
+                }}
+                disabled={syncOsData.isPending}
+                className="px-2.5 py-1 text-sm rounded border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-50"
+              >
+                {syncOsData.isPending ? "Syncing from endoflife.date…" : "Sync now (endoflife.date)"}
+              </button>
+              {syncStatus && <span className="text-xs text-slate-500">{syncStatus}</span>}
+            </div>
+          )}
           {/* Phase 5 Task 11 (Req 9) — region map, only on the regions lookup. */}
           {active === "regions" && (
             <Suspense

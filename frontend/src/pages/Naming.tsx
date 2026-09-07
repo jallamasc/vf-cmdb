@@ -98,8 +98,12 @@ const RegionMap = lazy(() => import("../components/RegionMap"));
  * NOT NULL and the abbreviation is globally unique (case-insensitive), so a
  * random suffix keeps repeated "Add row" clicks from colliding.
  */
+// Phase 6 Task 4 (Req 3.1/3.3) — full_name is now table-wide unique
+// (case-insensitive) for every lookup here, so a fixed placeholder would
+// fail on the second "Add row" click; randomize it the same way the
+// abbreviation already was.
 const newLookupDefaults = () => ({
-  full_name: "New entry",
+  full_name: `New entry ${Math.random().toString(36).slice(2, 6)}`,
   abbreviation: `new-${Math.random().toString(36).slice(2, 6)}`,
 });
 

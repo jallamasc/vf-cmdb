@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from sqlalchemy import inspect, select
+from sqlalchemy import func, inspect, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import abbrev, bitwarden_client, lifecycle_sync, models, naming
@@ -380,8 +380,84 @@ async def _validate_generic_entity_ip_assignment(session: AsyncSession, obj) -> 
         )
 
 
+# Phase 6 Task 4/5/6 (Req 3.1/3.2/3.3/3.4) — case-insensitive duplicate-name
+# rejection, applied uniformly whether the value was typed manually or
+# produced by the Naming_Engine. Maps a model to (name_field, parent_field);
+# ``parent_field=None`` means the check is table-wide (the model has no
+# natural parent to scope it to), otherwise the same name is only rejected
+# when it collides *under the same parent* (Req 3.2).
+#
+# Deliberately excludes fields the Naming_Engine only populates AFTER this
+# validator runs (``apply_naming`` runs after ``_validate_model`` in both
+# create_item/update_item — see those functions) — e.g. Rack/PowerDevice's
+# own ``vf_long_name``/``simple_name``. Those are already collision-free by
+# their own sequence-scanning construction, so this only needs to guard
+# fields that can already hold a real value at validation time: every
+# always-manual field, and every Code-Mode-overridable field (whose value
+# the client explicitly sent in the payload).
+UNIQUE_NAME_FIELDS: dict[type, tuple[str, Optional[str]]] = {
+    # --- No natural parent: table-wide. ---
+    models.Organization: ("full_name", None),
+    models.Cloud: ("full_name", None),
+    models.Region: ("full_name", None),
+    models.Campus: ("full_name", None),
+    models.Building: ("full_name", None),
+    models.FloorSection: ("full_name", None),
+    models.ComputeDeviceType: ("full_name", None),
+    models.Brand: ("full_name", None),
+    models.DeviceRole: ("full_name", None),
+    models.NetworkDeviceType: ("full_name", None),
+    models.NetworkSubtype: ("full_name", None),
+    models.OsFamily: ("full_name", None),
+    models.OsVersion: ("full_name", None),
+    models.AppType: ("full_name", None),
+    models.ClusterType: ("full_name", None),
+    models.StorageDeviceType: ("full_name", None),
+    models.PowerDeviceType: ("full_name", None),
+    models.NetworkIdType: ("full_name", None),
+    models.RackType: ("name", None),
+    models.EntityTypeDef: ("label", None),
+    models.FieldTypeDef: ("label", None),
+    # --- Natural parent FK: scoped. ---
+    # Rack is deliberately NOT included here: it has no plain NOT NULL
+    # manual name field (only naming-engine-driven code/vf_long_name/
+    # simple_name) and can belong to one of three alternate parents
+    # (floor/room/section, see `_validate_rack`), which doesn't fit this
+    # single-parent-field shape.
+    models.Datacenter: ("name", "site_id"),
+    models.DatacenterFloor: ("name", "datacenter_id"),
+    models.Room: ("name", "datacenter_floor_id"),
+    models.Section: ("name", "room_id"),
+}
+
+
+async def _validate_unique_name(session: AsyncSession, obj, entity_id) -> None:
+    entry = UNIQUE_NAME_FIELDS.get(type(obj))
+    if entry is None:
+        return
+    name_field, parent_field = entry
+    raw_value = getattr(obj, name_field, None)
+    if raw_value is None or str(raw_value).strip() == "":
+        return
+    value = str(raw_value).strip()
+    model = type(obj)
+    column = getattr(model, name_field)
+    stmt = select(model).where(func.lower(column) == value.lower())
+    if parent_field is not None:
+        stmt = stmt.where(getattr(model, parent_field) == getattr(obj, parent_field, None))
+    if entity_id is not None:
+        stmt = stmt.where(model.id != entity_id)
+    existing = (await session.execute(stmt)).scalars().first()
+    if existing is not None:
+        scope = " under the same parent" if parent_field else ""
+        raise _http409(
+            f"'{raw_value}' already exists{scope}. Please choose a different name."
+        )
+
+
 async def _validate_model(session: AsyncSession, obj, entity_id) -> None:
     """Model-specific validation dispatch (beyond abbrev + IPAM)."""
+    await _validate_unique_name(session, obj, entity_id)
     if isinstance(obj, models.Cable):
         _validate_cable(obj)
     elif isinstance(obj, models.EntityTypeDef):

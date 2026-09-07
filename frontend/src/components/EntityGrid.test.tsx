@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import React from "react";
 import { render, waitFor, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import EntityGrid from "./EntityGrid";
+import EntityGrid, { friendlyError } from "./EntityGrid";
 import { api } from "../api";
 
 let latestGridProps: any = null;
@@ -162,6 +162,23 @@ describe("EntityGrid — grid edit integrity (Req 1)", () => {
       expect(latestGridProps.rowData).toEqual([
         { id: 1, rack_id: "AA01", panel_id_label: null },
       ])
+    );
+  });
+});
+
+describe("friendlyError — duplicate-name 409s (Phase 6 Task 7, Req 3.4)", () => {
+  it("passes a table-wide duplicate-name message through cleanly", () => {
+    const raw = "409: 'Virtualfactor' already exists. Please choose a different name.";
+    expect(friendlyError(raw)).toBe(
+      "'Virtualfactor' already exists. Please choose a different name."
+    );
+  });
+
+  it("passes a parent-scoped duplicate-name message through cleanly", () => {
+    const raw =
+      "409: 'Ground Floor' already exists under the same parent. Please choose a different name.";
+    expect(friendlyError(raw)).toBe(
+      "'Ground Floor' already exists under the same parent. Please choose a different name."
     );
   });
 });

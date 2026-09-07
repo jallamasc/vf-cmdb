@@ -56,7 +56,8 @@ const columns = [
 // Naming.tsx's newLookupDefaults / ReferenceData.tsx's Field Types panel).
 const newEntityTypeDefaults = () => ({
   slug: `entity-type-${Math.random().toString(36).slice(2, 8)}`,
-  label: "New Entity Type",
+  // Phase 6 Task 4 (Req 3.1/3.3) — `label` is now table-wide unique.
+  label: `New Entity Type ${Math.random().toString(36).slice(2, 6)}`,
   capabilities: [],
 });
 

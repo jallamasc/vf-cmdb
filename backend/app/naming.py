@@ -385,10 +385,78 @@ async def generate_cable(session: AsyncSession, cable: models.Cable) -> None:
     cable.label = (label or None)
 
 
+async def generate_floor(session: AsyncSession, floor: models.DatacenterFloor) -> None:
+    """Phase 6 Task 13 (Req 6.1) — a Floor's `code` had no generator at all
+    (pure free text), so "F1" never actually meant anything the naming
+    engine produced. Composition: the parent Datacenter's own ``code`` +
+    a sequential ``F{n}`` scoped to that same Datacenter (n = 1 + however
+    many other floors it already has) — mirroring every other generator in
+    this app's parent-prefix + local-sequence shape (generate_patch_panel,
+    generate_power_device, ...).
+
+    The Datacenter prefix is NOT cosmetic: `DatacenterFloor.code` is already
+    registered in the GLOBAL Abbreviation_Registry (abbrev.py's
+    `ABBR_FIELDS`, predating this task), so a bare "F1" for every
+    datacenter's first floor would collide the moment a second datacenter
+    got one — confirmed by a real 409 the first time this was written
+    without the prefix. Composing the parent's own already-globally-unique
+    code in keeps "F{n}" restarting at 1 per datacenter while staying
+    collision-free, exactly like every sibling generator.
+
+    Req 6.3 — gated by `naming_mode`, same as every other naming-engine
+    field.
+    """
+    if not _is_auto(floor):
+        return
+    prefix = ""
+    if floor.datacenter_id:
+        dc = await session.get(models.Datacenter, floor.datacenter_id)
+        if dc:
+            # `Datacenter.code` is optional/manual (no generator populates
+            # it) — fall back to the numeric id so the prefix is ALWAYS
+            # unique per parent even when code hasn't been set, since a
+            # blank prefix here would let two different datacenters' first
+            # floor both compute a bare "F1" and collide in the global
+            # Abbreviation_Registry (a real 409 caught by a full pytest run,
+            # not just designed on paper).
+            prefix = f"{dc.code or f'DC{dc.id}'}-"
+    conditions = [models.DatacenterFloor.id != (floor.id or -1)]
+    if floor.datacenter_id is not None:
+        conditions.append(models.DatacenterFloor.datacenter_id == floor.datacenter_id)
+    existing = (
+        await session.execute(
+            select(func.count(models.DatacenterFloor.id)).where(*conditions)
+        )
+    ).scalar_one()
+    floor.code = f"{prefix}F{existing + 1}"
+
+
+async def generate_section(session: AsyncSession, section: models.Section) -> None:
+    """Phase 6 Task 13 (Req 6.2) — a Section's `code` had no generator at
+    all either. Composition: a sequential ``S{n}`` scoped to the parent
+    Room (Section.room_id is NOT NULL — a Section always belongs to
+    exactly one Room).
+
+    Req 6.3 — gated by `naming_mode`.
+    """
+    if not _is_auto(section):
+        return
+    conditions = [
+        models.Section.id != (section.id or -1),
+        models.Section.room_id == section.room_id,
+    ]
+    existing = (
+        await session.execute(select(func.count(models.Section.id)).where(*conditions))
+    ).scalar_one()
+    section.code = f"S{existing + 1}"
+
+
 # Dispatch table: model class -> generator coroutine
 GENERATORS = {
     models.Site: generate_site,
     models.Datacenter: generate_datacenter,
+    models.DatacenterFloor: generate_floor,
+    models.Section: generate_section,
     models.Rack: generate_rack,
     models.PhysicalServer: generate_physical_server,
     models.VirtualMachine: generate_vm,
@@ -433,6 +501,8 @@ PREVIEW_MODELS = {
     "datacenter-floors": models.DatacenterFloor,
     "room": models.Room,
     "rooms": models.Room,
+    "section": models.Section,
+    "sections": models.Section,
     "physical_server": models.PhysicalServer,
     "physical-servers": models.PhysicalServer,
     "virtual_machine": models.VirtualMachine,
@@ -478,14 +548,16 @@ _NAME_INPUTS: dict[type, list[str]] = {
     models.NetworkDevice: ["site_id", "device_type_id", "subtype_id", "brand_id"],
 }
 
-# Readable location path. Floor / Room have no generator (they are not part of
-# the Organization>Cloud>…>Rack naming chain) so only their path is previewed;
-# Datacenter does have one since FEAT-5 but still needs its parent path.
-# Each entry lists the parent FKs to try, most specific first.
+# Readable location path. Room has no generator (not part of the
+# Organization>Cloud>…>Rack naming chain) so only its path is previewed.
+# Datacenter/Floor/Section DO have generators (FEAT-5, Phase 6 Task 13) but
+# still need their own parent path shown too. Each entry lists the parent
+# FKs to try, most specific first.
 _PARENT_CHAIN: dict[type, list[tuple[str, type]]] = {
     models.Datacenter: [("site_id", models.Site)],
     models.DatacenterFloor: [("datacenter_id", models.Datacenter)],
     models.Room: [("datacenter_floor_id", models.DatacenterFloor)],
+    models.Section: [("room_id", models.Room)],
     models.Rack: [
         ("room_id", models.Room),
         ("datacenter_floor_id", models.DatacenterFloor),
@@ -590,6 +662,10 @@ async def preview_names(
         "vf_short_name": getattr(obj, "vf_short_name", None) or None,
         "tia606b_name": getattr(obj, "tia606b_name", None) or None,
         "vf_friendly_name": getattr(obj, "vf_friendly_name", None) or None,
+        # Phase 6 Task 13/14 — Floor/Section only ever populate `code`, not
+        # any of the 4 fields above; without this, their preview card would
+        # say "generated"/"complete" yet show nothing at all.
+        "code": getattr(obj, "code", None) or None,
         "path": " › ".join(p for p in path_parts if p),
         "missing": missing,
         "complete": generator is not None and not missing,

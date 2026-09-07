@@ -93,6 +93,49 @@ describe("Hierarchy — Room/Section blueprint + Section level (Req 21.3, 22.1, 
     );
   });
 
+  it("Phase 6 Task 13/14: Floor Quick Add defaults to auto-generated code (no code/naming_mode sent)", async () => {
+    wrap(<Hierarchy />);
+    await waitFor(() => expect(screen.getByText(/Floor1/)).toBeTruthy());
+
+    const floorsCard = getCard("Floors");
+    fireEvent.click(within(floorsCard).getByText("+ Quick Add"));
+    const nameInput = within(floorsCard).getByText("Name").nextElementSibling as HTMLInputElement;
+    fireEvent.change(nameInput, { target: { value: "New Floor" } });
+    expect(within(floorsCard).queryByText(/Abbreviation/)).toBeNull();
+    fireEvent.click(within(floorsCard).getByText("Create"));
+
+    await waitFor(() =>
+      expect(api.create).toHaveBeenCalledWith(
+        "datacenter-floors",
+        expect.not.objectContaining({ naming_mode: "manual" })
+      )
+    );
+  });
+
+  it("Phase 6 Task 13/14: unchecking Auto-generate code reveals the manual code field and sends naming_mode manual", async () => {
+    wrap(<Hierarchy />);
+    await waitFor(() => expect(screen.getByText(/Section1/)).toBeTruthy());
+
+    const sectionsCard = getCard("Sections");
+    fireEvent.click(within(sectionsCard).getByText("+ Quick Add"));
+    const nameInput = within(sectionsCard).getByText("Name").nextElementSibling as HTMLInputElement;
+    fireEvent.change(nameInput, { target: { value: "Manual Section" } });
+    const roomSelect = within(sectionsCard).getByText("Room (parent)")
+      .nextElementSibling as HTMLSelectElement;
+    fireEvent.change(roomSelect, { target: { value: "1" } });
+
+    fireEvent.click(within(sectionsCard).getByText("Auto-generate code (Code Mode)"));
+    expect(within(sectionsCard).queryByText(/Abbreviation/)).toBeTruthy();
+
+    fireEvent.click(within(sectionsCard).getByText("Create"));
+    await waitFor(() =>
+      expect(api.create).toHaveBeenCalledWith(
+        "sections",
+        expect.objectContaining({ name: "Manual Section", room_id: 1, naming_mode: "manual" })
+      )
+    );
+  });
+
   it("offers a Section picker on the Rack Quick Add form", async () => {
     wrap(<Hierarchy />);
     await waitFor(() => expect(screen.getByText(/Section1/)).toBeTruthy());

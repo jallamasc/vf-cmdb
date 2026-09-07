@@ -58,26 +58,40 @@ function wrap(ui: React.ReactElement) {
 describe("RackView — Room/Section-aware breadcrumb resolution (Req 21.1/22.1)", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("resolves the full Site/DC/Floor breadcrumb for a room-parented rack", async () => {
+  it("resolves the full Site/DC/Floor/Room breadcrumb for a room-parented rack", async () => {
     wrap(<RackView />);
-    // Each rack's name appears twice (the breadcrumb <option> + the card
-    // title) — use getAllByText and require at least one match.
     await waitFor(() => expect(screen.getAllByText("RACK-ROOM").length).toBeGreaterThan(0));
-    expect(screen.getAllByText("Site1 / DC1 / Floor1").length).toBeGreaterThan(0);
+    // Phase 6 Task 15 (Req 6.4) — Room now appears in the breadcrumb too.
+    expect(screen.getAllByText("Site1 / DC1 / Floor1 / Room1").length).toBeGreaterThan(0);
   });
 
-  it("resolves the full Site/DC/Floor breadcrumb for a section-parented rack", async () => {
+  it("resolves the full Site/DC/Floor/Room breadcrumb for a section-parented rack", async () => {
     wrap(<RackView />);
     await waitFor(() => expect(screen.getAllByText("RACK-SECTION").length).toBeGreaterThan(0));
-    // getAllByText since the direct-floor rack shares the identical string.
-    expect(screen.getAllByText("Site1 / DC1 / Floor1").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Site1 / DC1 / Floor1 / Room1").length).toBeGreaterThan(0);
   });
 
-  it("still resolves a directly floor-parented rack (no regression)", async () => {
+  it("still resolves a directly floor-parented rack (no regression, no Room appended)", async () => {
     wrap(<RackView />);
     await waitFor(() => expect(screen.getAllByText("RACK-FLOOR").length).toBeGreaterThan(0));
-    // 3 racks x 1 card each = 3 breadcrumb strings (options aren't the
-    // location breadcrumb text, just the rack's own name).
-    expect(screen.getAllByText("Site1 / DC1 / Floor1").length).toBe(3);
+    // Only the direct-floor rack (no room/section) has the bare, un-suffixed
+    // breadcrumb — the other two now also show "/ Room1".
+    expect(screen.getAllByText("Site1 / DC1 / Floor1").length).toBe(1);
+  });
+
+  it("Phase 6 Task 15 (Req 6.4): combines Floor+Section generated codes into one tag", async () => {
+    const withCodes: Record<string, any[]> = {
+      ...FIXTURES,
+      "datacenter-floors": [{ id: 1, datacenter_id: 1, name: "Floor1", code: "DC1-F1" }],
+      sections: [{ id: 1, room_id: 1, name: "Section1", code: "S1" }],
+    };
+    (await import("../api")).api.list = vi.fn((resource: string) =>
+      Promise.resolve(withCodes[resource] ?? [])
+    ) as any;
+    wrap(<RackView />);
+    await waitFor(() => expect(screen.getAllByText("RACK-SECTION").length).toBeGreaterThan(0));
+    expect(
+      screen.getAllByText("Site1 / DC1 / Floor1 / Room1 (DC1-F1 S1)").length
+    ).toBeGreaterThan(0);
   });
 });

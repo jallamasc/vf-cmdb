@@ -7,7 +7,7 @@ export type Row = Record<string, any>;
  * Result of GET /naming/generate?entity_type=… — what an entity *would* be
  * called for the currently selected foreign keys. Nothing is persisted.
  * ``generated`` is false for hierarchy levels outside the naming chain
- * (floor / room), which only get a readable ``path``.
+ * (room), which only get a readable ``path``.
  */
 export interface NamePreview {
   entity_type: string;
@@ -18,6 +18,8 @@ export interface NamePreview {
   vf_short_name: string | null;
   tia606b_name: string | null;
   vf_friendly_name: string | null;
+  /** Phase 6 Task 13/14 — Floor/Section's generated code (F{n}/S{n}). */
+  code: string | null;
   path: string;
   missing: string[];
   complete: boolean;

@@ -437,6 +437,12 @@ class DatacenterFloor(Base):
     # Phase 5 Task 26 (Req 21.3) — an uploaded floor-plan image, set by
     # POST /blueprints/datacenter-floors/{id} (backend/app/routers/special.py).
     blueprint_url: Mapped[Optional[str]] = mapped_column(String(500))
+    # Phase 6 Task 13 (Req 6.1/6.3) — gates the new auto-generated `code`
+    # (F{n}), same toggle shape as every other naming-engine field.
+    naming_mode: Mapped[str] = mapped_column(
+        _naming_mode_enum("floor_naming_mode"), nullable=False,
+        default="auto", server_default="auto",
+    )
 
 
 class Room(Base):
@@ -493,6 +499,12 @@ class Section(Base):
     # Phase 5 Task 27 (Req 22.3) — an uploaded floor-plan image, set by
     # POST /blueprints/sections/{id}.
     blueprint_url: Mapped[Optional[str]] = mapped_column(String(500))
+    # Phase 6 Task 13 (Req 6.2/6.3) — gates the new auto-generated `code`
+    # (S{n}), same toggle shape as every other naming-engine field.
+    naming_mode: Mapped[str] = mapped_column(
+        _naming_mode_enum("section_naming_mode"), nullable=False,
+        default="auto", server_default="auto",
+    )
 
 
 class RackType(Base):

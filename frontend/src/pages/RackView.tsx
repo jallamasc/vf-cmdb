@@ -432,12 +432,28 @@ export default function RackView() {
     const st =
       siteById.get(r.site_id) ||
       (dcParent ? siteById.get(dcParent.site_id) : undefined);
+    // Phase 6 Task 15 (Req 6.4) — resolve Room/Section the same way
+    // `effectiveFloorId` already does, so the breadcrumb can show them too.
+    const section = r.section_id != null ? sectionById.get(r.section_id) : undefined;
+    const room =
+      r.room_id != null
+        ? roomById.get(r.room_id)
+        : section
+          ? roomById.get(section.room_id)
+          : undefined;
     const parts = [
       st ? nameOf(st, "Site") : null,
       dcParent ? nameOf(dcParent, "DC") : null,
       fl ? nameOf(fl, "Floor") : null,
+      room ? nameOf(room, "Room") : null,
     ].filter(Boolean);
-    return parts.join(" / ");
+    // Phase 6 Task 15 (Req 6.4) — the Floor+Section auto-generated codes
+    // combined into one compact tag (e.g. "F1 S1"), distinct from the
+    // name-based path above since Floor/Section's own `.name` is already
+    // shown there — this specifically surfaces what the naming engine
+    // actually generated for each.
+    const codeTag = [fl?.code, section?.code].filter(Boolean).join(" ");
+    return parts.join(" / ") + (codeTag ? ` (${codeTag})` : "");
   };
 
   return (

@@ -207,12 +207,12 @@ capability patterns rather than reinventing them.
   - [x]* 32.2 pytest: creation without both IPs is rejected; both link
         correctly
 
-- [ ] 33. Bitwarden Secrets Manager client
-  - [ ] 33.1 `backend/app/bitwarden_client.py` wrapping `bitwarden-sdk`;
+- [x] 33. Bitwarden Secrets Manager client
+  - [x] 33.1 `backend/app/bitwarden_client.py` wrapping `bitwarden-sdk`;
         config via `BW_ORGANIZATION_ID`/`BW_ACCESS_TOKEN`/`BW_PROJECT_ID`;
         `create_secret`/`get_secret`/`regenerate_secret` (no automatic delete)
     - _Requirements: 27.1, 27.2_
-  - [ ]* 33.2 pytest against a mocked SDK client
+  - [x]* 33.2 pytest against a mocked SDK client
 
 - [ ] 34. Default admin credential per device
   - [ ] 34.1 Create-hook generating a password via `bitwarden_client.py`;

@@ -18,6 +18,16 @@ class Settings(BaseSettings):
     api_prefix: str = "/api/v1"
     cors_origins: str = "*"
 
+    # Bitwarden Secrets Manager (Phase 5 Task 33, Req 27.1) — an
+    # administrator's existing Organization/Project + a machine account
+    # Access Token. Empty by default: vf-cmdb runs fine without Bitwarden
+    # configured, credential features simply aren't available until set.
+    bw_organization_id: str = ""
+    bw_access_token: str = ""
+    bw_project_id: str = ""
+    bw_api_url: str = "https://api.bitwarden.com"
+    bw_identity_url: str = "https://identity.bitwarden.com"
+
     @property
     def database_url(self) -> str:
         return (

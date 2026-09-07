@@ -33,6 +33,12 @@ class Settings(BaseSettings):
     # aren't available until configured.
     semaphore_url: str = ""
     semaphore_api_token: str = ""
+    # Phase 5 Task 38 (Req 30.1) — the single Semaphore Project every
+    # ansible_managed Generic_Entity's inventory is upserted into. Semaphore
+    # has no vf-cmdb-wide "default project" concept of its own, so this
+    # mirrors Bitwarden's BW_PROJECT_ID: one fixed target the administrator
+    # configures once. 0 (falsy) means "not configured yet".
+    semaphore_project_id: int = 0
 
     @property
     def database_url(self) -> str:

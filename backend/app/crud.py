@@ -10,7 +10,7 @@ from typing import Any, Optional
 from sqlalchemy import inspect, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from . import abbrev, bitwarden_client, models, naming
+from . import abbrev, bitwarden_client, lifecycle_sync, models, naming
 
 # Auto-generated columns must never be set directly by clients.
 COMPUTED_FIELDS = {
@@ -628,6 +628,7 @@ async def create_item(
     await _autoreserve_gateway(session, obj)
     await _sync_cable_for_interface(session, obj)
     await _provision_credential(session, obj)
+    await lifecycle_sync.sync_semaphore_inventory(session, obj)
     await session.flush()
     for field, value in data.items():
         await _log(session, model.__tablename__, obj.id, field, None, value, source)
@@ -662,6 +663,7 @@ async def update_item(
         await naming.apply_naming(session, obj)
         await _sync_abbrev(session, obj)
         await _sync_cable_for_interface(session, obj, prior_label_a=prior_label_a)
+        await lifecycle_sync.sync_semaphore_inventory(session, obj)
         await session.flush()
         for field, old, new in changes:
             await _log(session, model.__tablename__, obj.id, field, old, new, source)
@@ -690,6 +692,10 @@ async def delete_item(
     await _log(session, model.__tablename__, item_id, "__deleted__", "exists", None, source)
     if type(obj) in abbrev.ABBR_FIELDS:
         await abbrev.remove_registry(session, obj.__tablename__, obj.id)
+    # Phase 5 Task 38 (Req 30.2) — remove the Semaphore inventory host entry
+    # BEFORE the row itself is gone (needs its semaphore_host_id); never
+    # touches bw_secret_id/Bitwarden.
+    await lifecycle_sync.remove_semaphore_inventory(obj)
     await session.delete(obj)
     await session.commit()
     return True

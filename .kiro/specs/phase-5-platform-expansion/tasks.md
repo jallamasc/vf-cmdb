@@ -214,12 +214,12 @@ capability patterns rather than reinventing them.
     - _Requirements: 27.1, 27.2_
   - [x]* 33.2 pytest against a mocked SDK client
 
-- [ ] 34. Default admin credential per device
-  - [ ] 34.1 Create-hook generating a password via `bitwarden_client.py`;
+- [x] 34. Default admin credential per device
+  - [x] 34.1 Create-hook generating a password via `bitwarden_client.py`;
         store only `admin_username`/`bw_secret_id` on the record; reveal/
         regenerate endpoints; masked UI with reveal/regenerate actions
     - _Requirements: 28.1, 28.2, 28.3_
-  - [ ]* 34.2 pytest for the create-hook and reveal/regenerate endpoints
+  - [x]* 34.2 pytest for the create-hook and reveal/regenerate endpoints
         (mocked client)
 
 - [ ] 35. Checkpoint E — build + test verification; flag that live Bitwarden

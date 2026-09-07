@@ -327,6 +327,15 @@ export const api = {
     return fetch(`${BASE}/naming/theme-names?${qs.toString()}`).then(handle);
   },
   /**
+   * Phase 5 Task 34 (Req 28.2/28.3) — fetch a record's default admin
+   * credential on demand. Never persisted anywhere by the caller either.
+   */
+  revealCredential: (resource: string, id: number): Promise<{ username: string; password: string }> =>
+    fetch(`${BASE}/credentials/${resource}/${id}/reveal`).then(handle),
+  /** Rotate a record's default admin credential's value in place. */
+  regenerateCredential: (resource: string, id: number): Promise<{ username: string; password: string }> =>
+    fetch(`${BASE}/credentials/${resource}/${id}/regenerate`, { method: "POST" }).then(handle),
+  /**
    * FEAT-5 — resolve a city to the IATA code of its main airport, with
    * ``matches`` for autocomplete and ``alternatives`` for multi-airport cities.
    *

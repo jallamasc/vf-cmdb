@@ -1184,6 +1184,11 @@ class GenericEntity(Base):
     is enforced at the CRUD layer (``crud._validate_generic_entity_ip_assignment``):
     a record whose Entity_Type_Def carries this capability must have BOTH
     ``ip_id`` and ``management_ip_id`` set, on every create and update.
+    ``admin_username``/``bw_secret_id`` (``ansible_managed`` — Phase 5
+    Task 34, Req 28.1): a default admin credential, auto-provisioned via
+    ``crud._provision_credential`` on creation only. The plaintext password
+    is never stored here — only the username and the Bitwarden Secrets
+    Manager's own reference to it.
     """
 
     __tablename__ = "generic_entities"
@@ -1215,3 +1220,8 @@ class GenericEntity(Base):
     # own IpAssignment row (Phase 5 Task 32).
     ip_id: Mapped[Optional[int]] = mapped_column(ForeignKey("ip_assignments.id"))
     management_ip_id: Mapped[Optional[int]] = mapped_column(ForeignKey("ip_assignments.id"))
+    # ansible_managed capability hook — default admin credential. Only the
+    # username and the Bitwarden Secrets Manager reference are stored here;
+    # the plaintext password lives only in Bitwarden (Phase 5 Task 34).
+    admin_username: Mapped[Optional[str]] = mapped_column(String(100))
+    bw_secret_id: Mapped[Optional[str]] = mapped_column(String(64))

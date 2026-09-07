@@ -10,7 +10,7 @@ from typing import Any, Optional
 from sqlalchemy import inspect, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from . import abbrev, models, naming
+from . import abbrev, bitwarden_client, models, naming
 
 # Auto-generated columns must never be set directly by clients.
 COMPUTED_FIELDS = {
@@ -426,6 +426,42 @@ async def _autoreserve_gateway(session: AsyncSession, obj) -> None:
     )
 
 
+async def _provision_credential(session: AsyncSession, obj) -> None:
+    """Phase 5 Task 34 (Req 28.1) — a Generic_Entity whose Entity_Type_Def
+    carries the ansible_managed Capability gets a default admin credential
+    generated and stored via the Secrets_Client, on CREATION only (not on
+    every update — see Req 28's "WHEN ... is created"). Only the username
+    and the Secrets_Client's own reference (`bw_secret_id`) are ever written
+    to this app's database; the plaintext password is never persisted here.
+
+    Silently does nothing if Bitwarden isn't configured — this app runs
+    fine without it, credential provisioning simply doesn't happen until
+    it's set up (the record is still created normally either way) — or if
+    a credential is already provisioned (`bw_secret_id` already set), so
+    this never re-provisions/overwrites an existing one.
+    """
+    if not isinstance(obj, models.GenericEntity):
+        return
+    if getattr(obj, "bw_secret_id", None):
+        return
+    entity_type = await session.get(models.EntityTypeDef, obj.entity_type_id)
+    caps = (entity_type.capabilities if entity_type else None) or []
+    if "ansible_managed" not in caps:
+        return
+    try:
+        client = bitwarden_client.get_secrets_client()
+        password = bitwarden_client.generate_password()
+        secret = client.create_secret(
+            key=f"generic-entities-{obj.id}-admin",
+            value=password,
+            note=f"vf-cmdb generic-entities #{obj.id} default admin credential",
+        )
+    except bitwarden_client.BitwardenNotConfigured:
+        return
+    obj.admin_username = "admin"
+    obj.bw_secret_id = secret["id"]
+
+
 def _interface_own_label(obj: "models.DeviceInterface") -> str:
     """The label an interface is identified by on its own end of a Cable —
     identical fallback chain to ``ports.candidate_ports()``'s ``label`` and
@@ -591,6 +627,7 @@ async def create_item(
     await _sync_abbrev(session, obj)
     await _autoreserve_gateway(session, obj)
     await _sync_cable_for_interface(session, obj)
+    await _provision_credential(session, obj)
     await session.flush()
     for field, value in data.items():
         await _log(session, model.__tablename__, obj.id, field, None, value, source)

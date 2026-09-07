@@ -115,6 +115,30 @@ class SecretsClient:
         return _secret_dict(result.data)
 
 
+def generate_password(length: int = 24) -> str:
+    """A strong random password, via the SDK's generator (Phase 5 Task 34).
+
+    Bitwarden's generator needs no authentication (it's pure local
+    generation, not a Secrets Manager API call), so this works even before
+    `BW_ORGANIZATION_ID`/`BW_ACCESS_TOKEN`/`BW_PROJECT_ID` are configured —
+    unlike everything else in this module, it doesn't raise
+    `BitwardenNotConfigured`.
+    """
+    from bitwarden_sdk import BitwardenClient, DeviceType, client_settings_from_dict
+
+    client = BitwardenClient(
+        client_settings_from_dict(
+            {
+                "apiUrl": settings.bw_api_url,
+                "deviceType": DeviceType.SDK,
+                "identityUrl": settings.bw_identity_url,
+                "userAgent": "vf-cmdb",
+            }
+        )
+    )
+    return client.generators().generate(length=length)
+
+
 @lru_cache
 def get_secrets_client() -> SecretsClient:
     """Shared `SecretsClient`, built once per process from `settings` —

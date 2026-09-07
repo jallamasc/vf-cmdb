@@ -93,6 +93,9 @@ vi.mock("../api", async (orig) => {
       get: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      // Phase 5 Task 34 — the credential panel's reveal/regenerate actions.
+      revealCredential: vi.fn(),
+      regenerateCredential: vi.fn(),
     },
   };
 });
@@ -298,5 +301,43 @@ describe("GenericEntityView — dual IP assignment (Req 26.1/26.2)", () => {
     fireEvent.click(screen.getByTestId("select-row"));
     await waitFor(() => expect(screen.getByText("10.0.0.5")).toBeTruthy());
     expect(screen.getByText("10.0.1.5")).toBeTruthy();
+  });
+});
+
+describe("GenericEntityView — default admin credential (Req 28.2/28.3)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    capturedProps = [];
+    (api.list as any).mockImplementation((resource: string) => {
+      if (resource === "entity-type-defs")
+        return Promise.resolve([
+          { id: 7, slug: "monitor", label: "Monitor", capabilities: ["ansible_managed"] },
+        ]);
+      if (resource === "entity-field-defs") return Promise.resolve([]);
+      if (resource === "field-type-defs") return Promise.resolve(FIELD_TYPES);
+      return Promise.resolve([]);
+    });
+  });
+
+  it("mentions 'credential' in the pre-selection prompt for an ansible_managed type", async () => {
+    wrap("monitor");
+    await waitFor(() => expect(screen.getByText(/Select a row to manage/)).toBeTruthy());
+    expect(screen.getByText(/credential/)).toBeTruthy();
+  });
+
+  it("shows CredentialField for the selected row when the type has the ansible_managed capability", async () => {
+    selectRowPayload = {
+      id: 1,
+      entity_type_id: 7,
+      admin_username: "admin",
+      bw_secret_id: "secret-1",
+    };
+    wrap("monitor");
+    await screen.findByTestId("select-row");
+    fireEvent.click(screen.getByTestId("select-row"));
+    await waitFor(() => expect(screen.getByText("Default admin credential")).toBeTruthy());
+    expect(screen.getByText("admin")).toBeTruthy();
+    expect(screen.getByText("Reveal")).toBeTruthy();
+    expect(screen.getByText("Regenerate")).toBeTruthy();
   });
 });

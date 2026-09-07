@@ -2,14 +2,20 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   api,
-  StencilLibraryFetchResult,
+  StencilLibraryShape,
   StencilLibrarySource,
 } from "../api";
 import { fuzzyScore } from "../lib/fuzzy";
 
-const SOURCES: { key: StencilLibrarySource; label: string }[] = [
+/** Phase 6 Req 9.2/9.3 — "vendor" is a 3rd browse source, alongside the two
+ * existing 2-level ones (source -> category -> file); it adds one more
+ * level (vendor -> product line -> file-inside-a-ZIP). */
+type BrowseSource = StencilLibrarySource | "vendor";
+
+const SOURCES: { key: BrowseSource; label: string }[] = [
   { key: "github", label: "bhdicaire/visioStencils (GitHub)" },
   { key: "visiocafe", label: "VisioCafe" },
+  { key: "vendor", label: "Vendor ZIP" },
 ];
 
 interface Props {
@@ -27,31 +33,73 @@ interface Props {
  * `modelSlug`'s `face` — through the EXISTING upload endpoint
  * (`api.uploadStencil`), so an applied shape is indistinguishable from a
  * manually-uploaded SVG once saved.
+ *
+ * Phase 6 Task 24 / Requirement 9.2 — a 3rd "Vendor ZIP" source adds one
+ * more browse level (vendor -> product line -> file inside that product
+ * line's ZIP), reusing the SAME shape-preview/apply UI at the bottom once a
+ * file is picked either way.
  */
 export default function StencilLibraryPicker({ modelSlug, face, onApplied, onClose }: Props) {
   const qc = useQueryClient();
-  const [source, setSource] = useState<StencilLibrarySource>("github");
+  const [source, setSource] = useState<BrowseSource>("github");
   const [category, setCategory] = useState<string | null>(null);
+  const [productLine, setProductLine] = useState<string | null>(null);
   const [fileQuery, setFileQuery] = useState("");
-  const [result, setResult] = useState<StencilLibraryFetchResult | null>(null);
+  const [result, setResult] = useState<{ file: string; shapes: StencilLibraryShape[] } | null>(
+    null
+  );
   const [error, setError] = useState<string | null>(null);
   const [applyingTitle, setApplyingTitle] = useState<string | null>(null);
 
+  const isVendor = source === "vendor";
+
   const categories = useQuery({
     queryKey: ["stencil-library-categories", source],
-    queryFn: () => api.stencilLibraryCategories(source),
+    queryFn: () => api.stencilLibraryCategories(source as StencilLibrarySource),
+    enabled: !isVendor,
+  });
+
+  const vendors = useQuery({
+    queryKey: ["stencil-vendors"],
+    queryFn: () => api.stencilVendors(),
+    enabled: isVendor,
+  });
+
+  const productLines = useQuery({
+    queryKey: ["stencil-vendor-product-lines", category],
+    queryFn: () => api.stencilVendorProductLines(category as string),
+    enabled: isVendor && category != null,
   });
 
   const files = useQuery({
     queryKey: ["stencil-library-files", source, category],
-    queryFn: () => api.stencilLibraryFiles(source, category as string),
-    enabled: category != null,
+    queryFn: () => api.stencilLibraryFiles(source as StencilLibrarySource, category as string),
+    enabled: !isVendor && category != null,
+  });
+
+  // Requirement 9.3 — downloads+extracts ONLY the selected product line's
+  // ZIP (a cache hit with no further network calls on repeat selection).
+  const vendorFiles = useMutation({
+    mutationFn: () => api.stencilVendorFiles(category as string, productLine as string),
+    onError: (e: unknown) => setError(e instanceof Error ? e.message : String(e)),
   });
 
   const fetchAndConvert = useMutation({
-    mutationFn: (file: string) => api.stencilLibraryFetch(source, category as string, file),
+    mutationFn: (file: string) => api.stencilLibraryFetch(source as StencilLibrarySource, category as string, file),
     onSuccess: (data) => {
-      setResult(data);
+      setResult({ file: data.file, shapes: data.shapes });
+      setError(null);
+    },
+    onError: (e: unknown) => {
+      setResult(null);
+      setError(e instanceof Error ? e.message : String(e));
+    },
+  });
+
+  const vendorConvert = useMutation({
+    mutationFn: (file: string) => api.stencilVendorConvert(category as string, productLine as string, file),
+    onSuccess: (data) => {
+      setResult({ file: data.file, shapes: data.shapes });
       setError(null);
     },
     onError: (e: unknown) => {
@@ -78,9 +126,39 @@ export default function StencilLibraryPicker({ modelSlug, face, onApplied, onClo
     onSettled: () => setApplyingTitle(null),
   });
 
-  const filteredFiles = (files.data ?? []).filter(
-    (f) => fileQuery.trim() === "" || fuzzyScore(fileQuery, f.name) !== null
+  // Normalized to plain names regardless of source, so the file list and
+  // search filter below render identically for all three sources.
+  const fileNames: string[] = isVendor
+    ? vendorFiles.data ?? []
+    : (files.data ?? []).map((f) => f.name);
+  const filteredFileNames = fileNames.filter(
+    (name) => fileQuery.trim() === "" || fuzzyScore(fileQuery, name) !== null
   );
+  const filesLoading = isVendor ? vendorFiles.isPending : files.isLoading;
+  const filesError = isVendor ? vendorFiles.error : files.error;
+  const convertPending = isVendor ? vendorConvert.isPending : fetchAndConvert.isPending;
+
+  const handlePickCategory = (key: string) => {
+    setCategory(key);
+    setProductLine(null);
+    setResult(null);
+    setError(null);
+  };
+
+  const handlePickProductLine = (key: string) => {
+    setProductLine(key);
+    setResult(null);
+    setError(null);
+    vendorFiles.mutate();
+  };
+
+  const handlePickFile = (name: string) => {
+    if (isVendor) {
+      vendorConvert.mutate(name);
+    } else {
+      fetchAndConvert.mutate(name);
+    }
+  };
 
   return (
     <div
@@ -102,8 +180,9 @@ export default function StencilLibraryPicker({ modelSlug, face, onApplied, onClo
           <select
             value={source}
             onChange={(e) => {
-              setSource(e.target.value as StencilLibrarySource);
+              setSource(e.target.value as BrowseSource);
               setCategory(null);
+              setProductLine(null);
               setResult(null);
               setError(null);
             }}
@@ -118,75 +197,143 @@ export default function StencilLibraryPicker({ modelSlug, face, onApplied, onClo
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-3 space-y-3">
-          {categories.isLoading && <p className="text-sm text-slate-500">Loading categories…</p>}
-          {categories.isError && (
-            <p className="text-sm text-rose-600">
-              Could not load categories: {(categories.error as Error)?.message}
-            </p>
-          )}
-          {categories.data && categories.data.length === 0 && (
-            <p className="text-sm text-slate-400 italic">
-              No categories curated yet for this source. See{" "}
-              <code>backend/app/stencil_sources.py</code> to add entries.
-            </p>
+          {!isVendor && (
+            <>
+              {categories.isLoading && (
+                <p className="text-sm text-slate-500">Loading categories…</p>
+              )}
+              {categories.isError && (
+                <p className="text-sm text-rose-600">
+                  Could not load categories: {(categories.error as Error)?.message}
+                </p>
+              )}
+              {categories.data && categories.data.length === 0 && (
+                <p className="text-sm text-slate-400 italic">
+                  No categories curated yet for this source. See{" "}
+                  <code>backend/app/stencil_sources.py</code> to add entries.
+                </p>
+              )}
+              <div className="flex flex-wrap gap-1.5">
+                {(categories.data ?? []).map((c) => (
+                  <button
+                    key={c.key}
+                    type="button"
+                    onClick={() => handlePickCategory(c.key)}
+                    className={`px-2.5 py-1 text-xs rounded-full border ${
+                      category === c.key
+                        ? "bg-blue-600 text-white border-blue-600"
+                        : "border-slate-300 text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            </>
           )}
 
-          <div className="flex flex-wrap gap-1.5">
-            {(categories.data ?? []).map((c) => (
-              <button
-                key={c.key}
-                type="button"
-                onClick={() => {
-                  setCategory(c.key);
-                  setResult(null);
-                  setError(null);
-                }}
-                className={`px-2.5 py-1 text-xs rounded-full border ${
-                  category === c.key
-                    ? "bg-blue-600 text-white border-blue-600"
-                    : "border-slate-300 text-slate-700 hover:bg-slate-50"
-                }`}
-              >
-                {c.label}
-              </button>
-            ))}
-          </div>
+          {isVendor && (
+            <>
+              {vendors.isLoading && <p className="text-sm text-slate-500">Loading vendors…</p>}
+              {vendors.isError && (
+                <p className="text-sm text-rose-600">
+                  Could not load vendors: {(vendors.error as Error)?.message}
+                </p>
+              )}
+              {vendors.data && vendors.data.length === 0 && (
+                <p className="text-sm text-slate-400 italic">
+                  No vendors curated yet. See <code>backend/app/vendor_stencils.py</code> to add
+                  entries.
+                </p>
+              )}
+              <div className="flex flex-wrap gap-1.5">
+                {(vendors.data ?? []).map((v) => (
+                  <button
+                    key={v.key}
+                    type="button"
+                    onClick={() => handlePickCategory(v.key)}
+                    className={`px-2.5 py-1 text-xs rounded-full border ${
+                      category === v.key
+                        ? "bg-blue-600 text-white border-blue-600"
+                        : "border-slate-300 text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    {v.label}
+                  </button>
+                ))}
+              </div>
 
-          {category != null && (
+              {category != null && (
+                <div className="space-y-1.5">
+                  <p className="text-xs uppercase tracking-wide text-slate-400">Product line</p>
+                  {productLines.isLoading && (
+                    <p className="text-sm text-slate-500">Loading product lines…</p>
+                  )}
+                  {productLines.isError && (
+                    <p className="text-sm text-rose-600">
+                      Could not load product lines: {(productLines.error as Error)?.message}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-1.5">
+                    {(productLines.data ?? []).map((p) => (
+                      <button
+                        key={p.key}
+                        type="button"
+                        onClick={() => handlePickProductLine(p.key)}
+                        className={`px-2.5 py-1 text-xs rounded-full border ${
+                          productLine === p.key
+                            ? "bg-blue-600 text-white border-blue-600"
+                            : "border-slate-300 text-slate-700 hover:bg-slate-50"
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {(isVendor ? productLine != null : category != null) && (
             <div className="space-y-2">
               <input
                 value={fileQuery}
                 onChange={(e) => setFileQuery(e.target.value)}
-                placeholder="Search files in this category…"
+                placeholder={isVendor ? "Search files in this ZIP…" : "Search files in this category…"}
                 className="w-full border border-slate-300 rounded px-2.5 py-1.5 text-sm"
               />
-              {files.isLoading && <p className="text-sm text-slate-500">Loading files…</p>}
-              {files.isError && (
+              {filesLoading && (
+                <p className="text-sm text-slate-500">
+                  {isVendor ? "Downloading and extracting ZIP…" : "Loading files…"}
+                </p>
+              )}
+              {Boolean(filesError) && (
                 <p className="text-sm text-rose-600">
-                  Could not load files: {(files.error as Error)?.message}
+                  Could not load files: {(filesError as Error)?.message}
                 </p>
               )}
               <ul className="max-h-40 overflow-y-auto border border-slate-200 rounded divide-y divide-slate-100">
-                {filteredFiles.map((f) => (
-                  <li key={f.name}>
+                {filteredFileNames.map((name) => (
+                  <li key={name}>
                     <button
                       type="button"
-                      disabled={fetchAndConvert.isPending}
-                      onClick={() => fetchAndConvert.mutate(f.name)}
+                      disabled={convertPending}
+                      onClick={() => handlePickFile(name)}
                       className="w-full text-left px-3 py-1.5 text-sm hover:bg-slate-50 disabled:opacity-50"
                     >
-                      {f.name}
+                      {name}
                     </button>
                   </li>
                 ))}
-                {filteredFiles.length === 0 && !files.isLoading && (
+                {filteredFileNames.length === 0 && !filesLoading && (
                   <li className="px-3 py-2 text-sm text-slate-400 italic">No matching files.</li>
                 )}
               </ul>
             </div>
           )}
 
-          {fetchAndConvert.isPending && (
+          {convertPending && (
             <p className="text-sm text-slate-500">Fetching and converting…</p>
           )}
 

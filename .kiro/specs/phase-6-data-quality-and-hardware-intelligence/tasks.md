@@ -153,25 +153,25 @@ sub-phases that reuse them.
 
 ### Sub-phase G — Stencil Pipeline: Dev Workflow & Vendor ZIPs
 
-- [ ] 22. Containerized dev workflow
-  - [ ] 22.1 Documented volume-mounted, `--reload`-capable container dev loop
+- [x] 22. Containerized dev workflow
+  - [x] 22.1 Documented volume-mounted, `--reload`-capable container dev loop
         so `vss2svg-conv` works locally
     - _Requirements: 9.1_
-  - [ ]* 22.2 Live verification: convert a real stencil through it
+  - [x]* 22.2 Live verification: convert a real stencil through it
 
-- [ ] 23. Vendor stencil ZIP source
-  - [ ] 23.1 `VENDOR_STENCIL_SOURCES` registry + download/extract/cache-on-
+- [x] 23. Vendor stencil ZIP source
+  - [x] 23.1 `VENDOR_STENCIL_SOURCES` registry + download/extract/cache-on-
         selection + list contained files into the existing convert pipeline
     - _Requirements: 9.2, 9.3_
-  - [ ]* 23.2 pytest against a mocked ZIP download
+  - [x]* 23.2 pytest against a mocked ZIP download
 
-- [ ] 24. Frontend vendor browsing UI
-  - [ ] 24.1 Extend `StencilLibraryPicker.tsx` with vendor/product-line →
+- [x] 24. Frontend vendor browsing UI
+  - [x] 24.1 Extend `StencilLibraryPicker.tsx` with vendor/product-line →
         file-inside-zip → existing preview/apply flow
     - _Requirements: 9.2_
-  - [ ]* 24.2 Vitest for the new selector flow
+  - [x]* 24.2 Vitest for the new selector flow
 
-- [ ] 25. Checkpoint G — build + test verification (incl. live containerized
+- [x] 25. Checkpoint G — build + test verification (incl. live containerized
       stencil conversion).
 
 ### Sub-phase H — Universal Stencil Override & Fallback Icons

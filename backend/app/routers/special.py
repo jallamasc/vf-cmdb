@@ -29,6 +29,7 @@ from .. import (
     stencil_sources,
     stencils,
     themes,
+    vendor_stencils,
 )
 from ..config import settings
 from ..database import get_session
@@ -1392,6 +1393,34 @@ async def stencil_library_files(
     return [{"name": f.name, "size": f.size} for f in files]
 
 
+def _convert_and_save_previews(raw_path: Path) -> tuple[str, list[dict[str, str]]]:
+    """Shared tail of every stencil source's fetch flow (github/visiocafe's
+    ``stencil_library_fetch`` below AND Task 23's vendor ZIP flow): convert
+    ``raw_path`` into one SVG per shape master and cache them as previews.
+    Raises the same HTTPException shapes (503/422) either flow already
+    surfaced before this helper existed."""
+    try:
+        shapes = stencil_library.convert_stencil(raw_path)
+    except stencil_library.ConversionUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    except stencil_library.ConversionFailed as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+    token = stencil_library.new_preview_token()
+    try:
+        saved = stencil_library.save_previews(token, shapes)
+    finally:
+        shutil.rmtree(shapes[0].svg_path.parent, ignore_errors=True)
+
+    return token, [
+        {
+            "title": s["title"],
+            "preview_url": f"{settings.api_prefix}/stencil-library/previews/{token}/{s['filename']}",
+        }
+        for s in saved
+    ]
+
+
 @router.post("/stencil-library/fetch")
 async def stencil_library_fetch(
     source: str = Body(..., embed=True),
@@ -1413,7 +1442,6 @@ async def stencil_library_fetch(
         raise HTTPException(status_code=502, detail=str(exc))
 
     download_dir = Path(tempfile.mkdtemp(prefix="stencil_fetch_"))
-    shapes: list[Any] = []
     try:
         try:
             resp = httpx.get(entry.download_url, timeout=_STENCIL_FETCH_TIMEOUT, follow_redirects=True)
@@ -1425,32 +1453,75 @@ async def stencil_library_fetch(
         raw_path = download_dir / Path(entry.name).name
         raw_path.write_bytes(resp.content)
 
-        try:
-            shapes = stencil_library.convert_stencil(raw_path)
-        except stencil_library.ConversionUnavailable as exc:
-            raise HTTPException(status_code=503, detail=str(exc))
-        except stencil_library.ConversionFailed as exc:
-            raise HTTPException(status_code=422, detail=str(exc))
-
-        token = stencil_library.new_preview_token()
-        saved = stencil_library.save_previews(token, shapes)
+        token, shapes_out = _convert_and_save_previews(raw_path)
     finally:
         shutil.rmtree(download_dir, ignore_errors=True)
-        if shapes:
-            shutil.rmtree(shapes[0].svg_path.parent, ignore_errors=True)
 
     return {
         "token": token,
         "source": source,
         "category": category,
         "file": entry.name,
-        "shapes": [
-            {
-                "title": s["title"],
-                "preview_url": f"{settings.api_prefix}/stencil-library/previews/{token}/{s['filename']}",
-            }
-            for s in saved
-        ],
+        "shapes": shapes_out,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Phase 6 Task 23 (Requirements 9.2/9.3) — Vendor_Stencil_Source: a vendor +
+# product line maps to a ZIP of many stencils, downloaded/extracted/cached
+# only on explicit selection (never a vendor's whole catalogue up front),
+# then handed to the SAME convert/preview pipeline as above.
+# ---------------------------------------------------------------------------
+@router.get("/stencil-library/vendors")
+async def stencil_library_vendors() -> list[dict[str, str]]:
+    """Requirement 9.2 — vendors available in the curated ZIP registry."""
+    return vendor_stencils.list_vendors()
+
+
+@router.get("/stencil-library/vendors/{vendor}/product-lines")
+async def stencil_library_vendor_product_lines(vendor: str) -> list[dict[str, str]]:
+    """Requirement 9.2 — product lines (each its own ZIP) for one vendor."""
+    try:
+        return vendor_stencils.list_product_lines(vendor)
+    except vendor_stencils.UnknownVendor as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.post("/stencil-library/vendors/{vendor}/product-lines/{product_line}/files")
+async def stencil_library_vendor_files(vendor: str, product_line: str) -> list[str]:
+    """Requirement 9.3 — download+extract ONLY this product line's ZIP (a
+    cache hit on repeat calls, no further network access) and list the
+    .vss/.vssx files found inside it."""
+    try:
+        return vendor_stencils.fetch_and_extract(vendor, product_line)
+    except (vendor_stencils.UnknownVendor, vendor_stencils.UnknownProductLine) as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except vendor_stencils.DownloadFailed as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
+@router.post("/stencil-library/vendors/{vendor}/product-lines/{product_line}/convert")
+async def stencil_library_vendor_convert(
+    vendor: str,
+    product_line: str,
+    file: str = Body(..., embed=True),
+) -> dict[str, Any]:
+    """Requirement 9.2 — convert one already-extracted file from a vendor
+    ZIP through the SAME preview pipeline as the github/visiocafe flow.
+    Call the `files` endpoint above first (it triggers the download+extract
+    if this is the first time this product line was selected)."""
+    try:
+        raw_path = vendor_stencils.resolve_extracted_file(vendor, product_line, file)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+    token, shapes_out = _convert_and_save_previews(raw_path)
+    return {
+        "token": token,
+        "vendor": vendor,
+        "product_line": product_line,
+        "file": file,
+        "shapes": shapes_out,
     }
 
 

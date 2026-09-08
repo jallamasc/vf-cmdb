@@ -236,6 +236,16 @@ class ComputeDeviceType(LookupMixin, Base):
     # owning device's grid (e.g. "Server"). Free text, not FK-constrained —
     # the frontend falls back to a generic icon for an unrecognised name.
     icon: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+    # Phase 6 Task 33 (Req 13.1) — Hardware_Spec fields, populated manually
+    # or via the Icecat/Brave Search lookup flow (Tasks 34-37). All nullable
+    # — a device-type row with no confirmed specs yet shows blanks, not
+    # zeros/placeholders.
+    rack_units: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    cpu_sockets: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    max_cpu_cores: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    max_memory_gb: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    drive_bays: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    max_power_watts: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
 
 class Brand(LookupMixin, Base):
@@ -259,6 +269,13 @@ class NetworkDeviceType(LookupMixin, Base):
     stencil_url_back: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     # Phase 5 Req 6.2/7.1: lucide-react icon name rendered per device row.
     icon: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+    # Phase 6 Task 33 (Req 13.1) — Hardware_Spec fields; see
+    # ComputeDeviceType's own comment above for the full rationale.
+    rack_units: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    port_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    port_speed_gbps: Mapped[Optional[float]] = mapped_column()
+    poe_supported: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    max_power_watts: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
 
 class NetworkSubtype(LookupMixin, Base):
@@ -300,6 +317,13 @@ class StorageDeviceType(LookupMixin, Base):
     stencil_url_back: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     # Phase 5 Req 6.2/7.1: lucide-react icon name rendered per device row.
     icon: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+    # Phase 6 Task 33 (Req 13.1) — Hardware_Spec fields; see
+    # ComputeDeviceType's own comment above for the full rationale.
+    rack_units: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    capacity_tb: Mapped[Optional[float]] = mapped_column()
+    drive_bays: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    interface_type: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    max_power_watts: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
 
 class PowerDeviceType(LookupMixin, Base):
@@ -316,6 +340,16 @@ class PowerDeviceType(LookupMixin, Base):
     stencil_url_back: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     # Phase 5 Req 6.2/7.1: lucide-react icon name rendered per device row.
     icon: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+    # Phase 6 Task 33 (Req 13.1) — Hardware_Spec fields; see
+    # ComputeDeviceType's own comment above for the full rationale. A power
+    # device's own "capacity" is what it SUPPLIES, not draws (unlike the
+    # other 3 categories' max_power_watts), so it gets its own field names —
+    # this is the literal "a UPS's max capacity and output count" example
+    # from Requirement 13's user story.
+    rack_units: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    capacity_va: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    output_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    input_voltage: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
 
 
 class NetworkIdType(LookupMixin, Base):
@@ -1301,6 +1335,17 @@ class GenericEntity(Base):
     — Phase 5 Task 38, Req 30.1/30.2): the id of the Semaphore Inventory
     ``lifecycle_sync.py`` upserts for this record on every create/update, and
     removes (without touching ``bw_secret_id``/Bitwarden) on delete.
+
+    ``ansible_facts``/``cpu_cores``/``memory_mb``/``os_distribution``/
+    ``last_fact_sync_at`` (``ansible_managed`` — Phase 6 Task 38, Req 13.4):
+    the Gather_Facts_Sync mechanism's targets, identical in shape to the
+    same-named columns on PhysicalServer/VirtualMachine/NetworkDevice/
+    Workstation/ContainerApp (Phase 4 Req 21) — a Semaphore-run playbook
+    reports back via ``POST /generic-entities/{id}/facts``
+    (``routers.special.ingest_generic_entity_facts``), which is gated on
+    this record's Entity_Type_Def actually carrying the ansible_managed
+    Capability (unlike the hardcoded device tables, which have no
+    capability system and so need no such gate).
     """
 
     __tablename__ = "generic_entities"
@@ -1338,3 +1383,11 @@ class GenericEntity(Base):
     admin_username: Mapped[Optional[str]] = mapped_column(String(100))
     bw_secret_id: Mapped[Optional[str]] = mapped_column(String(64))
     semaphore_host_id: Mapped[Optional[str]] = mapped_column(String(64))
+    # Phase 6 Task 38 (Req 13.4) — Gather_Facts_Sync targets. Identical
+    # shape to PhysicalServer/VirtualMachine/etc's own facts columns
+    # (Phase 4 Req 21); see the class docstring above.
+    ansible_facts: Mapped[Optional[dict]] = mapped_column(JSONB)
+    cpu_cores: Mapped[Optional[int]] = mapped_column(Integer)
+    memory_mb: Mapped[Optional[int]] = mapped_column(Integer)
+    os_distribution: Mapped[Optional[str]] = mapped_column(String(80))
+    last_fact_sync_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))

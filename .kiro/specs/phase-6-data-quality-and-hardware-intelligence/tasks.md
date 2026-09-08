@@ -212,41 +212,41 @@ sub-phases that reuse them.
 
 ### Sub-phase J — Hardware Spec Detail Pages
 
-- [ ] 33. Structured spec fields
-  - [ ] 33.1 Category-appropriate spec columns (migration) on all 4
+- [x] 33. Structured spec fields
+  - [x] 33.1 Category-appropriate spec columns (migration) on all 4
         device-type registries
     - _Requirements: 13.1_
-  - [ ]* 33.2 pytest round-trip
+  - [x]* 33.2 pytest round-trip
 
-- [ ] 34. Icecat client
-  - [ ] 34.1 `backend/app/icecat_client.py` (brand+model lookup, `ICECAT_*`
+- [x] 34. Icecat client
+  - [x] 34.1 `backend/app/icecat_client.py` (brand+model lookup, `ICECAT_*`
         config, mirrors `bitwarden_client.py`'s shape)
     - _Requirements: 13.3_
-  - [ ]* 34.2 pytest against a mocked HTTP client
+  - [x]* 34.2 pytest against a mocked HTTP client
 
-- [ ] 35. Brave Search fallback client
-  - [ ] 35.1 `backend/app/search_client.py` (`BRAVE_SEARCH_API_KEY` config)
+- [x] 35. Brave Search fallback client
+  - [x] 35.1 `backend/app/search_client.py` (`BRAVE_SEARCH_API_KEY` config)
     - _Requirements: 13.3_
-  - [ ]* 35.2 pytest against a mocked HTTP client
+  - [x]* 35.2 pytest against a mocked HTTP client
 
-- [ ] 36. Look-up-specs endpoint
-  - [ ] 36.1 Icecat-then-Brave-Search proposed-values endpoint, per
+- [x] 36. Look-up-specs endpoint
+  - [x] 36.1 Icecat-then-Brave-Search proposed-values endpoint, per
         device-type row
     - _Requirements: 13.3_
-  - [ ]* 36.2 pytest both paths
+  - [x]* 36.2 pytest both paths
 
-- [ ] 37. Frontend detail pages
-  - [ ] 37.1 A detail page per device-type registry with spec fields + "Look
+- [x] 37. Frontend detail pages
+  - [x] 37.1 A detail page per device-type registry with spec fields + "Look
         up online" + confirm-before-save UI
     - _Requirements: 13.2, 13.3_
-  - [ ]* 37.2 Vitest lookup-then-confirm flow
+  - [x]* 37.2 Vitest lookup-then-confirm flow
 
-- [ ] 38. Ansible gather-facts wiring
-  - [ ] 38.1 Semaphore template convention + ingestion endpoint updating
+- [x] 38. Ansible gather-facts wiring
+  - [x] 38.1 Semaphore template convention + ingestion endpoint updating
         specific fields for SSH-reachable `ansible_managed` records
     - _Requirements: 13.4_
-  - [ ]* 38.2 pytest ingestion endpoint
-  - [ ] 38.3 Checkpoint J — build + test verification.
+  - [x]* 38.2 pytest ingestion endpoint
+  - [x] 38.3 Checkpoint J — build + test verification.
 
 ### Sub-phase K — IP-to-Device Auto-Sync
 

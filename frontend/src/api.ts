@@ -240,6 +240,34 @@ export interface OsDataSyncResult {
   products_unreachable: string[];
 }
 
+/** Phase 6 Task 36 (Req 13.3) — one Icecat proposed spec pair. */
+export interface HardwareSpecEntry {
+  name: string;
+  value: string;
+}
+
+/** Phase 6 Task 36 (Req 13.3) — one Icecat lookup result. */
+export interface IcecatLookupResult {
+  found: boolean;
+  title: string | null;
+  specs: HardwareSpecEntry[];
+}
+
+/** Phase 6 Task 36 (Req 13.3) — one Brave Search result (link + snippet
+ * only — never an auto-parsed value). */
+export interface BraveSearchResult {
+  title: string;
+  url: string;
+  description: string | null;
+}
+
+/** Phase 6 Task 36 (Req 13.3) — result of POST /hardware-specs/lookup. */
+export interface HardwareSpecLookupResult {
+  source: "icecat" | "brave" | "none";
+  icecat: IcecatLookupResult | null;
+  brave_results: BraveSearchResult[];
+}
+
 /** FEAT-6 (6C) / Phase 4 Task 21 — a source port handed to the Connect panel. */
 export interface SourcePort {
   source_type: string;
@@ -666,6 +694,17 @@ export const api = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ products: products ?? null }),
+    }).then(handle),
+  /**
+   * Phase 6 Task 36 (Req 13.3) — Hardware_Spec_Lookup: Icecat first, Brave
+   * Search fallback. Never saves anything — the caller shows the result as
+   * PROPOSED data the operator must explicitly confirm before saving.
+   */
+  lookupHardwareSpecs: (brand: string, model: string): Promise<HardwareSpecLookupResult> =>
+    fetch(`${BASE}/hardware-specs/lookup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ brand, model }),
     }).then(handle),
   /**
    * FEAT-6 (6C) — connectable destination ports for a source port. Scoped to

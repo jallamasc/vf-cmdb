@@ -115,6 +115,22 @@ describe("Naming — inline stencil panel (Req 24.1/24.2)", () => {
     expect(screen.getAllByText("Upload SVG").length).toBe(2);
   });
 
+  // Phase 6 Task 37 (Req 13.2) — the hardware-spec panel sits alongside
+  // the stencil panel on the same 4 device-type resources.
+  it("also shows the hardware-spec panel (with its lookup form) once a device-type row is selected", async () => {
+    wrap();
+    await selectNetworkDeviceTypes();
+    expect(
+      screen.getByText("Select a Network Device Types row below to manage its hardware specs.")
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId("select-row"));
+    await waitFor(() => expect(screen.getByText("Port Count")).toBeTruthy());
+    expect(screen.getByText("PoE Supported")).toBeTruthy();
+    expect(screen.getByPlaceholderText("Brand (e.g. APC)")).toBeTruthy();
+    expect(screen.getByText("Look up")).toBeTruthy();
+  });
+
   it("clears the panel back to the selection prompt when the selection is cleared", async () => {
     wrap();
     await selectNetworkDeviceTypes();

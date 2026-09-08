@@ -107,6 +107,62 @@ by adding it to the host vars in a future iteration, or map by `vf_short_name`.
 
 ---
 
+## 3. Generic entities (`ansible_managed` capability) — Gather_Facts_Sync
+
+Custom asset types built in the Entity Type Builder don't appear in the
+dynamic inventory above — they have no OS/role/site columns to group by.
+Instead, any record whose type carries the `ansible_managed` capability
+automatically gets its own single-host static Semaphore Inventory (kept in
+sync on every create/update/delete — see `backend/app/lifecycle_sync.py`),
+reachable from its detail page's Automation tab (`launch` an existing
+Semaphore template against it, poll status/output — no dynamic-inventory
+script needed for this path).
+
+**Template convention:** name any playbook/template intended for fact
+gathering with a `gather-facts-` prefix (e.g. `gather-facts-linux`,
+`gather-facts-network`) so it's recognizable in the Automation tab's
+template list. The template itself only needs to gather facts and push them
+back — launching it is already handled by the existing
+`POST /automation/generic-entities/{id}/launch` endpoint (Phase 5 Sub-phase
+F); Task 38 adds no new launch mechanism.
+
+**Ingestion endpoint:**
+
+```
+POST /api/v1/generic-entities/{entity_id}/facts
+```
+
+Same JSON body shape (column → value) and `ansible_callback` change-source
+as the device-table endpoint above, merged into the record's own
+`ansible_facts` JSONB blob (`cpu_cores`/`memory_mb`/`os_distribution` are
+promoted to their own columns too). Returns 400 if the record's Entity_Type_Def
+does not carry the `ansible_managed` capability.
+
+The record's single-host inventory carries a `cmdb_id` host variable (added
+alongside `ansible_user`/`vf_cmdb_bw_secret_id`) for exactly this purpose:
+
+```yaml
+- name: Push gathered facts back to the CMDB (generic entity)
+  hosts: all
+  gather_facts: true
+  tasks:
+    - name: Update CMDB record
+      ansible.builtin.uri:
+        url: "{{ cmdb_api_url }}/generic-entities/{{ cmdb_id }}/facts"
+        method: POST
+        body_format: json
+        body:
+          os_distribution: "{{ ansible_distribution }} {{ ansible_distribution_version }}"
+          cpu_cores: "{{ ansible_processor_vcpus }}"
+          memory_mb: "{{ ansible_memtotal_mb }}"
+        status_code: 200
+      delegate_to: localhost
+      vars:
+        cmdb_api_url: "{{ lookup('env', 'CMDB_API_URL') }}"
+```
+
+---
+
 ## Notes
 
 * The script uses only the Python standard library — no `pip install` needed.

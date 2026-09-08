@@ -71,6 +71,11 @@ def _no_real_external_integrations(monkeypatch):
     monkeypatch.setattr(settings, "semaphore_url", "")
     monkeypatch.setattr(settings, "semaphore_api_token", "")
     monkeypatch.setattr(settings, "semaphore_project_id", 0)
+    # Phase 6 Task 34/35 — same rationale, for the Hardware_Spec_Lookup's
+    # Icecat/Brave Search credentials.
+    monkeypatch.setattr(settings, "icecat_username", "")
+    monkeypatch.setattr(settings, "icecat_password", "")
+    monkeypatch.setattr(settings, "brave_search_api_key", "")
 
 
 @pytest_asyncio.fixture

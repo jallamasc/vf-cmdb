@@ -84,7 +84,7 @@ export function useLookups(slugs: string[]) {
 export function lookupLabel(o: Row): string {
   if (o == null) return "";
   if (o.full_name && o.abbreviation) return `${o.full_name} - ${o.abbreviation}`;
-  return (
+  const fallback =
     o.full_name ??
     o.label ??
     o.simple_name ??
@@ -93,8 +93,16 @@ export function lookupLabel(o: Row): string {
     o.friendly_name ??
     o.name ??
     o.description ??
-    String(o.id)
-  );
+    String(o.id);
+  // Naming-convention modifications (item 10) — a "fantastic"/theme name
+  // (Site.theme_name, NetworkDevice.theme_name) is never a REPLACEMENT for
+  // the real generated code, it's a memorable nickname alongside it — so
+  // show both, "FANTASTICNAME-REALNAME", instead of only the code (what
+  // this always showed before) or only the nickname.
+  if (o.theme_name && fallback != null && String(fallback) !== String(o.theme_name)) {
+    return `${o.theme_name}-${fallback}`;
+  }
+  return String(fallback);
 }
 
 // ---------------------------------------------------------------------------

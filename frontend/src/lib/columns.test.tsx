@@ -1,7 +1,14 @@
 // Phase 5 Task 9 — deviceTypeIconCol: icon resolution + animated active dot.
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render } from "@testing-library/react";
-import { deviceTypeIconCol, flagCol, namingComputedCol, generatedCol, modeToggleCol } from "./columns";
+import {
+  deviceTypeIconCol,
+  flagCol,
+  namingComputedCol,
+  generatedCol,
+  modeToggleCol,
+  lookupLabel,
+} from "./columns";
 
 const TYPES = [
   { id: 1, full_name: "24-port switch", abbreviation: "sw24", icon: "Router" },
@@ -108,5 +115,40 @@ describe("generatedCol / modeToggleCol (Phase 6 Task 11, Req 5.2)", () => {
     const col = modeToggleCol("site_code_type", "Code Mode", ["auto", "custom", "theme"]);
     expect(col.cellClass).toBe("vf-mode-toggle-cell");
     expect(col.cellEditorParams).toEqual({ values: ["auto", "custom", "theme"] });
+  });
+});
+
+// Naming-convention modifications (item 10) — FANTASTICNAME-REALNAME in
+// dropdown labels wherever a row has a theme/"fantastic" name alongside
+// its real generated code.
+describe("lookupLabel (naming-convention modifications, item 10)", () => {
+  it("shows full_name - abbreviation for a plain lookup dictionary row", () => {
+    expect(lookupLabel({ full_name: "Amazon Web Services", abbreviation: "aw" })).toBe(
+      "Amazon Web Services - aw"
+    );
+  });
+
+  it("falls back to simple_name for a Site with no theme name", () => {
+    expect(lookupLabel({ simple_name: "vfhmcc1" })).toBe("vfhmcc1");
+  });
+
+  it("shows FANTASTICNAME-REALNAME when a theme name is set alongside the real code", () => {
+    expect(lookupLabel({ simple_name: "vfhmcc1", theme_name: "Tatooine" })).toBe(
+      "Tatooine-vfhmcc1"
+    );
+  });
+
+  it("works the same for a NetworkDevice's vf_friendly_name + theme_name", () => {
+    expect(lookupLabel({ vf_friendly_name: "sw01", theme_name: "Deathstar" })).toBe(
+      "Deathstar-sw01"
+    );
+  });
+
+  it("never duplicates the theme name if it happens to equal the fallback value", () => {
+    expect(lookupLabel({ simple_name: "tatooine", theme_name: "tatooine" })).toBe("tatooine");
+  });
+
+  it("returns just the id as a string when nothing else is available", () => {
+    expect(lookupLabel({ id: 42 })).toBe("42");
   });
 });

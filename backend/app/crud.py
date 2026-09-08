@@ -145,6 +145,7 @@ async def _validate_abbrev(session: AsyncSession, obj, entity_id) -> None:
     value = abbrev.apply_case(value, getattr(obj, "case_enforcement", None))
     setattr(obj, field, value)
     abbrev.validate_charset(value, field)
+    abbrev.validate_abbreviation_length(value, getattr(obj, "max_length", None), field)
     conflict = await abbrev._conflict(
         session, value, obj.__tablename__, entity_id
     )
@@ -458,6 +459,11 @@ async def _validate_unique_name(session: AsyncSession, obj, entity_id) -> None:
 async def _validate_model(session: AsyncSession, obj, entity_id) -> None:
     """Model-specific validation dispatch (beyond abbrev + IPAM)."""
     await _validate_unique_name(session, obj, entity_id)
+    # Naming-convention modifications (item 1) — every LookupMixin row's own
+    # `max_length` must stay within the 1-9 range the frontend now offers
+    # as a dropdown instead of a freeform number.
+    if hasattr(obj, "max_length"):
+        abbrev.validate_max_length_bounds(obj.max_length)
     if isinstance(obj, models.Cable):
         _validate_cable(obj)
     elif isinstance(obj, models.EntityTypeDef):

@@ -69,6 +69,40 @@ def validate_charset(value: str, field: str = "abbreviation") -> None:
         )
 
 
+def validate_max_length_bounds(value: Optional[int]) -> None:
+    """Naming-convention modifications (item 1) — a `LookupMixin` row's own
+    `max_length` must be within the 1-9 range the frontend's dropdown
+    offers. Raises HTTP 422 otherwise. A `None` value (not yet set) is
+    always fine — `max_length` is optional."""
+    if value is None:
+        return
+    if not (1 <= value <= 9):
+        raise HTTPException(
+            status_code=422,
+            detail=f"Max Length must be between 1 and 9 (got {value}).",
+        )
+
+
+def validate_abbreviation_length(
+    value: str, max_length: Optional[int], field: str = "abbreviation"
+) -> None:
+    """Naming-convention modifications (item 1/9) — make `max_length`
+    actually mean something: reject an abbreviation/code longer than the
+    row's own `max_length`. A `None`/unset `max_length` never constrains
+    anything (existing rows created before this check keep working)."""
+    if not value or max_length is None:
+        return
+    if len(value) > max_length:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"'{value}' is {len(value)} character(s), longer than this "
+                f"row's own Max Length ({max_length}). Shorten it, or raise "
+                "Max Length first."
+            ),
+        )
+
+
 def apply_case(value: str, case_enforcement: Optional[str]) -> str:
     """Normalise *value* according to the record-type case setting."""
     if value is None:
@@ -125,6 +159,51 @@ async def _conflict(
         if not (row.entity_type == entity_type and row.entity_id == entity_id):
             return row
     return None
+
+
+async def suggest_abbreviation(
+    session: AsyncSession,
+    full_name: str,
+    max_length: Optional[int] = None,
+    trim_mode: str = "first_2",
+    case_enforcement: Optional[str] = "lowercase",
+    entity_type: Optional[str] = None,
+    entity_id: Optional[int] = None,
+) -> str:
+    """Naming-convention modifications (item 2/3) — a GUARANTEED-available
+    abbreviation candidate derived from *full_name*, for the "Suggest from
+    Full Name" action on every lookup dictionary's abbreviation field.
+
+    Derives a base via the existing trim-mode machinery (default: first 2
+    letters — "Virtualfactor" -> "vf" is itself a hand-picked real-world
+    abbreviation, not something any mechanical rule can reliably guess
+    from a single un-delimited word, so this picks the simple, predictable
+    default and lets an operator type something smarter if they want to).
+    On a collision, appends an incrementing numeric suffix (`vf` -> `vf1`
+    -> `vf2` -> ...), trimming the base further if *max_length* would
+    otherwise be exceeded. Never raises — always returns a usable, charset-
+    valid, currently-free value.
+    """
+    base = derive_abbreviation(full_name, trim_mode)
+    if not base:
+        # Fall back to every alnum character in full_name, then to a
+        # single placeholder letter if full_name itself has none.
+        base = re.sub(r"[^A-Za-z0-9]", "", full_name or "")
+    base = apply_case(base, case_enforcement) or "x"
+    if max_length:
+        base = base[:max_length] or "x"
+
+    candidate = base
+    suffix_n = 0
+    while True:
+        conflict = await _conflict(session, candidate, entity_type or "", entity_id)
+        if conflict is None:
+            return candidate
+        suffix_n += 1
+        suffix = str(suffix_n)
+        room = max_length - len(suffix) if max_length else None
+        trimmed_base = base[: max(1, room)] if room is not None else base
+        candidate = f"{trimmed_base}{suffix}"
 
 
 async def check_available(

@@ -57,6 +57,7 @@ vi.mock("../api", async (orig) => {
       stencilUrl: vi.fn((slug: string, face: string) => `/api/v1/stencils/${slug}?face=${face}`),
       update: vi.fn(),
       syncOsData: vi.fn(),
+      suggestAbbreviation: vi.fn(),
     },
   };
 });
@@ -154,6 +155,67 @@ describe("Naming — inline stencil panel (Req 24.1/24.2)", () => {
   });
 });
 
+// Naming-convention modifications (item 2/3) — "Suggest abbreviation from
+// Full Name", shown for the selected row on EVERY naming lookup.
+describe("Naming — suggest abbreviation from full name", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    capturedProps = [];
+  });
+
+  it("shows no suggest panel before a row is selected", async () => {
+    wrap();
+    await waitFor(() =>
+      expect(capturedProps.some((p) => p.resource === "organizations")).toBe(true)
+    );
+    expect(screen.queryByText(/Suggest abbreviation for/)).toBeNull();
+  });
+
+  it("shows the suggest button once a row is selected, on a plain (non-device-type) lookup", async () => {
+    wrap();
+    await waitFor(() =>
+      expect(capturedProps.some((p) => p.resource === "organizations")).toBe(true)
+    );
+    fireEvent.click(screen.getByTestId("select-row"));
+    expect(await screen.findByText("Suggest abbreviation for “Cisco X”")).toBeTruthy();
+  });
+
+  it("applies the suggested abbreviation via api.update on click", async () => {
+    (api.suggestAbbreviation as any).mockResolvedValue({
+      full_name: "Cisco X",
+      abbreviation: "cx1",
+    });
+    (api.update as any).mockResolvedValue({});
+    wrap();
+    await waitFor(() =>
+      expect(capturedProps.some((p) => p.resource === "organizations")).toBe(true)
+    );
+    fireEvent.click(screen.getByTestId("select-row"));
+    fireEvent.click(await screen.findByText("Suggest abbreviation for “Cisco X”"));
+
+    await waitFor(() =>
+      expect(api.suggestAbbreviation).toHaveBeenCalledWith(
+        "Cisco X",
+        expect.objectContaining({ entityType: "organizations", entityId: 5 })
+      )
+    );
+    await waitFor(() =>
+      expect(api.update).toHaveBeenCalledWith("organizations", 5, { abbreviation: "cx1" })
+    );
+    expect(await screen.findByText("Applied “cx1”.")).toBeTruthy();
+  });
+
+  it("also shows alongside the stencil panel on a device-type lookup", async () => {
+    wrap();
+    await selectNetworkDeviceTypes();
+    fireEvent.click(screen.getByTestId("select-row"));
+    await waitFor(() =>
+      expect(screen.getByText("Suggest abbreviation for “Cisco X”")).toBeTruthy()
+    );
+    expect(screen.getByText("Stencil — Cisco X")).toBeTruthy();
+  });
+});
+
 describe("Naming — region geo click-to-place (Phase 6 Task 19, Req 7.3)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -247,5 +309,70 @@ describe("Naming — endoflife.date manual sync (Task 30, Req 12.1)", () => {
 
     fireEvent.click(screen.getByText("Sync now (endoflife.date)"));
     expect(await screen.findByText(/endoflife.date unreachable/)).toBeTruthy();
+  });
+});
+
+// Naming-convention modifications (item 6) — OS Versions default to the
+// latest 4 per family, with a toggle to see everything.
+describe("Naming — OS Versions grouping (latest 4 per family)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    capturedProps = [];
+  });
+
+  const FAMILIES = [{ id: 1, full_name: "Ubuntu", abbreviation: "ubuntu" }];
+  const VERSIONS = [
+    { id: 1, full_name: "Ubuntu 14.04", abbreviation: "ubuntu-1404" },
+    { id: 2, full_name: "Ubuntu 16.04", abbreviation: "ubuntu-1604" },
+    { id: 3, full_name: "Ubuntu 18.04", abbreviation: "ubuntu-1804" },
+    { id: 4, full_name: "Ubuntu 20.04", abbreviation: "ubuntu-2004" },
+    { id: 5, full_name: "Ubuntu 22.04", abbreviation: "ubuntu-2204" },
+    { id: 6, full_name: "Ubuntu 24.04", abbreviation: "ubuntu-2404" },
+  ];
+
+  function mockOsData() {
+    (api.list as any).mockImplementation((slug: string) => {
+      if (slug === "os-families") return Promise.resolve(FAMILIES);
+      if (slug === "os-versions") return Promise.resolve(VERSIONS);
+      return Promise.resolve([]);
+    });
+  }
+
+  async function selectOsVersions() {
+    const btn = await screen.findByText("OS Versions");
+    fireEvent.click(btn);
+    await waitFor(() =>
+      expect(capturedProps.some((p) => p.resource === "os-versions")).toBe(true)
+    );
+  }
+
+  it("defaults to showing only the latest 4 versions per family", async () => {
+    mockOsData();
+    wrap();
+    await selectOsVersions();
+    expect(screen.getByText(/Showing the 4 most recent version/)).toBeTruthy();
+    const gridProps = capturedProps.filter((p) => p.resource === "os-versions").pop();
+    const kept = VERSIONS.filter((v) => gridProps.externalFilter(v));
+    expect(kept.map((v) => v.id)).toEqual([3, 4, 5, 6]);
+  });
+
+  it("shows every version once toggled to 'Show all versions'", async () => {
+    mockOsData();
+    wrap();
+    await selectOsVersions();
+    fireEvent.click(screen.getByText("Show all versions"));
+    await waitFor(() => expect(screen.getByText(/Showing all 6 version/)).toBeTruthy());
+    const gridProps = capturedProps.filter((p) => p.resource === "os-versions").pop();
+    expect(gridProps.externalFilter).toBeUndefined();
+  });
+
+  it("adds a computed, sortable OS Family column", async () => {
+    mockOsData();
+    wrap();
+    await selectOsVersions();
+    const gridProps = capturedProps.filter((p) => p.resource === "os-versions").pop();
+    const familyCol = gridProps.columns.find((c: any) => c.colId === "os_family_label");
+    expect(familyCol).toBeTruthy();
+    expect(familyCol.valueGetter({ data: VERSIONS[5] })).toBe("Ubuntu");
   });
 });

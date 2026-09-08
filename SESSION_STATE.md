@@ -150,6 +150,76 @@ exercises AG Grid's real popup-editor runtime end to end; keep it if these
 editors are touched again. Verified: 318 frontend Vitest passed (+2 new),
 tsc clean, build clean.
 
+**Naming-convention modifications (2026-09-08, same day, later in session)** —
+10 user-requested changes to the naming engine/UX, planned with the user
+before implementing (2 deliberately smaller/safer interpretations were
+confirmed: no `theme_name` on all 17 lookup dictionaries; only
+`vf_short_name`/`vf_friendly_name` get the length cap, not `vf_long_name`).
+All implemented, tested, and verified:
+
+1. **Max Length -> bounded 1-9 dropdown**, and made it actually mean
+   something: `abbrev.validate_max_length_bounds`/
+   `validate_abbreviation_length` (backend/app/abbrev.py, wired into
+   `crud.py`) reject an abbreviation longer than its own row's Max Length,
+   or a Max Length outside 1-9.
+2/3. **Auto-suggested abbreviation**: `abbrev.suggest_abbreviation()` +
+   `GET /naming/suggest-abbreviation` — derives a base (first 2 letters by
+   default) and appends an incrementing numeric suffix on collision
+   (`vi`/`vi1`/`vi2`...), trimmed to fit `max_length`. Frontend: a
+   "Suggest abbreviation for ..." panel shown for the selected row on
+   EVERY naming lookup (`Naming.tsx`'s `SuggestAbbreviationPanel`).
+7. Every lookup already shows both `full_name` and `abbreviation` as
+   columns; the Suggest panel is the "automatic name" half — did NOT add
+   theme names to the 17 plain dictionaries (their `full_name` already
+   plays that role).
+9. **Length cap**: `naming.SHORT_NAME_MAX_LENGTH` 12 -> 8; new
+   `naming._cap_short_name()` truncates the assembled abbreviation prefix
+   while always preserving the trailing consecutive/sequence number
+   intact (that's what keeps it unique). Applied to
+   `PhysicalServer`/`VirtualMachine`/`ContainerApp`/`Workstation.vf_short_name`
+   and `NetworkDevice.vf_friendly_name`. `vf_long_name` (full hierarchical
+   identifier, used for TIA-606-B/uniqueness) deliberately NOT capped.
+10. `lib/columns.tsx`'s `lookupLabel()` now shows `theme_name-realcode`
+   (e.g. "Tatooine-vfhmcc1") when a theme name is set (Site,
+   NetworkDevice), instead of hiding the real code behind the nickname.
+4. **Region detail page** — new `pages/RegionDetail.tsx` at `/regions/:id`
+   (App.tsx), linked from a new "View details ->" column in the Regions
+   grid. Shows the region's own fields, a map centered on its own marker,
+   and a live `sites` EntityGrid filtered to that region (no backend
+   changes needed — reuses existing generic CRUD).
+5. **OS Family name picker** — new `lib/osNames.ts` (curated OS/platform
+   catalogue: Android, iOS, Ubuntu, Windows Server, Cisco IOS, ... —
+   broader than the backend's endoflife.date-oriented `CURATED_PRODUCTS`)
+   + new `components/OsNameEditor.tsx`, a free-text-WITH-suggestions popup
+   editor (unlike `FuzzySelectEditor`'s closed list, Enter always commits
+   whatever is typed, matching a suggestion or not). Wired only onto
+   `os-families`' `full_name` column.
+6. **OS Versions grouping** — new `lib/osVersionGrouping.ts`: since
+   `OsVersion` has no real FK to `OsFamily` (they're matched by
+   abbreviation-prefix convention, same limitation `endoflife_client.py`
+   already documents), groups by longest-matching family prefix and ranks
+   by the first numeric run found in each version's name. `os-versions`
+   defaults to an `externalFilter` showing only the latest 4 per family
+   (with a "Show all versions" toggle) plus a computed, sortable "OS
+   Family" column — endoflife.date syncs EVERY release it has ever
+   tracked, which otherwise balloons this list past 100 rows.
+8. **Ansible/Semaphore usage** — clarified for the user (not a code
+   change): the web UI can only launch an existing Semaphore template
+   against a Generic Entity that has the `ansible_managed` capability
+   (via that record's Automation tab) and watch it run. Inventory preview,
+   ad-hoc/group playbook runs, and automation on the 5 hardcoded device
+   tables all happen outside vf-cmdb (Semaphore's own UI, or the CLI via
+   `ansible/cmdb_inventory.py`) — there's no code path for those inside
+   this app today.
+
+No backend schema/migration changes were needed for items 4/5/6 (frontend-
+only, reusing existing generic CRUD + the region/OS-family/OS-version data
+that already existed). Verified: 345 backend pytest passed / 1 skipped
+(+21 new), 353 frontend Vitest passed (+37 new), `tsc --noEmit` clean,
+`vite build` clean. Live-curl-verified against the running containerized
+dev backend: `/naming/suggest-abbreviation`, the `max_length` 422
+rejection, and `/regions` data (has lat/lng) all confirmed working.
+
 **Next for the user**: browser-test Phase 6 at `http://localhost:5173` —
 particularly the Naming Conventions page's new Hardware Spec panel
 (Icecat/Brave lookup, read-only results) on any of the 4 device-type

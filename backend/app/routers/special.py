@@ -714,6 +714,33 @@ async def naming_preview(
     }
 
 
+@router.get("/naming/suggest-abbreviation")
+async def naming_suggest_abbreviation(
+    full_name: str,
+    max_length: Optional[int] = None,
+    trim_mode: str = "first_2",
+    case_enforcement: str = "lowercase",
+    entity_type: str = "",
+    entity_id: Optional[int] = None,
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Naming-convention modifications (item 2/3) — a guaranteed-available
+    abbreviation suggestion for the "Suggest from Full Name" action on any
+    lookup dictionary (Organizations, Regions, Clouds, ...). Unlike
+    `/naming/preview` (which only derives, never checks availability),
+    this always returns a value that is free to save right now."""
+    suggestion = await abbrev.suggest_abbreviation(
+        session,
+        full_name,
+        max_length=max_length,
+        trim_mode=trim_mode,
+        case_enforcement=case_enforcement,
+        entity_type=entity_type or None,
+        entity_id=entity_id,
+    )
+    return {"full_name": full_name, "abbreviation": suggestion}
+
+
 @router.get("/naming/check-abbreviation")
 async def naming_check_abbreviation(
     value: str,

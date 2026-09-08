@@ -72,7 +72,12 @@ export default function Sites() {
       // is recognizable here too even though it's read-only in the grid.
       generatedCol("simple_name", "Site Code", 160),
       { ...roCol("site_code_type", "Code Mode", 120), cellClass: "vf-mode-toggle-cell" },
-      roCol("theme_name", "Theme Name", 150),
+      // Bug fix (post-Phase-6 QA) — the "fantastic" name must coexist with
+      // (not be replaced by, or locked behind) the system-generated code:
+      // an operator can type/edit it directly here, same as any other
+      // manual field, instead of it only ever being settable via a themed
+      // catalogue pick in the tri-mode panel above.
+      textCol("theme_name", "Fantastic Name", 150),
       fkCol("organization_id", "Org", map["organizations"] ?? []),
       fkCol("cloud_id", "Cloud", map["clouds"] ?? []),
       fkCol("region_id", "Region", map["regions"] ?? []),

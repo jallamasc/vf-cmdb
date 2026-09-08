@@ -126,17 +126,14 @@ const ALL_LOOKUPS = CATEGORIES.flatMap((c) => c.lookups);
 const RegionMap = lazy(() => import("../components/RegionMap"));
 
 /**
- * Defaults for a brand-new lookup row. ``full_name`` and ``abbreviation`` are
- * NOT NULL and the abbreviation is globally unique (case-insensitive), so a
- * random suffix keeps repeated "Add row" clicks from colliding.
+ * Defaults for a brand-new lookup row. ``full_name`` is NOT NULL and now
+ * table-wide unique (case-insensitive), so a random suffix keeps repeated
+ * "Add row" clicks from colliding. ``abbreviation`` is no longer sent —
+ * it's always forced server-side from ``full_name`` (Bug fix, post-Phase-6
+ * QA — see ``crud.py``'s ``_auto_abbreviate``).
  */
-// Phase 6 Task 4 (Req 3.1/3.3) — full_name is now table-wide unique
-// (case-insensitive) for every lookup here, so a fixed placeholder would
-// fail on the second "Add row" click; randomize it the same way the
-// abbreviation already was.
 const newLookupDefaults = () => ({
   full_name: `New entry ${Math.random().toString(36).slice(2, 6)}`,
-  abbreviation: `new-${Math.random().toString(36).slice(2, 6)}`,
 });
 
 // Phase 6 Task 10 (Req 4.1/4.2) — every lookup now has an `icon` column,
@@ -146,7 +143,11 @@ const baseColumns = [
   roCol("id", "ID", 70),
   iconCol(),
   textCol("full_name", "Full Name", 220),
-  textCol("abbreviation", "Abbreviation", 150),
+  // Bug fix (post-Phase-6 QA) — the abbreviation is now ALWAYS forced,
+  // server-side, from Full Name (crud.py's `_auto_abbreviate`, default
+  // consonant-stripping — "Hoymeaseguro" -> "hm"-style), so it's read-only
+  // here instead of a freeform text cell an operator could still overtype.
+  roCol("abbreviation", "Abbreviation", 150),
   // Naming-convention modifications (item 1) — Max Length now bounds the
   // abbreviation's own length (backend rejects a longer one), so it's a
   // constrained 1-9 dropdown instead of a freeform number that could
@@ -178,6 +179,11 @@ const columnsFor = (slug: string) => {
   if (slug === "regions") {
     return [
       flagCol("abbreviation", "🏳", (row) => countriesForRegion(String(row.abbreviation ?? ""))[0]),
+      // Bug fix (post-Phase-6 QA) — moved next to the flag, right up
+      // front, instead of after every other column (off-screen without
+      // scrolling, which is why "clicking a region" only ever seemed to
+      // select/focus it rather than visibly offering a detail page).
+      regionDetailLinkCol(),
       ...baseColumns,
       // Bug-fix (post-Phase-6 QA) — surfaced here so "click a region's map
       // marker" has visible detail to focus on, and so an operator can also
@@ -185,70 +191,10 @@ const columnsFor = (slug: string) => {
       // click-to-place editor (Req 7.3).
       numCol("latitude", "Latitude"),
       numCol("longitude", "Longitude"),
-      // Naming-convention modifications (item 4) — the dedicated detail page.
-      regionDetailLinkCol(),
     ];
   }
   return baseColumns;
 };
-
-/**
- * Naming-convention modifications (item 2/3) — "Suggest from Full Name":
- * derives a guaranteed-available abbreviation from the selected row's own
- * `full_name` (respecting its own `max_length`/`case_enforcement`) and
- * applies it with one click, instead of the operator having to hand-invent
- * one and hand-check it isn't already taken elsewhere in the global
- * abbreviation registry. Shown for the selected row on EVERY naming
- * lookup (they all share the same full_name/abbreviation shape via
- * `LookupMixin`), not just the 4 stencil-carrying device-type resources.
- */
-function SuggestAbbreviationPanel({
-  resource,
-  row,
-  onChanged,
-}: {
-  resource: string;
-  row: Row;
-  onChanged: () => void;
-}) {
-  const [status, setStatus] = useState<string | null>(null);
-  const suggest = useMutation({
-    mutationFn: async () => {
-      const { abbreviation } = await api.suggestAbbreviation(String(row.full_name ?? ""), {
-        maxLength: row.max_length as number | null,
-        caseEnforcement: row.case_enforcement as string | null,
-        entityType: resource,
-        entityId: row.id,
-      });
-      await api.update(resource, row.id, { abbreviation });
-      return abbreviation;
-    },
-    onSuccess: (abbreviation: string) => {
-      setStatus(`Applied “${abbreviation}”.`);
-      onChanged();
-    },
-    onError: (e: unknown) => setStatus(e instanceof Error ? e.message : "Suggestion failed"),
-  });
-
-  return (
-    <div className="px-3 py-2 border border-slate-200 bg-slate-50 rounded flex items-center gap-2">
-      <button
-        type="button"
-        onClick={() => {
-          setStatus(null);
-          suggest.mutate();
-        }}
-        disabled={suggest.isPending || !row.full_name}
-        className="px-2.5 py-1 text-sm rounded border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-50"
-      >
-        {suggest.isPending
-          ? "Suggesting…"
-          : `Suggest abbreviation for “${row.full_name ?? ""}”`}
-      </button>
-      {status && <span className="text-xs text-slate-500">{status}</span>}
-    </div>
-  );
-}
 
 /**
  * Phase 5 Task 29 (Req 24.1/24.2) — inline, expandable stencil management for
@@ -498,6 +444,17 @@ export default function Naming() {
                   real-world point by clicking the map. */}
               {selected && (
                 <div className="mb-2 flex items-center gap-2">
+                  {/* Bug fix (post-Phase-6 QA) — clicking a region's map
+                      marker only ever focused/selected it; this makes the
+                      detail page directly reachable from that same click,
+                      right where the operator is looking, instead of only
+                      via a column that could be scrolled off-screen. */}
+                  <Link
+                    to={`/regions/${selected.id}`}
+                    className="px-2.5 py-1 text-sm rounded border border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium"
+                  >
+                    Open detail page for “{selected.full_name ?? selected.abbreviation}” →
+                  </Link>
                   <button
                     type="button"
                     onClick={() => setPlacingLocation((v) => !v)}
@@ -565,14 +522,7 @@ export default function Naming() {
             // the abbreviation must be globally unique — seed a placeholder so
             // "Add row" always succeeds and the user just renames it.
             newRowDefaults={newLookupDefaults}
-            requiredFields={[
-              { field: "full_name", label: "Full Name" },
-              {
-                field: "abbreviation",
-                label: "Abbreviation",
-                hint: "Abbreviations are globally unique (case-insensitive).",
-              },
-            ]}
+            requiredFields={[{ field: "full_name", label: "Full Name" }]}
             externalFilter={
               active === "regions"
                 ? focusedRegionId != null
@@ -594,13 +544,6 @@ export default function Naming() {
             panel={
               selected || STENCIL_RESOURCES.has(active) ? (
                 <div className="space-y-3">
-                  {selected && (
-                    <SuggestAbbreviationPanel
-                      resource={active}
-                      row={selected}
-                      onChanged={() => qc.invalidateQueries({ queryKey: [active] })}
-                    />
-                  )}
                   {STENCIL_RESOURCES.has(active) && (
                     <>
                       <StencilPanel

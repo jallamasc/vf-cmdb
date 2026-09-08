@@ -5,6 +5,7 @@ import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router-dom";
 import Naming from "./Naming";
 import { api } from "../api";
 
@@ -66,7 +67,13 @@ function wrap() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <Naming />
+      {/* Bug fix (post-Phase-6 QA) — Naming now renders a real <Link>
+          ("Open detail page for …") directly (not just inside a grid
+          column, which the EntityGrid mock above never renders), so a
+          router context is required here too. */}
+      <MemoryRouter>
+        <Naming />
+      </MemoryRouter>
     </QueryClientProvider>
   );
 }
@@ -152,67 +159,6 @@ describe("Naming — inline stencil panel (Req 24.1/24.2)", () => {
     );
     const props = capturedProps.find((p) => p.resource === "organizations");
     expect(props.panel).toBeUndefined();
-  });
-});
-
-// Naming-convention modifications (item 2/3) — "Suggest abbreviation from
-// Full Name", shown for the selected row on EVERY naming lookup.
-describe("Naming — suggest abbreviation from full name", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    capturedProps = [];
-  });
-
-  it("shows no suggest panel before a row is selected", async () => {
-    wrap();
-    await waitFor(() =>
-      expect(capturedProps.some((p) => p.resource === "organizations")).toBe(true)
-    );
-    expect(screen.queryByText(/Suggest abbreviation for/)).toBeNull();
-  });
-
-  it("shows the suggest button once a row is selected, on a plain (non-device-type) lookup", async () => {
-    wrap();
-    await waitFor(() =>
-      expect(capturedProps.some((p) => p.resource === "organizations")).toBe(true)
-    );
-    fireEvent.click(screen.getByTestId("select-row"));
-    expect(await screen.findByText("Suggest abbreviation for “Cisco X”")).toBeTruthy();
-  });
-
-  it("applies the suggested abbreviation via api.update on click", async () => {
-    (api.suggestAbbreviation as any).mockResolvedValue({
-      full_name: "Cisco X",
-      abbreviation: "cx1",
-    });
-    (api.update as any).mockResolvedValue({});
-    wrap();
-    await waitFor(() =>
-      expect(capturedProps.some((p) => p.resource === "organizations")).toBe(true)
-    );
-    fireEvent.click(screen.getByTestId("select-row"));
-    fireEvent.click(await screen.findByText("Suggest abbreviation for “Cisco X”"));
-
-    await waitFor(() =>
-      expect(api.suggestAbbreviation).toHaveBeenCalledWith(
-        "Cisco X",
-        expect.objectContaining({ entityType: "organizations", entityId: 5 })
-      )
-    );
-    await waitFor(() =>
-      expect(api.update).toHaveBeenCalledWith("organizations", 5, { abbreviation: "cx1" })
-    );
-    expect(await screen.findByText("Applied “cx1”.")).toBeTruthy();
-  });
-
-  it("also shows alongside the stencil panel on a device-type lookup", async () => {
-    wrap();
-    await selectNetworkDeviceTypes();
-    fireEvent.click(screen.getByTestId("select-row"));
-    await waitFor(() =>
-      expect(screen.getByText("Suggest abbreviation for “Cisco X”")).toBeTruthy()
-    );
-    expect(screen.getByText("Stencil — Cisco X")).toBeTruthy();
   });
 });
 

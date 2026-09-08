@@ -161,14 +161,25 @@ class LookupMixin:
     # calls this "Description" for consistent terminology.
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     # Per record-type case enforcement applied to abbreviation + name fields.
+    # Bug fix (post-Phase-6 QA) — defaults to "lowercase", not "mixed":
+    # forced derivation (crud.py's `_auto_abbreviate`) otherwise preserves
+    # whatever casing `full_name` happens to be typed in (e.g.
+    # "Virtualfactor" -> "Vrtlfctr"), which reads nothing like the
+    # conventional lowercase domain-style codes ("vf") every seeded
+    # abbreviation in this app already uses.
     case_enforcement: Mapped[str] = mapped_column(
-        _case_enum("case_enforcement"), nullable=False, default="mixed",
-        server_default="mixed",
+        _case_enum("case_enforcement"), nullable=False, default="lowercase",
+        server_default="lowercase",
     )
-    # How the abbreviation is auto-derived from the full name.
+    # How the abbreviation is auto-derived from the full name. Bug fix
+    # (post-Phase-6 QA) — defaults to "consonants" (Hoymeaseguro -> hm),
+    # not "manual": crud.py's `_auto_abbreviate` now forces derivation on
+    # every lookup regardless of this value, and treats an existing
+    # "manual" row (the old default) the same as "consonants" too — see
+    # that function's docstring.
     trim_mode: Mapped[str] = mapped_column(
-        _trim_enum("trim_mode"), nullable=False, default="manual",
-        server_default="manual",
+        _trim_enum("trim_mode"), nullable=False, default="consonants",
+        server_default="consonants",
     )
 
     @declared_attr.directive

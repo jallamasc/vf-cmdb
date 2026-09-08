@@ -1,9 +1,86 @@
 # Virtualfactor IT CMDB - Session State
 ## Living Document - Read on Every Interaction
 
-**Last Updated**: 2026-09-04 (Current session)  
-**Project Phase**: Phase 3 nearly complete — only FEAT-6 remains  
-**Status**: ✅ Bugs A–D, UX 1–4, FEAT-1/2/3/4/5/7 shipped (HEAD `59fa10a`). FEAT-6 spec authored; Kiro memory infrastructure installed.
+**Last Updated**: 2026-09-08 (Current session)
+**Project Phase**: Phase 6 ("Data Quality & Hardware Intelligence") COMPLETE — all 41 tasks done, all 4 checkpoints (I/J/K/L) verified and committed.
+**Status**: ✅ Phases 1-5 shipped and stable. Phase 6 fully implemented, tested, and verified end-to-end against live Podman Postgres + running dev backend/frontend. HEAD `077c9dd` on `master` (working tree clean, not pushed — this repo has no configured push target for this checkout; see "Everything below this section" for the full Phase 1-5 history, which is stale in its specifics — e.g. paths/ports — but the architecture/decisions remain valid).
+
+---
+
+## 🆕 (2026-09-08): Phase 6 COMPLETE — Data Quality & Hardware Intelligence
+
+Spec: `.kiro/specs/phase-6-data-quality-and-hardware-intelligence/` (41 tasks
+across 12 sub-phases A-L). All tasks checked off in `tasks.md`. Delivered
+across many commits this session; the final two sub-phases (this session's
+tail end) were:
+
+**Checkpoint J (commit `57fc9e3`)** — Sub-phase J, Tasks 33-38, Requirement 13
+("Hardware Spec Detail Pages"):
+- Task 33: category-appropriate spec columns on the 4 device-type registries
+  (`compute_device_types`/`network_device_types`/`storage_device_types`/
+  `power_device_types`) — migration `0030_hardware_spec_fields`.
+- Task 34: `backend/app/icecat_client.py` — Icecat brand+model lookup client.
+- Task 35: `backend/app/search_client.py` — Brave Search fallback (links +
+  snippets only, never auto-parses a value out of text — Req 13.3).
+- Task 36: `GET /hardware-spec/lookup` — Icecat first, Brave fallback.
+- Task 37: `frontend/src/components/HardwareSpecPanel.tsx` — inline panel
+  (same idiom as StencilPanel) wired into `Naming.tsx`; lookup results are
+  read-only, operator must manually apply any value.
+- Task 38: Gather_Facts_Sync (Req 13.4) — `ansible_facts`/`cpu_cores`/
+  `memory_mb`/`os_distribution`/`last_fact_sync_at` columns added to
+  `generic_entities` (migration `0031_generic_entity_facts`, mirroring the
+  hardcoded device tables' Phase 4 shape); capability-gated
+  `POST /generic-entities/{id}/facts` in `routers/special.py`
+  (`ingest_generic_entity_facts`); `lifecycle_sync.py`'s per-record
+  Semaphore inventory now carries a `cmdb_id` hostvar; convention + example
+  playbook task documented in `ansible/README.md` section 3. No new
+  automation transport — reuses the existing Semaphore launch/poll
+  endpoints from Phase 5 Sub-phase F as-is.
+
+**Checkpoint K (commit `077c9dd`)** — Sub-phase K, Tasks 39-40, Requirement 14
+("IP-to-Device Auto-Sync"):
+- `backend/app/ip_auto_sync.py` — a `lifecycle_sync.py`-style module (its
+  own file, called from `crud.create_item`/`update_item`/`delete_item`)
+  that mirrors every IP-bearing column on the 5 hardcoded device models
+  into a matching polymorphic `IpAssignment` row: `NetworkDevice`/
+  `VirtualMachine` (management ipv4+ipv6), `PhysicalServer` (TWO roles —
+  management AND its separate iLO/IPMI ipv4), `ContainerApp` (its own
+  ipv4+ipv6), `Workstation` (management ipv4 only). Set/changed ->
+  create-or-update; cleared -> remove.
+- `IpAssignment.auto_generated` (new bool column, migration
+  `0032_ip_assignment_flag`) mirrors `Cable.auto_generated`'s exact
+  rationale — only a row this module created is ever auto-touched, so a
+  manually-created `IpAssignment` row sharing the same
+  `(assigned_to_type, assigned_to_id, interface_name)` is never clobbered.
+
+**Checkpoint L (Task 41, this session, not a separate commit — a
+verification pass over the state left by Checkpoint K)**: full backend
+pytest (321 passed / 1 skipped, `vfcmdb_test`), full frontend Vitest (313
+passed) + `tsc --noEmit` + `vite build`, all clean. Both dev servers
+live-verified reachable (`curl` 200 on `:8000/api/v1/sites` and `:5173/`).
+**All 41 tasks in tasks.md are now `[x]`.**
+
+**A mid-session gotcha worth remembering**: the Podman machine
+(`podman-machine-default`) and its two containers (`vf_cmdb_dev` postgres,
+`vf_cmdb_semaphore`) can silently stop between agent turns (observed this
+session — likely a host sleep/session-lifecycle event, unrelated to any
+app change). Symptom: `curl` to `:8000` fails with connection-refused, and
+`list_processes` shows the uvicorn/vite background terminals gone too. Fix:
+`podman machine start` (from `/opt/homebrew/bin`), then
+`podman start vf_cmdb_dev vf_cmdb_semaphore`, then restart the uvicorn
+(`--reload`, `POSTGRES_DB=vfcmdb`, port 8000) and `npm run dev` (port 5173)
+background processes. Postgres data survives (it's a named container, not
+`--rm`), so nothing was lost — just restart, don't recreate.
+
+**Next for the user**: browser-test Phase 6 at `http://localhost:5173` —
+particularly the Naming Conventions page's new Hardware Spec panel
+(Icecat/Brave lookup, read-only results) on any of the 4 device-type
+registries, and the IP Assignments tab/page after editing a device's own
+management IP (should now auto-populate without any manual IP Assignment
+entry). Optionally configure `ICECAT_*`/`BRAVE_SEARCH_*`/`SEMAPHORE_*` env
+vars to exercise the live external-integration paths (all gracefully
+degrade to "unconfigured" without them, per this phase's non-functional
+requirement).
 
 ---
 

@@ -261,7 +261,7 @@ sub-phases that reuse them.
 
 ### Sub-phase L — Final Checkpoint
 
-- [ ] 41. Checkpoint L — final full build + test verification of the entire
+- [x] 41. Checkpoint L — final full build + test verification of the entire
       Phase 6 scope; present for browser testing.
 
 ## Notes

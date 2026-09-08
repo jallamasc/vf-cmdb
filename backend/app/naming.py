@@ -20,7 +20,29 @@ from . import models
 # no context. Keep padding it with the next hierarchy levels until it reaches
 # this many characters, so operators can recognise the site at a glance.
 SHORT_NAME_MIN_LENGTH = 4
-SHORT_NAME_MAX_LENGTH = 12
+# Naming-convention modifications (item 9) — every "short"/"friendly" device
+# identifier (site vf_short_name, and every device's vf_short_name/
+# vf_friendly_name below) is capped at this many characters total. Tightened
+# from an earlier, unbounded-in-practice 12 — a name assembled from several
+# abbreviations plus a multi-digit consecutive number could otherwise grow
+# into an unreadable, serial-number-like string. `vf_long_name` (the full
+# hierarchical identifier used for TIA-606-B labeling/uniqueness) is
+# deliberately NOT capped — truncating it risks two different racks/sites
+# generating the same code.
+SHORT_NAME_MAX_LENGTH = 8
+
+
+def _cap_short_name(prefix: str, suffix: str, max_len: int = SHORT_NAME_MAX_LENGTH) -> str:
+    """Truncate *prefix* so ``prefix + suffix`` never exceeds *max_len*
+    characters, preserving *suffix* (the consecutive/sequence number that
+    keeps the name unique within its scope) intact. Falls back to a
+    truncated bare *suffix* in the pathological case where even that alone
+    doesn't fit."""
+    suffix = suffix or ""
+    room = max_len - len(suffix)
+    if room <= 0:
+        return suffix[:max_len]
+    return f"{prefix[:room]}{suffix}"
 
 
 async def _abbr(session: AsyncSession, model, pk: Optional[int]) -> str:
@@ -182,8 +204,8 @@ async def generate_physical_server(session: AsyncSession, s: models.PhysicalServ
     brand = await _abbr(session, models.Brand, s.brand_id)
     role = await _abbr(session, models.DeviceRole, s.role_id)
     os_fam = await _abbr(session, models.OsFamily, s.os_family_id)
-    cons = s.consecutive if s.consecutive is not None else ""
-    short = f"{dt}{brand}{role}{os_fam}{cons}".lower()
+    cons = str(s.consecutive) if s.consecutive is not None else ""
+    short = _cap_short_name(f"{dt}{brand}{role}{os_fam}", cons).lower()
     s.vf_short_name = short
     base = ""
     if s.site_id:
@@ -201,17 +223,17 @@ async def generate_physical_server(session: AsyncSession, s: models.PhysicalServ
 async def generate_vm(session: AsyncSession, vm: models.VirtualMachine) -> None:
     os_fam = await _abbr(session, models.OsFamily, vm.os_family_id)
     role = await _abbr(session, models.DeviceRole, vm.role_id)
-    cons = vm.consecutive if vm.consecutive is not None else ""
-    vm.vf_short_name = f"vm{os_fam}{role}{cons}".lower()
+    cons = str(vm.consecutive) if vm.consecutive is not None else ""
+    vm.vf_short_name = _cap_short_name(f"vm{os_fam}{role}", cons).lower()
 
 
 async def generate_container(session: AsyncSession, c: models.ContainerApp) -> None:
     app = await _abbr(session, models.AppType, c.app_type_id)
     role = await _abbr(session, models.DeviceRole, c.role_id)
-    cons = c.consecutive if c.consecutive is not None else ""
+    cons = str(c.consecutive) if c.consecutive is not None else ""
     ver = c.version or ""
     ctype = c.container_type or "cn"
-    c.vf_short_name = f"{ctype}{app}{ver}{role}{cons}".lower()
+    c.vf_short_name = _cap_short_name(f"{ctype}{app}{ver}{role}", cons).lower()
 
 
 async def generate_workstation(session: AsyncSession, w: models.Workstation) -> None:
@@ -219,8 +241,8 @@ async def generate_workstation(session: AsyncSession, w: models.Workstation) -> 
     brand = await _abbr(session, models.Brand, w.brand_id)
     role = await _abbr(session, models.DeviceRole, w.role_id)
     os_fam = await _abbr(session, models.OsFamily, w.os_family_id)
-    cons = w.consecutive if w.consecutive is not None else ""
-    short = f"{dt}{brand}{role}{os_fam}{cons}".lower()
+    cons = str(w.consecutive) if w.consecutive is not None else ""
+    short = _cap_short_name(f"{dt}{brand}{role}{os_fam}", cons).lower()
     w.vf_short_name = short
     base = ""
     if w.site_id:
@@ -234,8 +256,8 @@ async def generate_network_device(session: AsyncSession, d: models.NetworkDevice
     dt = await _abbr(session, models.NetworkDeviceType, d.device_type_id)
     sub = await _abbr(session, models.NetworkSubtype, d.subtype_id)
     brand = await _abbr(session, models.Brand, d.brand_id)
-    cons = d.consecutive if d.consecutive is not None else ""
-    friendly = f"{dt}{sub}{cons}".lower()
+    cons = str(d.consecutive) if d.consecutive is not None else ""
+    friendly = _cap_short_name(f"{dt}{sub}", cons).lower()
     d.vf_friendly_name = friendly
     base = ""
     if d.site_id:

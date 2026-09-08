@@ -26,6 +26,7 @@ import Changelog from "./pages/Changelog";
 import DeviceDashboard from "./pages/DeviceDashboard";
 import CablesViewer from "./pages/CablesViewer";
 import SimpleGridPage from "./pages/SimpleGridPage";
+import RegionDetail from "./pages/RegionDetail";
 
 export default function App() {
   return (
@@ -60,6 +61,9 @@ export default function App() {
         <Route path="changelog" element={<Changelog />} />
         {/* FEAT-7: single-device dashboard, linked from every device grid. */}
         <Route path="devices/:type/:id" element={<DeviceDashboard />} />
+        {/* Naming-convention modifications (item 4): per-region detail page,
+            linked from the Regions grid in Naming Conventions. */}
+        <Route path="regions/:id" element={<RegionDetail />} />
       </Route>
     </Routes>
   );

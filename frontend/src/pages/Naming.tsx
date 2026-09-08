@@ -1,4 +1,6 @@
 import { lazy, Suspense, useCallback, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import type { ICellRendererParams } from "ag-grid-community";
 import { useQueries, useQueryClient, useMutation } from "@tanstack/react-query";
 import EntityGrid from "../components/EntityGrid";
 import { StencilPanel } from "../components/StencilField";
@@ -6,6 +8,36 @@ import HardwareSpecPanel, { hasHardwareSpecFields } from "../components/Hardware
 import { api, Row } from "../api";
 import { textCol, roCol, numCol, selectCol, flagCol, iconCol } from "../lib/columns";
 import { regionAbbreviationsForCountry, countriesForRegion } from "../lib/regionGeo";
+import OsNameEditor from "../components/OsNameEditor";
+import { familyLabelByVersionId, latestNPerFamily } from "../lib/osVersionGrouping";
+
+// Naming-convention modifications (item 4) — link into the dedicated
+// per-region detail page (`RegionDetail.tsx`), the same "read-only + Link"
+// idiom `recordsLinkCol` (EntityTypeBuilder.tsx) / `deviceLinkCol`
+// (lib/columns.tsx) already use elsewhere, rather than replacing the
+// editable Full Name cell itself.
+function regionDetailLinkCol() {
+  return {
+    colId: "region_detail_link",
+    headerName: "Details",
+    editable: false,
+    sortable: false,
+    filter: false,
+    width: 110,
+    cellRenderer: (p: ICellRendererParams) => {
+      const id = p.data?.id;
+      if (id == null) return null;
+      return (
+        <Link
+          to={`/regions/${id}`}
+          className="text-blue-600 hover:text-blue-800 hover:underline"
+        >
+          View details →
+        </Link>
+      );
+    },
+  };
+}
 
 // FEAT-6 (6B) / Phase 4 Task 22: device-type resources that carry a
 // stencil_url + stencil upload. The backend has treated power-device-types
@@ -115,7 +147,11 @@ const baseColumns = [
   iconCol(),
   textCol("full_name", "Full Name", 220),
   textCol("abbreviation", "Abbreviation", 150),
-  numCol("max_length", "Max Length"),
+  // Naming-convention modifications (item 1) — Max Length now bounds the
+  // abbreviation's own length (backend rejects a longer one), so it's a
+  // constrained 1-9 dropdown instead of a freeform number that could
+  // silently be set to something meaningless like 42.
+  selectCol("max_length", "Max Length", [null, 1, 2, 3, 4, 5, 6, 7, 8, 9], { width: 120 }),
   textCol("description", "Description", 300),
 ];
 
@@ -127,6 +163,18 @@ const columnsFor = (slug: string) => {
   if (STENCIL_RESOURCES.has(slug)) {
     return [...baseColumns, textCol("stencil_url", "Stencil URL", 260)];
   }
+  // Naming-convention modifications (item 5) — OsFamily.full_name gets a
+  // curated OS/platform-name picker (Android, Ubuntu, Cisco IOS, ...)
+  // instead of a plain free-text cell, so creating a well-known OS means
+  // picking it rather than hand-typing it. Everything else about the
+  // lookup grid stays the same as `baseColumns`.
+  if (slug === "os-families") {
+    return baseColumns.map((col) =>
+      col.field === "full_name"
+        ? { ...col, cellEditor: OsNameEditor, cellEditorPopup: true }
+        : col
+    );
+  }
   if (slug === "regions") {
     return [
       flagCol("abbreviation", "🏳", (row) => countriesForRegion(String(row.abbreviation ?? ""))[0]),
@@ -137,10 +185,70 @@ const columnsFor = (slug: string) => {
       // click-to-place editor (Req 7.3).
       numCol("latitude", "Latitude"),
       numCol("longitude", "Longitude"),
+      // Naming-convention modifications (item 4) — the dedicated detail page.
+      regionDetailLinkCol(),
     ];
   }
   return baseColumns;
 };
+
+/**
+ * Naming-convention modifications (item 2/3) — "Suggest from Full Name":
+ * derives a guaranteed-available abbreviation from the selected row's own
+ * `full_name` (respecting its own `max_length`/`case_enforcement`) and
+ * applies it with one click, instead of the operator having to hand-invent
+ * one and hand-check it isn't already taken elsewhere in the global
+ * abbreviation registry. Shown for the selected row on EVERY naming
+ * lookup (they all share the same full_name/abbreviation shape via
+ * `LookupMixin`), not just the 4 stencil-carrying device-type resources.
+ */
+function SuggestAbbreviationPanel({
+  resource,
+  row,
+  onChanged,
+}: {
+  resource: string;
+  row: Row;
+  onChanged: () => void;
+}) {
+  const [status, setStatus] = useState<string | null>(null);
+  const suggest = useMutation({
+    mutationFn: async () => {
+      const { abbreviation } = await api.suggestAbbreviation(String(row.full_name ?? ""), {
+        maxLength: row.max_length as number | null,
+        caseEnforcement: row.case_enforcement as string | null,
+        entityType: resource,
+        entityId: row.id,
+      });
+      await api.update(resource, row.id, { abbreviation });
+      return abbreviation;
+    },
+    onSuccess: (abbreviation: string) => {
+      setStatus(`Applied “${abbreviation}”.`);
+      onChanged();
+    },
+    onError: (e: unknown) => setStatus(e instanceof Error ? e.message : "Suggestion failed"),
+  });
+
+  return (
+    <div className="px-3 py-2 border border-slate-200 bg-slate-50 rounded flex items-center gap-2">
+      <button
+        type="button"
+        onClick={() => {
+          setStatus(null);
+          suggest.mutate();
+        }}
+        disabled={suggest.isPending || !row.full_name}
+        className="px-2.5 py-1 text-sm rounded border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-50"
+      >
+        {suggest.isPending
+          ? "Suggesting…"
+          : `Suggest abbreviation for “${row.full_name ?? ""}”`}
+      </button>
+      {status && <span className="text-xs text-slate-500">{status}</span>}
+    </div>
+  );
+}
 
 /**
  * Phase 5 Task 29 (Req 24.1/24.2) — inline, expandable stencil management for
@@ -176,6 +284,12 @@ export default function Naming() {
   // Phase 6 Task 19 (Req 7.3) — click-to-place mode for the selected
   // region's real-world location.
   const [placingLocation, setPlacingLocation] = useState(false);
+
+  // Naming-convention modifications (item 6) — OS Versions default to
+  // showing only the latest 4 per family (endoflife.date syncs EVERY
+  // release ever tracked, which balloons into 100+ rows); an operator can
+  // lift the cap to see the full history.
+  const [showAllOsVersions, setShowAllOsVersions] = useState(false);
   const placeRegionPoint = useMutation({
     mutationFn: ({ id, lat, lng }: { id: number; lat: number; lng: number }) =>
       api.update("regions", id, { latitude: lat, longitude: lng }),
@@ -219,6 +333,20 @@ export default function Naming() {
     });
     return c;
   }, [results]);
+
+  // Naming-convention modifications (item 6) — OS Versions grouping data,
+  // derived from whichever family a version's own abbreviation matches
+  // (there's no real FK — see `lib/osVersionGrouping.ts`).
+  const osFamilies = (results[ALL_LOOKUPS.findIndex((l) => l.slug === "os-families")]?.data as Row[]) ?? [];
+  const osVersions = (results[ALL_LOOKUPS.findIndex((l) => l.slug === "os-versions")]?.data as Row[]) ?? [];
+  const osVersionFamilyLabels = useMemo(
+    () => familyLabelByVersionId(osVersions, osFamilies),
+    [osVersions, osFamilies]
+  );
+  const latestOsVersionIds = useMemo(
+    () => latestNPerFamily(osVersions, osFamilies, 4),
+    [osVersions, osFamilies]
+  );
 
   const q = search.trim().toLowerCase();
   const matches = (l: Lookup) =>
@@ -339,6 +467,28 @@ export default function Naming() {
               {syncStatus && <span className="text-xs text-slate-500">{syncStatus}</span>}
             </div>
           )}
+          {/* Naming-convention modifications (item 6) — OS Versions
+              default to the latest 4 per family; endoflife.date syncs
+              EVERY release it has ever tracked, which otherwise balloons
+              this list into 100+ rows with no way to tell what's current. */}
+          {active === "os-versions" && (
+            <div className="mb-2 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowAllOsVersions((v) => !v)}
+                className="px-2.5 py-1 text-sm rounded border border-slate-300 bg-white hover:bg-slate-50"
+              >
+                {showAllOsVersions
+                  ? "Show only the latest 4 per OS"
+                  : "Show all versions"}
+              </button>
+              <span className="text-xs text-slate-500">
+                {showAllOsVersions
+                  ? `Showing all ${osVersions.length} version(s).`
+                  : `Showing the ${latestOsVersionIds.size} most recent version(s), up to 4 per OS family.`}
+              </span>
+            </div>
+          )}
           {/* Phase 5 Task 11 (Req 9) — region map, only on the regions lookup. */}
           {active === "regions" && (
             <Suspense
@@ -392,7 +542,25 @@ export default function Naming() {
             key={active}
             resource={active}
             title={activeLabel}
-            columns={columnsFor(active)}
+            columns={
+              active === "os-versions"
+                ? [
+                    ...columnsFor(active),
+                    // Naming-convention modifications (item 6) — a computed,
+                    // sortable "OS Family" column so the list reads as
+                    // organized even without native AG-Grid row grouping.
+                    {
+                      colId: "os_family_label",
+                      headerName: "OS Family",
+                      editable: false,
+                      sortable: true,
+                      width: 160,
+                      valueGetter: (p: { data?: Row }) =>
+                        p.data ? osVersionFamilyLabels.get(p.data.id as number) ?? "" : "",
+                    },
+                  ]
+                : columnsFor(active)
+            }
             // full_name + abbreviation are NOT NULL on every naming lookup and
             // the abbreviation must be globally unique — seed a placeholder so
             // "Add row" always succeeds and the user just renames it.
@@ -406,14 +574,16 @@ export default function Naming() {
               },
             ]}
             externalFilter={
-              active !== "regions"
-                ? undefined
-                : focusedRegionId != null
-                ? (row) => row.id === focusedRegionId
-                : mapCountry
-                ? (row) =>
-                    regionAbbreviationsForCountry(mapCountry, [String(row.abbreviation ?? "")])
-                      .length > 0
+              active === "regions"
+                ? focusedRegionId != null
+                  ? (row) => row.id === focusedRegionId
+                  : mapCountry
+                  ? (row) =>
+                      regionAbbreviationsForCountry(mapCountry, [String(row.abbreviation ?? "")])
+                        .length > 0
+                  : undefined
+                : active === "os-versions" && !showAllOsVersions
+                ? (row) => latestOsVersionIds.has(row.id as number)
                 : undefined
             }
             // Phase 5 Task 29 (Req 24.1/24.2) — inline, expandable stencil
@@ -422,26 +592,37 @@ export default function Naming() {
             // adds the hardware-spec fields + online lookup panel right
             // below it, on the SAME 4 device-type resources.
             panel={
-              STENCIL_RESOURCES.has(active) ? (
+              selected || STENCIL_RESOURCES.has(active) ? (
                 <div className="space-y-3">
-                  <StencilPanel
-                    resource={active}
-                    label={activeLabel}
-                    selected={selected}
-                    onChanged={() => qc.invalidateQueries({ queryKey: [active] })}
-                  />
-                  {hasHardwareSpecFields(active) &&
-                    (selected ? (
-                      <HardwareSpecPanel
+                  {selected && (
+                    <SuggestAbbreviationPanel
+                      resource={active}
+                      row={selected}
+                      onChanged={() => qc.invalidateQueries({ queryKey: [active] })}
+                    />
+                  )}
+                  {STENCIL_RESOURCES.has(active) && (
+                    <>
+                      <StencilPanel
                         resource={active}
-                        row={selected}
+                        label={activeLabel}
+                        selected={selected}
                         onChanged={() => qc.invalidateQueries({ queryKey: [active] })}
                       />
-                    ) : (
-                      <div className="px-3 py-2 border border-dashed border-slate-300 rounded text-sm text-slate-500">
-                        Select a {activeLabel} row below to manage its hardware specs.
-                      </div>
-                    ))}
+                      {hasHardwareSpecFields(active) &&
+                        (selected ? (
+                          <HardwareSpecPanel
+                            resource={active}
+                            row={selected}
+                            onChanged={() => qc.invalidateQueries({ queryKey: [active] })}
+                          />
+                        ) : (
+                          <div className="px-3 py-2 border border-dashed border-slate-300 rounded text-sm text-slate-500">
+                            Select a {activeLabel} row below to manage its hardware specs.
+                          </div>
+                        ))}
+                    </>
+                  )}
                 </div>
               ) : undefined
             }

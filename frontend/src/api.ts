@@ -425,6 +425,30 @@ export const api = {
     return fetch(`${BASE}/naming/site-code?${qs.toString()}`).then(handle);
   },
   /**
+   * Naming-convention modifications (item 2/3) — a guaranteed-available
+   * abbreviation suggestion derived from ``fullName``, for any lookup
+   * dictionary (Organizations, Regions, Clouds, ...). Pass the row's own
+   * ``maxLength``/``caseEnforcement`` so the suggestion already respects
+   * them, and (when editing) ``entityType``/``entityId`` so the row's own
+   * current abbreviation is never flagged as a collision with itself.
+   */
+  suggestAbbreviation: (
+    fullName: string,
+    opts?: {
+      maxLength?: number | null;
+      caseEnforcement?: string | null;
+      entityType?: string;
+      entityId?: number | null;
+    },
+  ): Promise<{ full_name: string; abbreviation: string }> => {
+    const qs = new URLSearchParams({ full_name: fullName });
+    if (opts?.maxLength != null) qs.set("max_length", String(opts.maxLength));
+    if (opts?.caseEnforcement) qs.set("case_enforcement", opts.caseEnforcement);
+    if (opts?.entityType) qs.set("entity_type", opts.entityType);
+    if (opts?.entityId != null) qs.set("entity_id", String(opts.entityId));
+    return fetch(`${BASE}/naming/suggest-abbreviation?${qs.toString()}`).then(handle);
+  },
+  /**
    * FEAT-3 — search the built-in themed name catalogues. Omit ``category`` to
    * search every theme at once.
    */

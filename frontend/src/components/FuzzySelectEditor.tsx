@@ -77,7 +77,16 @@ const FuzzySelectEditor = forwardRef((props: FuzzySelectEditorParams, ref) => {
   };
 
   return (
-    <div className="vf-fuzzy-editor" data-testid="fuzzy-select-editor">
+    // `ag-custom-component-popup` is AG Grid's own convention for marking a
+    // custom popup editor's root element as "part of the grid" for focus
+    // purposes: with `stopEditingWhenCellsLoseFocus` on (EntityGrid.tsx),
+    // AG Grid's FocusService otherwise treats a mousedown inside this popup
+    // (which lives outside the grid's own DOM subtree, in AG Grid's popup
+    // layer) as a click OUTSIDE the grid and calls stopEditing() itself —
+    // racing our own onMouseDown handler below and discarding the pending
+    // selection before `commit()` ever runs. Without this class, every
+    // click on an option appeared to just close the list with no effect.
+    <div className="vf-fuzzy-editor ag-custom-component-popup" data-testid="fuzzy-select-editor">
       <input
         ref={inputRef}
         className="vf-fuzzy-editor-input"

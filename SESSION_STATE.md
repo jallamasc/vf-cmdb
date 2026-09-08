@@ -72,6 +72,60 @@ app change). Symptom: `curl` to `:8000` fails with connection-refused, and
 background processes. Postgres data survives (it's a named container, not
 `--rm`), so nothing was lost — just restart, don't recreate.
 
+**Post-Phase-6 QA fixes (2026-09-08, same day, later in session)** — three
+bugs reported from live browser testing, all fixed and verified:
+
+1. **Every dropdown/picker in the app appeared to do nothing when you
+   clicked an option** (icon picker, FK pickers, select pickers, airport
+   picker — anywhere `cellEditorPopup` is used). Root cause: AG Grid's
+   `stopEditingWhenCellsLoseFocus: true` (`EntityGrid.tsx`) races a custom
+   popup cell editor's own click handler — AG Grid's FocusService treats a
+   click inside the popup as "outside the grid" (the popup DOM lives
+   outside the grid's own subtree) unless the popup's root element carries
+   AG Grid's own `ag-custom-component-popup` class, so it called
+   `stopEditing()` itself before our `commit()` ran, discarding the
+   selection. Fixed by adding that class to `FuzzySelectEditor.tsx`,
+   `IconPickerEditor.tsx`, `AirportCellEditor.tsx`.
+2. **Region map showed almost nothing illustrated, and clicking did
+   nothing useful.** No seeded `Region` row had ever had `latitude`/
+   `longitude` set (only the manual click-to-place editor could set them,
+   and nobody had used it), so the existing marker layer had zero markers
+   to draw. Added `REGION_COORDS` + `_backfill_region_coords()` to
+   `backend/app/seed.py` (illustrative centroid per region, additive/
+   idempotent, never overwrites an operator-placed point) and ran it
+   against the live `vfcmdb` DB. Markers are now also clickable
+   (`RegionMap.tsx`'s `onSelectRegion`) and focus that EXACT region in the
+   grid below (`Naming.tsx`'s `focusedRegionId`), more precise than the
+   pre-existing country-polygon click (which can't distinguish Colombia's
+   6 natural regions from each other). Also added visible/editable
+   latitude/longitude columns to the regions grid.
+3. **`503: vss2svg-conv is not installed on this host` on every Stencil
+   Library fetch.** Not a bug — `vss2svg-conv` is genuinely only buildable
+   inside the Containerfile image (Linux-only native deps), and the bare
+   `.venv` uvicorn dev backend on the host never has it. Fixed
+   operationally: stopped the bare-metal uvicorn on :8000, rebuilt
+   `vf-cmdb-backend-dev` (it was stale — missing migrations 0030-0032 baked
+   in from earlier this session) and ran `DEV_BACKEND_PORT=8000
+   ./dev-container.sh up` instead, so the SAME :8000 the frontend already
+   proxies to is now served from inside the container that has
+   `vss2svg-conv` built in. Live-verified full fetch->convert->preview
+   round-trip against a real vendor ZIP (Microsoft's Network Equipment
+   Shapes bundle) — 200s all the way through, real SVG served.
+   **Remember for next session**: the backend on :8000 is now the
+   CONTAINERIZED one (`vf_cmdb_backend_dev`, via `backend/dev-container.sh
+   up`), not a bare `uvicorn`. Its live-reload is a `podman cp` + `fswatch`
+   loop on `backend/app/` ONLY (this checkout's path isn't bind-mountable
+   into the Podman machine VM) — `backend/alembic/` changes are NOT
+   auto-synced by that loop; a new migration needs either a manual
+   `podman cp backend/alembic vf_cmdb_backend_dev:/app/alembic` or an image
+   rebuild (`podman build -t vf-cmdb-backend-dev -f Containerfile .`)
+   before `alembic upgrade head` inside the container will see it.
+
+Verified after all 3 fixes: 324 backend pytest passed / 1 skipped (was 321
+before this pass — +3 new `test_seed_region_coords.py` cases), 316
+frontend Vitest passed (was 313 — +3 new `RegionMap.test.tsx` marker-click
+cases), `tsc --noEmit` clean, `vite build` clean.
+
 **Next for the user**: browser-test Phase 6 at `http://localhost:5173` —
 particularly the Naming Conventions page's new Hardware Spec panel
 (Icecat/Brave lookup, read-only results) on any of the 4 device-type

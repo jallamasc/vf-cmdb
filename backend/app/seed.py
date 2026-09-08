@@ -197,6 +197,51 @@ async def _seed_lookups(session) -> tuple[dict, list[str]]:
     return maps, created
 
 
+# Bug-fix (post-Phase-6 QA) — approximate centroid coordinates for every
+# seeded Region (Req 7.1/7.2), so `RegionMap.tsx`'s marker layer (Task 18,
+# already built) plots a marker for every region instead of only the ones
+# an operator has manually placed via the map's click-to-place editor
+# (Task 19). This matters most for Colombia's 6 natural regions:
+# `regionGeo.ts`'s country-level highlight collapses all 6 onto the same
+# "Colombia" blob (there's no sub-national topology bundled), so the
+# marker is the ONLY thing that visually distinguishes them on the map —
+# without it, most of the seeded regions looked entirely unillustrated.
+# Approximate/illustrative centroids, not surveyed region boundaries.
+REGION_COORDS: dict[str, tuple[float, float]] = {
+    "CO-CTR": (3.9, -75.3),  # Central Colombia (Tolima/Huila coffee belt)
+    "CO-CAR": (9.5, -74.5),  # Caribbean coast
+    "CO-PAC": (3.5, -77.3),  # Pacific coast (Chocó/Valle/Cauca/Nariño)
+    "CO-AND": (6.2, -75.4),  # Andean interior (Antioquia/Santanders/Boyacá)
+    "CO-ORI": (4.5, -71.0),  # Eastern plains (Meta/Casanare/Arauca/Vichada)
+    "CO-AMZ": (0.0, -72.0),  # Amazonía (Amazonas/Caquetá/Putumayo/Guaviare)
+    "NAEAST": (38.0, -80.0),
+    "NAWEST": (40.0, -115.0),
+    "CAN": (56.0, -106.3),
+    "MEX-CA": (15.5, -90.0),
+    "CAR": (19.0, -75.0),
+    "LATAM-S": (-15.0, -55.0),
+}
+
+
+async def _backfill_region_coords(session, region_ids: dict) -> int:
+    """Set latitude/longitude on any seeded Region row that doesn't already
+    have one set — additive/idempotent like `_seed_lookups`, and never
+    overwrites a value an operator already placed via the map's
+    click-to-place editor (Req 7.3). Returns how many rows were backfilled."""
+    n = 0
+    for abbr, (lat, lon) in REGION_COORDS.items():
+        region_id = region_ids.get(abbr)
+        if region_id is None:
+            continue
+        region = await session.get(models.Region, region_id)
+        if region is None or region.latitude is not None or region.longitude is not None:
+            continue
+        region.latitude = lat
+        region.longitude = lon
+        n += 1
+    return n
+
+
 async def _log_create(session, obj) -> None:
     """Record a compact import changelog entry for a seeded row."""
     session.add(
@@ -223,6 +268,7 @@ async def seed() -> None:
         # entries (e.g. FEAT-4's regions) reach an existing database without
         # re-importing — or duplicating — the demo topology below.
         m, created = await _seed_lookups(session)
+        backfilled_coords = await _backfill_region_coords(session, m[models.Region])
 
         if already_seeded:
             await session.commit()
@@ -230,6 +276,8 @@ async def seed() -> None:
                 print(f"Added {len(created)} new lookup row(s): {', '.join(created)}")
             else:
                 print("Lookups already up to date; nothing to add.")
+            if backfilled_coords:
+                print(f"Backfilled latitude/longitude on {backfilled_coords} region row(s).")
             print("Demo topology already present; skipping.")
             return
 

@@ -75,7 +75,13 @@ const IconPickerEditor = forwardRef((props: IconPickerEditorParams, ref) => {
   };
 
   return (
-    <div className="vf-fuzzy-editor vf-icon-picker" data-testid="icon-picker-editor">
+    // See FuzzySelectEditor.tsx's comment on `ag-custom-component-popup` —
+    // required for stopEditingWhenCellsLoseFocus to treat clicks inside this
+    // popup as inside the grid, or every option click just closes the list.
+    <div
+      className="vf-fuzzy-editor vf-icon-picker ag-custom-component-popup"
+      data-testid="icon-picker-editor"
+    >
       <input
         ref={inputRef}
         className="vf-fuzzy-editor-input"

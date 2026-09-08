@@ -115,7 +115,10 @@ const AirportCellEditor = forwardRef((props: AirportCellEditorParams, ref) => {
   };
 
   return (
-    <div className="vf-fuzzy-editor" data-testid="airport-cell-editor">
+    // See FuzzySelectEditor.tsx's comment on `ag-custom-component-popup` —
+    // required for stopEditingWhenCellsLoseFocus to treat clicks inside this
+    // popup as inside the grid, or every option click just closes the list.
+    <div className="vf-fuzzy-editor ag-custom-component-popup" data-testid="airport-cell-editor">
       <select
         className="vf-fuzzy-editor-input"
         aria-label="Country"

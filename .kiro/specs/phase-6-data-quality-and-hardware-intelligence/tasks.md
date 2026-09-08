@@ -250,14 +250,14 @@ sub-phases that reuse them.
 
 ### Sub-phase K — IP-to-Device Auto-Sync
 
-- [ ] 39. IP auto-sync hook
-  - [ ] 39.1 Enumerate IP-bearing fields per hardcoded device model; a
+- [x] 39. IP auto-sync hook
+  - [x] 39.1 Enumerate IP-bearing fields per hardcoded device model; a
         `lifecycle_sync.py`-style hook upserting/removing a polymorphic
         IpAssignment row on create/update/delete
     - _Requirements: 14.1, 14.2_
-  - [ ]* 39.2 pytest create/update/delete sync behavior
+  - [x]* 39.2 pytest create/update/delete sync behavior
 
-- [ ] 40. Checkpoint K — build + test verification.
+- [x] 40. Checkpoint K — build + test verification.
 
 ### Sub-phase L — Final Checkpoint
 

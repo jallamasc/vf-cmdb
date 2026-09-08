@@ -1110,6 +1110,17 @@ class Workstation(Base):
 # IPAM
 # ---------------------------------------------------------------------------
 class IpAssignment(Base):
+    """
+    ``auto_generated`` (Phase 6 Task 39, Req 14) — set on any row
+    ``ip_auto_sync.py`` itself created from a hardcoded device's own
+    IP-bearing column(s) (e.g. ``PhysicalServer.management_ipv4``).
+    Mirrors ``Cable.auto_generated``'s exact role/rationale: ONLY a row
+    with this flag set is ever auto-updated or auto-deleted by that sync,
+    so an operator's own manually-created IpAssignment row is never
+    silently touched even if it happens to match the same
+    (assigned_to_type, assigned_to_id, interface_name) tuple.
+    """
+
     __tablename__ = "ip_assignments"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -1124,6 +1135,9 @@ class IpAssignment(Base):
     is_primary: Mapped[bool] = mapped_column(Boolean, default=False)
     status: Mapped[str] = mapped_column(String(20), default="active")  # active/reserved/deprecated
     notes: Mapped[Optional[str]] = mapped_column(Text)
+    auto_generated: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
 
 
 # ---------------------------------------------------------------------------

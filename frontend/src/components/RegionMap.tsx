@@ -14,6 +14,17 @@ interface Props {
    * placing/editing one region's real-world location. */
   placementMode?: boolean;
   onPlacePoint?: (lat: number, lng: number) => void;
+  /**
+   * Bug-fix (post-Phase-6 QA) — the id of the region whose own marker is
+   * currently focused, if any. A marker click identifies ONE exact region
+   * (unlike clicking a country polygon, which can match several regions
+   * at once — e.g. all 6 of Colombia's natural regions), so this drives a
+   * more precise "focus" than `selectedCountry` alone.
+   */
+  focusedRegionId?: number | null;
+  /** Called with the clicked region's own row when its marker is clicked
+   * (a second click on the already-focused marker clears the focus). */
+  onSelectRegion?: (region: Row | null) => void;
 }
 
 /**
@@ -76,6 +87,8 @@ export default function RegionMap({
   onSelectCountry,
   placementMode = false,
   onPlacePoint,
+  focusedRegionId = null,
+  onSelectRegion,
 }: Props) {
   const highlighted = new Set(
     regions.flatMap((r) => countriesForRegion(String(r.abbreviation ?? "")))
@@ -138,14 +151,28 @@ export default function RegionMap({
             })
           }
         </Geographies>
-        {/* Phase 6 Task 18 (Req 7.2) — a marker per region with a real point. */}
+        {/* Phase 6 Task 18 (Req 7.2) — a marker per region with a real point.
+            Bug-fix (post-Phase-6 QA, Req 7.2/9.2) — clicking a marker now
+            focuses that EXACT region (a second click clears it), instead of
+            being purely decorative; the focused marker gets a distinct
+            larger/blue treatment so it's obvious which one is selected. */}
         {!placementMode &&
-          markers.map((r) => (
-            <Marker key={r.id} coordinates={[r.longitude as number, r.latitude as number]}>
-              <circle r={4} fill="#dc2626" stroke="#fff" strokeWidth={1} />
-              <title>{String(r.full_name ?? r.abbreviation ?? `Region #${r.id}`)}</title>
-            </Marker>
-          ))}
+          markers.map((r) => {
+            const isFocused = r.id === focusedRegionId;
+            return (
+              <Marker key={r.id} coordinates={[r.longitude as number, r.latitude as number]}>
+                <circle
+                  r={isFocused ? 7 : 4}
+                  fill={isFocused ? "#2563eb" : "#dc2626"}
+                  stroke="#fff"
+                  strokeWidth={1.5}
+                  style={{ cursor: onSelectRegion ? "pointer" : "default" }}
+                  onClick={() => onSelectRegion?.(isFocused ? null : r)}
+                />
+                <title>{String(r.full_name ?? r.abbreviation ?? `Region #${r.id}`)}</title>
+              </Marker>
+            );
+          })}
         {/* Phase 6 Task 19 (Req 7.3) — click-to-place overlay, drawn last so
             it sits on top and captures the click regardless of what's under
             the cursor. */}
@@ -158,9 +185,18 @@ export default function RegionMap({
           "Click anywhere on the map to set this region's location."
         ) : (
           <>
-            Click a highlighted country to narrow the list below to its
-            region(s). Country-level detail only — Colombia's 6 natural
-            regions all resolve to Colombia.
+            Click a red marker to focus that exact region in the list below,
+            or a highlighted country to narrow it to every region in that
+            country (Colombia's 6 natural regions all resolve to the same
+            country outline — the marker is what tells them apart).
+            {focusedRegionId != null && (
+              <button
+                onClick={() => onSelectRegion?.(null)}
+                className="ml-2 text-blue-600 hover:underline"
+              >
+                Clear focused region
+              </button>
+            )}
             {selectedCountry && (
               <button
                 onClick={() => onSelectCountry(null)}

@@ -131,6 +131,12 @@ const columnsFor = (slug: string) => {
     return [
       flagCol("abbreviation", "🏳", (row) => countriesForRegion(String(row.abbreviation ?? ""))[0]),
       ...baseColumns,
+      // Bug-fix (post-Phase-6 QA) — surfaced here so "click a region's map
+      // marker" has visible detail to focus on, and so an operator can also
+      // type a coordinate directly as an alternative to the map's
+      // click-to-place editor (Req 7.3).
+      numCol("latitude", "Latitude"),
+      numCol("longitude", "Longitude"),
     ];
   }
   return baseColumns;
@@ -163,6 +169,10 @@ export default function Naming() {
   // Phase 5 Task 11 (Req 9) — RegionMap-driven narrowing, only relevant on
   // the "regions" lookup; cleared whenever the operator switches away.
   const [mapCountry, setMapCountry] = useState<string | null>(null);
+  // Bug-fix (post-Phase-6 QA, Req 7.2/9.2) — the id of the region whose own
+  // marker was clicked, narrowing the list to that EXACT region (takes
+  // priority over the coarser country-polygon filter below).
+  const [focusedRegionId, setFocusedRegionId] = useState<number | null>(null);
   // Phase 6 Task 19 (Req 7.3) — click-to-place mode for the selected
   // region's real-world location.
   const [placingLocation, setPlacingLocation] = useState(false);
@@ -275,6 +285,7 @@ export default function Naming() {
                         onClick={() => {
                           setActive(l.slug);
                           setMapCountry(null);
+                          setFocusedRegionId(null);
                           setSelected(null);
                           setPlacingLocation(false);
                         }}
@@ -354,7 +365,20 @@ export default function Naming() {
               <RegionMap
                 regions={(results[ALL_LOOKUPS.findIndex((l) => l.slug === "regions")]?.data as Row[]) ?? []}
                 selectedCountry={mapCountry}
-                onSelectCountry={setMapCountry}
+                onSelectCountry={(country) => {
+                  setMapCountry(country);
+                  setFocusedRegionId(null);
+                }}
+                focusedRegionId={focusedRegionId}
+                onSelectRegion={(region) => {
+                  setFocusedRegionId(region?.id ?? null);
+                  setMapCountry(null);
+                  // Bug-fix (post-Phase-6 QA) — clicking a marker also
+                  // selects that region the same way clicking its grid row
+                  // would, so "Set location on map" and any future
+                  // per-region panel react to it immediately.
+                  setSelected(region);
+                }}
                 placementMode={placingLocation}
                 onPlacePoint={
                   selected
@@ -382,7 +406,11 @@ export default function Naming() {
               },
             ]}
             externalFilter={
-              active === "regions" && mapCountry
+              active !== "regions"
+                ? undefined
+                : focusedRegionId != null
+                ? (row) => row.id === focusedRegionId
+                : mapCountry
                 ? (row) =>
                     regionAbbreviationsForCountry(mapCountry, [String(row.abbreviation ?? "")])
                       .length > 0

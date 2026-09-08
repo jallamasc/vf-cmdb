@@ -105,6 +105,68 @@ describe("RegionMap — geo markers + click-to-place (Phase 6 Task 18/19, Req 7.
     expect(container.querySelector('rect[fill="transparent"]')).toBeTruthy();
   });
 
+  it("clicking a marker calls onSelectRegion with that region's row", () => {
+    const onSelectRegion = vi.fn();
+    const withGeo = [
+      ...REGIONS,
+      { id: 3, full_name: "Bogotá Point", abbreviation: "CO-AND", latitude: 4.71, longitude: -74.07 },
+    ];
+    const { container } = render(
+      <RegionMap
+        regions={withGeo}
+        selectedCountry={null}
+        onSelectCountry={vi.fn()}
+        onSelectRegion={onSelectRegion}
+      />
+    );
+    const title = Array.from(container.querySelectorAll("title")).find(
+      (t) => t.textContent === "Bogotá Point"
+    );
+    const circle = title!.parentElement!.querySelector("circle");
+    circle!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(onSelectRegion).toHaveBeenCalledWith(withGeo[2]);
+  });
+
+  it("clicking an already-focused marker clears it (calls onSelectRegion with null)", () => {
+    const onSelectRegion = vi.fn();
+    const withGeo = [
+      ...REGIONS,
+      { id: 3, full_name: "Bogotá Point", abbreviation: "CO-AND", latitude: 4.71, longitude: -74.07 },
+    ];
+    const { container } = render(
+      <RegionMap
+        regions={withGeo}
+        selectedCountry={null}
+        onSelectCountry={vi.fn()}
+        focusedRegionId={3}
+        onSelectRegion={onSelectRegion}
+      />
+    );
+    const title = Array.from(container.querySelectorAll("title")).find(
+      (t) => t.textContent === "Bogotá Point"
+    );
+    const circle = title!.parentElement!.querySelector("circle");
+    circle!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(onSelectRegion).toHaveBeenCalledWith(null);
+  });
+
+  it("renders the focused marker larger and in blue", () => {
+    const withGeo = [
+      { id: 3, full_name: "Bogotá Point", abbreviation: "CO-AND", latitude: 4.71, longitude: -74.07 },
+    ];
+    const { container } = render(
+      <RegionMap
+        regions={withGeo}
+        selectedCountry={null}
+        onSelectCountry={vi.fn()}
+        focusedRegionId={3}
+        onSelectRegion={vi.fn()}
+      />
+    );
+    expect(container.querySelector('circle[fill="#2563eb"]')).toBeTruthy();
+    expect(container.querySelector('circle[fill="#dc2626"]')).toBeNull();
+  });
+
   it("reports the clicked point's [lat, lng] via onPlacePoint", () => {
     const getRectSpy = vi
       .spyOn(SVGElement.prototype, "getBoundingClientRect")

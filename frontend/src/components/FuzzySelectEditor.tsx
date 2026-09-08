@@ -56,7 +56,16 @@ const FuzzySelectEditor = forwardRef((props: FuzzySelectEditorParams, ref) => {
 
   const commit = (value: unknown) => {
     setCommitted(value);
-    // Stop editing on the next tick so React state flushes first.
+    // Write the value straight into the row via the grid API instead of
+    // relying solely on AG Grid's own getValue()/stopEditing() handshake:
+    // that handshake depends on AG Grid successfully round-tripping focus
+    // through this popup's own DOM subtree (rendered in AG Grid's popup
+    // layer, outside the grid's main DOM), which stopEditingWhenCellsLose
+    // Focus (EntityGrid.tsx) can race — an option click could get treated
+    // as "focus left the grid" before our stopEditing() call below ever
+    // applies the value, silently discarding the selection. setDataValue
+    // applies immediately and unconditionally, independent of any of that.
+    props.node?.setDataValue?.(props.column, value);
     setTimeout(() => props.api.stopEditing(), 0);
   };
 

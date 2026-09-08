@@ -55,6 +55,10 @@ const IconPickerEditor = forwardRef((props: IconPickerEditorParams, ref) => {
 
   const commit = (value: unknown) => {
     setCommitted(value);
+    // Write straight into the row via the grid API — see
+    // FuzzySelectEditor.tsx's `commit()` for why this doesn't rely solely
+    // on AG Grid's own getValue()/stopEditing() handshake.
+    props.node?.setDataValue?.(props.column, value);
     setTimeout(() => props.api.stopEditing(), 0);
   };
 

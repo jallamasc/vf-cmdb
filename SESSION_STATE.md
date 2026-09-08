@@ -126,6 +126,30 @@ before this pass — +3 new `test_seed_region_coords.py` cases), 316
 frontend Vitest passed (was 313 — +3 new `RegionMap.test.tsx` marker-click
 cases), `tsc --noEmit` clean, `vite build` clean.
 
+**Follow-up (same day) — fix #1 (dropdown selection) was NOT actually
+fixed by the `ag-custom-component-popup` class alone.** The user reported
+it was still broken after that change. Root-caused properly this time by
+mounting a REAL (unmocked) `AgGridReact` + real custom popup editor in a
+Vitest/happy-dom integration test — every existing unit test for these
+editors (`FuzzySelectEditor.test.tsx` etc.) calls `fireEvent.mouseDown`
+directly on the component, bypassing AG Grid's own runtime entirely, so
+none of them could ever have caught this class of bug. The real issue: a
+popup cell editor's commit relies on AG Grid successfully calling the
+editor's `getValue()` when `stopEditing()` runs, which itself depends on
+focus round-tripping correctly through the popup's detached DOM subtree —
+a dependency chain that `stopEditingWhenCellsLoseFocus` can race. Fixed by
+making the commit path NOT depend on that handshake at all:
+`FuzzySelectEditor.tsx`/`IconPickerEditor.tsx`/`AirportCellEditor.tsx` now
+call `props.node.setDataValue(props.column, value)` directly inside their
+option-click handler, which writes the value into the row (and fires
+`onCellValueChanged`) immediately and unconditionally. Added a permanent
+regression test, `AgGridPopupEditor.integration.test.tsx`, that mounts a
+real grid + real editor and asserts a clicked option's value actually
+reaches `onCellValueChanged` — this is the ONLY test in the suite that
+exercises AG Grid's real popup-editor runtime end to end; keep it if these
+editors are touched again. Verified: 318 frontend Vitest passed (+2 new),
+tsc clean, build clean.
+
 **Next for the user**: browser-test Phase 6 at `http://localhost:5173` —
 particularly the Naming Conventions page's new Hardware Spec panel
 (Icecat/Brave lookup, read-only results) on any of the 4 device-type

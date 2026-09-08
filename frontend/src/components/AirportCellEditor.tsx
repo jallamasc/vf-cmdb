@@ -102,6 +102,10 @@ const AirportCellEditor = forwardRef((props: AirportCellEditorParams, ref) => {
   const commit = (airport: Airport) => {
     setCommitted(airport.iata);
     setQuery(airport.iata);
+    // Write straight into the row via the grid API — see
+    // FuzzySelectEditor.tsx's `commit()` for why this doesn't rely solely
+    // on AG Grid's own getValue()/stopEditing() handshake.
+    props.node?.setDataValue?.(props.column, airport.iata);
     setTimeout(() => props.api.stopEditing(), 0);
   };
 

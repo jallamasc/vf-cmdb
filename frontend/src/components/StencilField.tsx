@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { api, Row } from "../api";
 import AnchorEditor from "./AnchorEditor";
@@ -139,6 +139,15 @@ function StencilFaceRow({
 }) {
   const urlField = face === "back" ? "stencil_url_back" : "stencil_url";
   const [url, setUrl] = useState<string>(row[urlField] ?? "");
+  // Bug fix (post-Phase-6 QA) — this input's local state only ever ran its
+  // initializer once; after an upload/library-apply persists the column
+  // server-side and `onChanged()` refetches, the freshly-fetched `row`
+  // prop changes but this input kept showing the stale (often blank)
+  // value it started with. Re-sync whenever the row's own URL changes.
+  useEffect(() => {
+    setUrl(row[urlField] ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [row[urlField]]);
   const [status, setStatus] = useState<string | null>(null);
   const [showLibrary, setShowLibrary] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);

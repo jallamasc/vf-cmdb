@@ -162,6 +162,58 @@ async def _validate_abbrev(session: AsyncSession, obj, entity_id) -> None:
         )
 
 
+async def _auto_abbreviate(session: AsyncSession, obj, entity_id) -> Optional[str]:
+    """Bug fix (post-Phase-6 QA) — force every plain full_name/abbreviation
+    lookup (LookupMixin: Organization, Cloud, Region, ...) to derive its
+    ``abbreviation`` from ``full_name`` server-side, on every create AND
+    update, regardless of what the client sent for that field. This is what
+    actually makes the field non-editable (Naming.tsx's column is now a
+    plain read-only ``roCol``) instead of merely offering a "Suggest" button
+    the operator could still overtype.
+
+    Only applies to models whose ``ABBR_FIELDS`` entry is ``"abbreviation"``
+    (the 17 LookupMixin dictionaries) — the ``"code"`` hierarchy models
+    (Datacenter/DatacenterFloor/Room/RackType/Rack) keep their existing
+    ``AbbrevField.tsx``-driven manual/derived choice on the Hierarchy page,
+    which is a different workflow the user didn't ask to change.
+
+    ``trim_mode="manual"`` used to mean "the operator types it"; that
+    contradicts "must be forced to derive from the name", so it's now
+    treated the same as ``"consonants"`` (Hoymeaseguro -> hm) for this
+    purpose. The enum value is left alone for backward compatibility (every
+    existing row defaults to it) — it just no longer disables derivation.
+    Returns the derived value, or ``None`` if this model/row isn't in scope.
+    """
+    if abbrev.ABBR_FIELDS.get(type(obj)) != "abbreviation":
+        return None
+    if not hasattr(obj, "full_name") or not hasattr(obj, "trim_mode"):
+        return None
+    full_name = getattr(obj, "full_name", None)
+    if not full_name:
+        return None
+    trim_mode = getattr(obj, "trim_mode", None) or "consonants"
+    if trim_mode == "manual":
+        trim_mode = "consonants"
+    # Column-level Python defaults (`default="lowercase"` on LookupMixin's
+    # `case_enforcement`) only apply at flush/INSERT time, not immediately
+    # on construction — this hook runs BEFORE the first flush, so a
+    # brand-new row's attribute is still `None` here even though it will
+    # end up "lowercase" once persisted. Mirror that same effective default
+    # now instead of deriving against an un-cased value.
+    case_enforcement = getattr(obj, "case_enforcement", None) or "lowercase"
+    derived = await abbrev.suggest_abbreviation(
+        session,
+        full_name,
+        max_length=getattr(obj, "max_length", None),
+        trim_mode=trim_mode,
+        case_enforcement=case_enforcement,
+        entity_type=obj.__tablename__,
+        entity_id=entity_id,
+    )
+    obj.abbreviation = derived
+    return derived
+
+
 async def _sync_abbrev(session: AsyncSession, obj) -> None:
     """Write / update / remove the global registry row for a saved record.
 
@@ -698,6 +750,15 @@ async def create_item(
 ):
     data = sanitize_payload(model, payload)
     obj = model(**data)
+    # Bug fix (post-Phase-6 QA) — force the abbreviation before the
+    # required-field check, so an omitted/blank client value is filled by
+    # derivation instead of being rejected as missing.
+    derived_abbrev = await _auto_abbreviate(session, obj, entity_id=None)
+    if derived_abbrev is not None:
+        # Keep the changelog loop below (which logs straight from `data`)
+        # accurate — it must show what was actually persisted, not whatever
+        # the client happened to send for this now-forced field.
+        data["abbreviation"] = derived_abbrev
     # Fail fast with a readable message rather than a raw NOT NULL error.
     validate_required(model, obj)
     await _validate_abbrev(session, obj, entity_id=None)
@@ -730,6 +791,14 @@ async def update_item(
     # interface's own label as it was prior to this update, in case
     # description/port_number (which the label is derived from) is changing.
     prior_label_a = _interface_own_label(obj) if isinstance(obj, models.DeviceInterface) else None
+    # Bug fix (post-Phase-6 QA) — the abbreviation's true "before" value, for
+    # an accurate changelog entry once `_auto_abbreviate` (below) overrides
+    # whatever the client tried to set it to.
+    original_abbrev = (
+        getattr(obj, "abbreviation", None)
+        if abbrev.ABBR_FIELDS.get(type(obj)) == "abbreviation"
+        else None
+    )
     data = sanitize_payload(model, payload, existing=obj)
     changes: list[tuple[str, Any, Any]] = []
     for field, new_value in data.items():
@@ -738,6 +807,16 @@ async def update_item(
             changes.append((field, old_value, new_value))
             setattr(obj, field, new_value)
     if changes:
+        # Force-derive the abbreviation from (possibly just-updated)
+        # full_name — this must win over whatever the client attempted to
+        # set the field to directly, and must also fire when full_name (or
+        # trim_mode/case_enforcement/max_length) changed even if the client
+        # never touched `abbreviation` itself.
+        derived_abbrev = await _auto_abbreviate(session, obj, entity_id=obj.id)
+        if derived_abbrev is not None:
+            changes = [c for c in changes if c[0] != "abbreviation"]
+            if _to_str(original_abbrev) != _to_str(derived_abbrev):
+                changes.append(("abbreviation", original_abbrev, derived_abbrev))
         validate_required(model, obj)
         await _validate_abbrev(session, obj, entity_id=obj.id)
         await _validate_ipam(session, obj, entity_id=obj.id)

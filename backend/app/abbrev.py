@@ -165,20 +165,21 @@ async def suggest_abbreviation(
     session: AsyncSession,
     full_name: str,
     max_length: Optional[int] = None,
-    trim_mode: str = "first_2",
+    trim_mode: str = "consonants",
     case_enforcement: Optional[str] = "lowercase",
     entity_type: Optional[str] = None,
     entity_id: Optional[int] = None,
 ) -> str:
-    """Naming-convention modifications (item 2/3) — a GUARANTEED-available
-    abbreviation candidate derived from *full_name*, for the "Suggest from
-    Full Name" action on every lookup dictionary's abbreviation field.
+    """Bug fix (post-Phase-6 QA) — a GUARANTEED-available abbreviation
+    candidate derived from *full_name*. Called by ``crud.py``'s
+    ``_auto_abbreviate`` on every create/update of a LookupMixin row (the
+    forced, non-editable path) and still exposed via
+    ``GET /naming/suggest-abbreviation`` for any other caller.
 
-    Derives a base via the existing trim-mode machinery (default: first 2
-    letters — "Virtualfactor" -> "vf" is itself a hand-picked real-world
-    abbreviation, not something any mechanical rule can reliably guess
-    from a single un-delimited word, so this picks the simple, predictable
-    default and lets an operator type something smarter if they want to).
+    Defaults to consonant-stripping ("Hoymeaseguro" -> "hm") — the closest
+    mechanical rule to how real-world abbreviations like "Virtualfactor" ->
+    "vf" are actually chosen, though no rule can perfectly reproduce a
+    hand-picked abbreviation from a single un-delimited word every time.
     On a collision, appends an incrementing numeric suffix (`vf` -> `vf1`
     -> `vf2` -> ...), trimming the base further if *max_length* would
     otherwise be exceeded. Never raises — always returns a usable, charset-

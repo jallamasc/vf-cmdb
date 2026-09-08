@@ -220,6 +220,117 @@ that already existed). Verified: 345 backend pytest passed / 1 skipped
 dev backend: `/naming/suggest-abbreviation`, the `max_length` 422
 rejection, and `/regions` data (has lat/lng) all confirmed working.
 
+**Post-Phase-6 QA round 2 (2026-09-08, same day, later still)** — 4 more
+bugs reported from live browser testing, all fixed and verified (a larger
+backlog from the same feedback batch — column reordering, short-name
+enrichment, Datacenter/Floor fantastic names, IPAM/port-grouping/
+PowerOutlet-UI gaps — is intentionally deferred; see "Next" below):
+
+A. **Abbreviation was still manually editable** despite the "Suggest"
+   button from the prior round — the button only ever offered a value, it
+   never forced anything. Fixed at the root: `crud.py`'s new
+   `_auto_abbreviate()` hook runs on every `create_item`/`update_item` for
+   the 17 plain full_name/abbreviation lookups (LookupMixin — anything
+   whose `abbrev.ABBR_FIELDS` entry is `"abbreviation"`, NOT the
+   `"code"`-based hierarchy models which keep their existing
+   `AbbrevField.tsx` manual/derived choice on Hierarchy), and
+   unconditionally overwrites whatever the client sent with a value
+   derived from `full_name` via `abbrev.suggest_abbreviation` — collision
+   -> numeric suffix, same as before. Default derivation is now
+   `trim_mode="consonants"` (was `"first_2"`) — e.g. "Hoymeaseguro" ->
+   "hymsgr" — the closest mechanical rule to how real abbreviations like
+   "Virtualfactor" -> "vf" are actually picked, though no rule reproduces
+   a hand-picked one perfectly every time (flagged to the user as a
+   known tradeoff). `LookupMixin.trim_mode`/`case_enforcement` defaults
+   changed to `"consonants"`/`"lowercase"` (was `"manual"`/`"mixed"`) to
+   match; an existing `"manual"` row is treated the same as `"consonants"`
+   for this forced path. The changelog now records the actual derived
+   value, not whatever the client attempted. Frontend: `Naming.tsx`'s
+   Abbreviation column is now `roCol` (was `textCol`), and the whole
+   "Suggest abbreviation" panel/button was removed (redundant — it's
+   automatic now). The `GET /naming/suggest-abbreviation` endpoint itself
+   is kept (harmless, still useful for other callers), its own default
+   trim mode updated to `"consonants"` too.
+B. **Clicking a region only ever focused the map/list — the dedicated
+   detail page (`RegionDetail.tsx`, already built last round) was easy to
+   miss.** Its "View details ->" link column existed but sat after every
+   other column (off-screen without scrolling) — moved to the front, right
+   next to the flag column. Also added a prominent "Open detail page for
+   '<name>' ->" link that appears next to the map whenever a region is
+   selected (by grid row OR by clicking its map marker), so the marker
+   click — which only ever focused/filtered before — now has an obvious,
+   one-click way to reach the real detail page too.
+C. **Site's "fantastic" name (`theme_name`) was locked (`roCol`) in the
+   Sites grid**, even though the dedicated tri-mode panel above the grid
+   could already set it — the two are meant to coexist (e.g. "Mirial -
+   Code Name"), not one gate the other. Changed to `textCol` in
+   `Sites.tsx` so it's a normal editable cell too, same as the panel.
+   (Datacenter/Floor getting their own fantastic+short names is a bigger,
+   separate ask — see "Next".)
+D. **Stencil Library "apply" (and the manual SVG upload) silently did
+   nothing — `stencil_url` stayed blank.** Root cause: `upload_stencil`
+   (`POST /stencils/{model_slug}`) only ever wrote the on-disk cache via
+   `stencils.store_bytes`; it never patched the owning row's own
+   `stencil_url`/`stencil_url_back` column, which is what every consumer
+   (`RackView`, `PortConfigView`, `PowerDeviceView`, and the admin UI's own
+   next load) actually reads to decide whether to render anything. Fixed
+   by patching that column (via `crud.update_item`, using the existing
+   `_parse_owner_slug`/`STENCIL_RESOURCES` map) right after the cache
+   write succeeds — covers BOTH the 4 device-type lookups and all 10
+   Universal_Stencil_Override device-instance tables, since they share the
+   one endpoint. Also fixed `StencilField.tsx`'s `StencilFaceRow`: its URL
+   input's local state never re-synced after an external update (upload/
+   library-apply), so it kept showing stale/blank text even once the real
+   column was correct — added a `useEffect` resync.
+
+Verified: 356 backend pytest passed / 1 skipped (a full-suite run without
+these fixes intermittently shows spurious Postgres `DeadlockDetectedError`
+failures across ~24 unrelated test files under this fixture setup's
+per-test drop/create-schema churn — confirmed pre-existing and unrelated
+by re-running the exact same failing files in isolation, all green; not
+fixed this round, flagging for awareness), 349 frontend Vitest passed
+(+0 net — some `Naming.test.tsx` cases were removed with the Suggest panel,
+one new `MemoryRouter` wrapper needed since `Naming.tsx` now renders a
+real `<Link>` outside of any grid column mock), `tsc --noEmit` clean,
+`vite build` clean. New backend test files: `test_forced_abbreviation.py`,
+`test_stencil_upload_persists_url.py`; `test_max_length.py`/
+`test_suggest_abbreviation.py` rewritten for the new forced-derivation
+behavior (collisions are now seeded directly in `AbbreviationRegistry`
+rather than via `crud.create_item`, since that no longer accepts a literal
+client-supplied abbreviation for these models).
+
+**Next** (from the same feedback batch, not yet started/confirmed):
+- Short-name enrichment vs the 8-char cap — user wants `vf_short_name` to
+  carry more identifying detail ("device, place, etc.") while still
+  capped at 8 chars; these pull in opposite directions and need either a
+  smarter component-priority order or a renegotiated cap — flag explicitly
+  before implementing.
+- Global column reordering: ID -> Code Name -> Fantastic Name (editable)
+  -> VF long name -> VF short name -> rest, applied consistently across
+  Sites AND every device grid (PhysicalServers/VirtualMachines/
+  Workstations/NetworkDevices/ContainersApps) — audit each grid's current
+  order.
+- Datacenter/DatacenterFloor need their own fantastic name + coded short
+  name (Room/Section already have `theme_name`/`theme_category` columns,
+  schema-only, no UI wired; Datacenter has neither column nor generator
+  yet — needs a migration + `naming.py` generator + UI).
+- IP Assignment creation should offer a dropdown of available IPs (reuse
+  the existing, currently-unused `/ipam/subnets/{id}/next-ip` /
+  `/next-reserved` endpoints) instead of a raw manual IP field.
+- Port Config grid should group rows by owning device (no AG-Grid
+  `rowGroup`/`masterDetail` used anywhere in the app yet).
+- `PowerOutlet` has full generic-CRUD backend support but zero frontend
+  page/route — can't be created via the UI at all.
+- Bulk "generate N ports" action for `DeviceInterface` (currently one row
+  at a time).
+- IPAM/Subnets page appearing empty — likely stale/unseeded data rather
+  than a code bug (`SubnetIpv4`/`SubnetIpv6` have no blocking required
+  FK); verify against the live DB row count before changing any code.
+- The claimed "IPv4-to-IPv6 mapping table" does not exist in this schema
+  (only `IpAssignment` carrying both address columns on one row) — this
+  needs to be reconciled with the user before building anything against
+  it.
+
 **Next for the user**: browser-test Phase 6 at `http://localhost:5173` —
 particularly the Naming Conventions page's new Hardware Spec panel
 (Icecat/Brave lookup, read-only results) on any of the 4 device-type

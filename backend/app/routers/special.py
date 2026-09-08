@@ -718,7 +718,7 @@ async def naming_preview(
 async def naming_suggest_abbreviation(
     full_name: str,
     max_length: Optional[int] = None,
-    trim_mode: str = "first_2",
+    trim_mode: str = "consonants",
     case_enforcement: str = "lowercase",
     entity_type: str = "",
     entity_id: Optional[int] = None,
@@ -1028,12 +1028,27 @@ async def upload_stencil(
         stencils.store_bytes(slug, data, file.content_type, face)
     except stencils.InvalidStencil as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+    path = f"{settings.api_prefix}/stencils/{slug}?face={face}"
+    # Bug fix (post-Phase-6 QA) — `store_bytes` only wrote the disk cache;
+    # it never persisted anything to the owning row's own
+    # `stencil_url`/`stencil_url_back` column. Every consumer that decides
+    # whether to render a stencil at all (RackView, PortConfigView,
+    # PowerDeviceView, the StencilField manual-upload row, the
+    # StencilLibraryPicker "apply" flow — all of which call this SAME
+    # endpoint) reads that column, not the disk cache, so an uploaded/
+    # applied stencil silently never showed up until this was fixed.
+    parsed = _parse_owner_slug(slug)
+    if parsed is not None:
+        resource, row_id = parsed
+        model = STENCIL_RESOURCES[resource]
+        attr = "stencil_url_back" if face == "back" else "stencil_url"
+        await crud.update_item(session, model, row_id, {attr: path})
     return {
         "model_slug": slug,
         "face": face,
         "stored": True,
         "bytes": len(data),
-        "path": f"{settings.api_prefix}/stencils/{slug}?face={face}",
+        "path": path,
     }
 
 

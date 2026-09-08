@@ -71,12 +71,12 @@ export default function NetworkDevices() {
             map["network-device-types"],
             "last_fact_sync_at"
           ),
-          // FEAT-7: the long name opens the device detail dashboard.
-          deviceLinkCol("vf_long_name", "VF Long Name", "network_devices", 240),
-          textCol("vf_friendly_name", "Friendly Name", 150),
-          // Req 10.2/10.4 — "Simple Name" is still a free-text cell (manual
-          // entry always works) plus a themed-picker button next to it.
-          textCol("alternative_name", "Simple Name", 140),
+          // Bug fix (post-Phase-6 QA, round 3) — column-order convention:
+          // ID -> Fantastic Name (editable) -> VF Long Name -> VF Short
+          // Name -> rest. "Simple Name" (`alternative_name`, still a
+          // free-text cell — manual entry always works) plus its themed-
+          // picker button fill the Fantastic Name slot, moved up front.
+          textCol("alternative_name", "Fantastic Name", 140),
           {
             headerName: "Theme",
             width: 90,
@@ -92,6 +92,9 @@ export default function NetworkDevices() {
               </button>
             ),
           },
+          // FEAT-7: the long name opens the device detail dashboard.
+          deviceLinkCol("vf_long_name", "VF Long Name", "network_devices", 240),
+          textCol("vf_friendly_name", "VF Short Name", 150),
           fkCol("site_id", "Site", map["sites"]),
           fkCol("rack_id", "Rack", map["racks"]),
           numCol("rack_unit", "U"),

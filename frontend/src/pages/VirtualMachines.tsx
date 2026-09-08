@@ -24,9 +24,13 @@ export default function VirtualMachines() {
   const columns = useMemo(
     () => [
       roCol("id", "ID", 70),
+      // Bug fix (post-Phase-6 QA, round 3) — column-order convention: ID ->
+      // Fantastic Name -> VF Long Name -> VF Short Name -> rest.
+      // VirtualMachine has no `vf_long_name` at all, so this is just
+      // Fantastic Name (its `friendly_name`) -> VF Short Name.
+      textCol("friendly_name", "Fantastic Name", 160),
       // FEAT-7: the short name opens the device detail dashboard.
-      deviceLinkCol("vf_short_name", "Short Name", "virtual_machines", 170),
-      textCol("friendly_name", "Friendly Name", 160),
+      deviceLinkCol("vf_short_name", "VF Short Name", "virtual_machines", 170),
       fkCol("host_server_id", "Host Server", map["physical-servers"]),
       fkCol("site_id", "Site", map["sites"]),
       fkCol("cluster_type_id", "Cluster", map["cluster-types"]),

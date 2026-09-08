@@ -33,9 +33,14 @@ export default function Workstations() {
   const columns = useMemo(
     () => [
       roCol("id", "ID", 70),
-      generatedCol("vf_short_name", "Short Name", 130),
+      // Bug fix (post-Phase-6 QA, round 3) — column-order convention: ID ->
+      // Fantastic Name -> VF Long Name -> VF Short Name -> rest. No
+      // `theme_name` column exists on Workstation, so the existing
+      // freeform `alternative_name` fills that slot.
+      textCol("alternative_name", "Fantastic Name", 150),
       // FEAT-7: the long name opens the device detail dashboard.
       deviceLinkCol("vf_long_name", "VF Long Name", "workstations", 240),
+      generatedCol("vf_short_name", "VF Short Name", 130),
       fkCol("site_id", "Site", map["sites"]),
       fkCol("device_type_id", "Device Type", map["compute-device-types"]),
       fkCol("brand_id", "Brand", map["brands"]),
@@ -44,7 +49,6 @@ export default function Workstations() {
       fkCol("os_version_id", "OS Version", map["os-versions"]),
       numCol("consecutive", "Seq"),
       textCol("serial_number", "Serial"),
-      textCol("alternative_name", "Alt Name"),
       ipCol("management_ipv4", "Mgmt IPv4", "lan"),
       textCol("management_fqdn", "Mgmt FQDN", 200),
       textCol("bitwarden_collection_ref", "Bitwarden Ref"),

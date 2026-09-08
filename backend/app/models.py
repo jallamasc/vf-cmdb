@@ -453,6 +453,11 @@ class Datacenter(Base):
     iata_code: Mapped[Optional[str]] = mapped_column(String(10))
     # Generated from the parent site + IATA code (see naming.generate_datacenter).
     vf_long_name: Mapped[Optional[str]] = mapped_column(String(200))
+    # Post-Phase-6 QA (round 3) — "fantastic"/themed nickname, alongside
+    # (not instead of) the real coded `code`, mirroring DatacenterFloor's
+    # existing shape (migration 0033_datacenter_theme_name).
+    theme_name: Mapped[Optional[str]] = mapped_column(String(120))
+    theme_category: Mapped[Optional[str]] = mapped_column(String(40))
     # Per record-type case enforcement for this hierarchy level.
     case_enforcement: Mapped[str] = mapped_column(
         _case_enum("dc_case_enforcement"), nullable=False, default="mixed",

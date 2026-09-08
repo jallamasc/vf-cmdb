@@ -87,3 +87,46 @@ async def test_site_short_name_never_exceeds_the_cap(session):
         session, models.Site, {"organization_id": org.id, "campus_id": campus.id}
     )
     assert len(site.vf_short_name) <= naming.SHORT_NAME_MAX_LENGTH
+
+
+@pytest.mark.asyncio
+async def test_site_short_name_packs_more_than_just_org_and_campus(session):
+    """Bug fix (post-Phase-6 QA, round 3) — org+campus alone used to
+    "win" and stop further packing as soon as it reached 4 characters;
+    now region/building/floor-section/cloud are packed in too, as long as
+    they still fit within the 8-char cap, so the short name carries real
+    place detail instead of just org+campus."""
+    org = await crud.create_item(session, models.Organization, {"full_name": "Virtualfactor", "max_length": 2})  # -> vr
+    region = await crud.create_item(session, models.Region, {"full_name": "Bogota", "max_length": 3})  # -> bgt
+    campus = await crud.create_item(session, models.Campus, {"full_name": "Home", "max_length": 2})  # -> hm
+    site = await crud.create_item(
+        session,
+        models.Site,
+        {"organization_id": org.id, "campus_id": campus.id, "region_id": region.id},
+    )
+    # All three abbreviations fit within 8 chars (2+2+3=7), so all three
+    # must be present, not just org+campus.
+    assert org.abbreviation in site.vf_short_name.lower()
+    assert campus.abbreviation in site.vf_short_name.lower()
+    assert region.abbreviation in site.vf_short_name.lower()
+    assert len(site.vf_short_name) <= naming.SHORT_NAME_MAX_LENGTH
+
+
+@pytest.mark.asyncio
+async def test_site_short_name_skips_a_piece_that_would_only_partially_fit(session):
+    """A component that doesn't fully fit in the remaining room is skipped
+    entirely (never cut mid-abbreviation) — org (6) + campus (2) already
+    fill the 8-char cap exactly, so region's own abbreviation must be
+    dropped whole rather than partially spliced in."""
+    org = await crud.create_item(session, models.Organization, {"full_name": "Virtualfactor", "max_length": 6})
+    campus = await crud.create_item(session, models.Campus, {"full_name": "Home", "max_length": 2})
+    region = await crud.create_item(session, models.Region, {"full_name": "Region"})
+    site = await crud.create_item(
+        session,
+        models.Site,
+        {"organization_id": org.id, "campus_id": campus.id, "region_id": region.id},
+    )
+    assert len(site.vf_short_name) <= naming.SHORT_NAME_MAX_LENGTH
+    assert org.abbreviation in site.vf_short_name.lower()
+    assert campus.abbreviation in site.vf_short_name.lower()
+    assert region.abbreviation not in site.vf_short_name.lower()

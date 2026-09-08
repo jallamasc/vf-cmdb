@@ -68,27 +68,39 @@ async def site_long_name(session: AsyncSession, site: models.Site) -> str:
 async def site_short_name(session: AsyncSession, site: models.Site) -> str:
     """Recognisable short name for a site.
 
-    Starts from organization + campus (``VFHM`` for Virtualfactor / Home) and,
-    when that is too terse to be meaningful — e.g. a site with no campus would
-    collapse to just ``VF`` — keeps appending the next most identifying levels
-    (region, cloud, building, floor/section) until ``SHORT_NAME_MIN_LENGTH`` is
-    reached. Sites that already produce a long-enough code are left untouched,
-    so existing values never churn.
+    Bug fix (post-Phase-6 QA) — this used to stop as soon as organization +
+    campus reached ``SHORT_NAME_MIN_LENGTH`` (4 characters), so a site with
+    both set (the common case) ended up as just those two pieces — "the name
+    of the cloud and the placement" and nothing else, per the reported
+    complaint. It now greedily PACKS as many distinct hierarchy levels as
+    fit within ``SHORT_NAME_MAX_LENGTH`` (still 8 — the cap itself is
+    unchanged), in priority order: organization, campus, region, building,
+    floor/section, cloud. Region/building/floor-section rank above cloud
+    because they carry real physical "place" detail (the user's own
+    example), whereas cloud is often the same value across many sites and
+    adds the least distinguishing information per character spent. A piece
+    that would only PARTIALLY fit is skipped entirely rather than being cut
+    mid-abbreviation (e.g. skip a 3-char piece with only 2 chars of room
+    left) so every included piece stays a whole, recognisable code — the
+    final `[:SHORT_NAME_MAX_LENGTH]` slice is just a safety net for the
+    pathological case where the FIRST piece alone already exceeds the cap.
     """
-    short = (
-        await _abbr(session, models.Organization, site.organization_id)
-        + await _abbr(session, models.Campus, site.campus_id)
-    )
-    fallbacks = (
+    components = (
+        (models.Organization, site.organization_id),
+        (models.Campus, site.campus_id),
         (models.Region, site.region_id),
-        (models.Cloud, site.cloud_id),
         (models.Building, site.building_id),
         (models.FloorSection, site.floor_section_id),
+        (models.Cloud, site.cloud_id),
     )
-    for model, pk in fallbacks:
-        if len(short) >= SHORT_NAME_MIN_LENGTH:
-            break
-        short += await _abbr(session, model, pk)
+    short = ""
+    for model, pk in components:
+        piece = await _abbr(session, model, pk)
+        if not piece:
+            continue
+        if len(short) + len(piece) > SHORT_NAME_MAX_LENGTH and short:
+            continue
+        short += piece
     return short[:SHORT_NAME_MAX_LENGTH].upper()
 
 

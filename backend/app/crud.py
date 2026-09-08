@@ -807,16 +807,21 @@ async def update_item(
             changes.append((field, old_value, new_value))
             setattr(obj, field, new_value)
     if changes:
-        # Force-derive the abbreviation from (possibly just-updated)
-        # full_name — this must win over whatever the client attempted to
-        # set the field to directly, and must also fire when full_name (or
-        # trim_mode/case_enforcement/max_length) changed even if the client
-        # never touched `abbreviation` itself.
-        derived_abbrev = await _auto_abbreviate(session, obj, entity_id=obj.id)
-        if derived_abbrev is not None:
-            changes = [c for c in changes if c[0] != "abbreviation"]
-            if _to_str(original_abbrev) != _to_str(derived_abbrev):
-                changes.append(("abbreviation", original_abbrev, derived_abbrev))
+        # Bug fix (post-Phase-6 QA) — only re-derive the abbreviation when
+        # something that actually affects it changed. Recomputing on EVERY
+        # update (e.g. a device-type's unrelated `stencil_url` PATCH from
+        # the stencil-upload endpoint) silently rewrote the abbreviation
+        # every time, which is a worse bug than the one being fixed here.
+        changed_fields = {c[0] for c in changes}
+        if changed_fields & {"full_name", "trim_mode", "case_enforcement", "max_length", "abbreviation"}:
+            # Force-derive from (possibly just-updated) full_name — this
+            # must win over whatever the client attempted to set the field
+            # to directly.
+            derived_abbrev = await _auto_abbreviate(session, obj, entity_id=obj.id)
+            if derived_abbrev is not None:
+                changes = [c for c in changes if c[0] != "abbreviation"]
+                if _to_str(original_abbrev) != _to_str(derived_abbrev):
+                    changes.append(("abbreviation", original_abbrev, derived_abbrev))
         validate_required(model, obj)
         await _validate_abbrev(session, obj, entity_id=obj.id)
         await _validate_ipam(session, obj, entity_id=obj.id)

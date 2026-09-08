@@ -40,6 +40,20 @@ class Settings(BaseSettings):
     # configures once. 0 (falsy) means "not configured yet".
     semaphore_project_id: int = 0
 
+    # Icecat Open Catalog (Phase 6 Task 34, Req 13.3) — an administrator's
+    # Open Icecat account, used by the Hardware_Spec_Lookup's brand+model
+    # lookup. Empty by default: the lookup endpoint falls straight through
+    # to Brave Search when unset, exactly like Bitwarden/Semaphore degrade
+    # gracefully above.
+    icecat_username: str = ""
+    icecat_password: str = ""
+    icecat_base_url: str = "https://data.icecat.biz/xml_s3/xml_server3.cgi"
+
+    # Brave Search (Phase 6 Task 35, Req 13.3) — the fallback source when
+    # Icecat has no or incomplete data for a brand+model. Empty by default.
+    brave_search_api_key: str = ""
+    brave_search_base_url: str = "https://api.search.brave.com/res/v1/web/search"
+
     @property
     def database_url(self) -> str:
         return (

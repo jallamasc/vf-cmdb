@@ -12,6 +12,12 @@ static inventory referencing the record's management IP and its Bitwarden
 Secrets_Client reference as an Ansible host variable (never the plaintext
 credential itself — that stays in Bitwarden, fetched at run time by
 whatever executes the playbook).
+
+Phase 6 Task 38 (Req 13.4) reuses this same inventory (no new automation
+transport — design.md Key Decision 11) as the target for Gather_Facts_Sync:
+a Semaphore template run against it reports real Ansible facts back via
+``POST /generic-entities/{id}/facts`` (``routers.special.ingest_generic_entity_facts``),
+using the ``cmdb_id`` hostvar ``_inventory_content`` below now carries.
 """
 from __future__ import annotations
 
@@ -29,9 +35,23 @@ def _inventory_name(obj: "models.GenericEntity") -> str:
 
 def _inventory_content(obj: "models.GenericEntity", management_ip: str | None) -> str:
     """A single-host static Ansible inventory. Host vars reference the
-    management IP and the Bitwarden secret id — never the secret's value."""
+    management IP and the Bitwarden secret id — never the secret's value.
+
+    Phase 6 Task 38 (Req 13.4) — also carries ``cmdb_id``, the SAME
+    hostvar-naming convention ``ansible/README.md`` already documents for
+    the dynamic-inventory-driven hardcoded device tables (``cmdb_id`` on
+    each host, used by a "push facts back" playbook task to know which
+    record to report to). This is the Semaphore template convention: a
+    gather-facts playbook run against one of these single-host inventories
+    reads ``cmdb_id`` and POSTs its results to
+    ``{{ cmdb_api_url }}/generic-entities/{{ cmdb_id }}/facts`` — see
+    ``ansible/README.md`` section 3 for the full example task.
+    """
     host = management_ip or "unassigned"
-    hostvars = [f"ansible_user={obj.admin_username}" if obj.admin_username else None]
+    hostvars = [
+        f"cmdb_id={obj.id}",
+        f"ansible_user={obj.admin_username}" if obj.admin_username else None,
+    ]
     if obj.bw_secret_id:
         hostvars.append(f"vf_cmdb_bw_secret_id={obj.bw_secret_id}")
     line = " ".join([host, *[v for v in hostvars if v]])

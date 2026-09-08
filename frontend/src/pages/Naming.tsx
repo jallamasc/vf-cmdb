@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import { useQueries, useQueryClient, useMutation } from "@tanstack/react-query";
 import EntityGrid from "../components/EntityGrid";
 import { StencilPanel } from "../components/StencilField";
+import HardwareSpecPanel, { hasHardwareSpecFields } from "../components/HardwareSpecPanel";
 import { api, Row } from "../api";
 import { textCol, roCol, numCol, selectCol, flagCol, iconCol } from "../lib/columns";
 import { regionAbbreviationsForCountry, countriesForRegion } from "../lib/regionGeo";
@@ -389,15 +390,31 @@ export default function Naming() {
             }
             // Phase 5 Task 29 (Req 24.1/24.2) — inline, expandable stencil
             // management for the selected row, replacing the old standalone
-            // "list every row" stencil panel.
+            // "list every row" stencil panel. Phase 6 Task 37 (Req 13.2)
+            // adds the hardware-spec fields + online lookup panel right
+            // below it, on the SAME 4 device-type resources.
             panel={
               STENCIL_RESOURCES.has(active) ? (
-                <StencilPanel
-                  resource={active}
-                  label={activeLabel}
-                  selected={selected}
-                  onChanged={() => qc.invalidateQueries({ queryKey: [active] })}
-                />
+                <div className="space-y-3">
+                  <StencilPanel
+                    resource={active}
+                    label={activeLabel}
+                    selected={selected}
+                    onChanged={() => qc.invalidateQueries({ queryKey: [active] })}
+                  />
+                  {hasHardwareSpecFields(active) &&
+                    (selected ? (
+                      <HardwareSpecPanel
+                        resource={active}
+                        row={selected}
+                        onChanged={() => qc.invalidateQueries({ queryKey: [active] })}
+                      />
+                    ) : (
+                      <div className="px-3 py-2 border border-dashed border-slate-300 rounded text-sm text-slate-500">
+                        Select a {activeLabel} row below to manage its hardware specs.
+                      </div>
+                    ))}
+                </div>
               ) : undefined
             }
             onSelectionChanged={handleSelection}

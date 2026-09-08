@@ -25,6 +25,8 @@ from .. import (
     photos,
     ports,
     endoflife_client,
+    icecat_client,
+    search_client,
     semaphore_client,
     stencil_library,
     stencil_sources,
@@ -1640,6 +1642,50 @@ async def ingest_facts(
 
 
 # ---------------------------------------------------------------------------
+# Phase 6 Task 38 (Requirement 13.4) — Gather_Facts_Sync ingestion for
+# ansible_managed Generic_Entity records.
+#
+# The 5 hardcoded device tables above have no capability system at all —
+# every row of PhysicalServer/etc is implicitly fact-collectable, so
+# `ingest_facts` needs no gate beyond "does this row exist". A
+# Generic_Entity's own Entity_Type_Def might NOT carry the ansible_managed
+# Capability though, so this dedicated endpoint checks that before writing
+# anything — reusing the exact same `build_facts_payload` merge semantics
+# and `ansible_callback` change-source as `ingest_facts` otherwise. The
+# Semaphore template convention for reaching this endpoint (which host
+# variable a gather-facts playbook reads to know its target, and the exact
+# callback URL shape) is documented in `ansible/README.md` section 3; the
+# `cmdb_id` hostvar it relies on is written by
+# `lifecycle_sync._inventory_content` into the record's own single-host
+# Semaphore Inventory (design.md Key Decision 11 — no new automation
+# transport, this reuses Phase 5 Sub-phase F's template/task launch path).
+# ---------------------------------------------------------------------------
+@router.post("/generic-entities/{entity_id}/facts")
+async def ingest_generic_entity_facts(
+    entity_id: int,
+    facts: dict[str, Any],
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    existing = await session.get(models.GenericEntity, entity_id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Record not found")
+    entity_type = await session.get(models.EntityTypeDef, existing.entity_type_id)
+    caps = (entity_type.capabilities if entity_type else None) or []
+    if "ansible_managed" not in caps:
+        raise HTTPException(
+            status_code=400,
+            detail="Record's entity type does not carry the ansible_managed capability",
+        )
+    payload = build_facts_payload(existing.ansible_facts, facts)
+    obj = await crud.update_item(
+        session, models.GenericEntity, entity_id, payload, source="ansible_callback"
+    )
+    if obj is None:
+        raise HTTPException(status_code=404, detail="Record not found")
+    return crud.to_dict(obj)
+
+
+# ---------------------------------------------------------------------------
 # Phase 6 Task 30 (Requirement 12.1) — endoflife.date sync: manual trigger.
 # The automatic side (seed-time, first-run-only) lives in seed.py; this is
 # the "manual trigger" half of Requirement 12.1's "at seed time and via a
@@ -1658,3 +1704,48 @@ async def sync_os_data(
     result = await endoflife_client.sync_products(session, products)
     await session.commit()
     return result.as_dict()
+
+
+# ---------------------------------------------------------------------------
+# Phase 6 Task 36 (Requirement 13.3) — Hardware_Spec_Lookup: Icecat first,
+# Brave Search fallback. NEVER saves anything itself — every value here is
+# a PROPOSAL the caller (Task 37's detail page) shows the operator, who
+# must explicitly confirm before it's PATCHed onto a device-type row
+# through the ordinary generic CRUD endpoint.
+# ---------------------------------------------------------------------------
+@router.post("/hardware-specs/lookup")
+async def lookup_hardware_specs(
+    brand: str = Body(..., embed=True),
+    model: str = Body(..., embed=True),
+) -> dict[str, Any]:
+    """Req 13.3 — query Icecat first; fall back to a Brave Search result
+    (links + snippets, never auto-parsed values) when Icecat has no or
+    incomplete data, or isn't configured, or fails outright."""
+    try:
+        icecat = icecat_client.get_icecat_client()
+    except icecat_client.IcecatNotConfigured:
+        icecat = None
+
+    if icecat is not None:
+        try:
+            result = await icecat.lookup_by_brand_model(brand, model)
+        except icecat_client.IcecatLookupFailed:
+            result = None
+        if result is not None and result.found:
+            return {"source": "icecat", "icecat": result.as_dict(), "brave_results": []}
+
+    try:
+        brave = search_client.get_brave_search_client()
+    except search_client.BraveSearchNotConfigured:
+        return {"source": "none", "icecat": None, "brave_results": []}
+
+    try:
+        results = await brave.search(f"{brand} {model} specifications")
+    except search_client.BraveSearchFailed:
+        return {"source": "none", "icecat": None, "brave_results": []}
+
+    return {
+        "source": "brave" if results else "none",
+        "icecat": None,
+        "brave_results": [r.as_dict() for r in results],
+    }

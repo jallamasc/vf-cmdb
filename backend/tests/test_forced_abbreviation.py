@@ -54,6 +54,20 @@ async def test_a_collision_gets_a_numeric_suffix(session):
     assert second.abbreviation == "cm1"
 
 
+async def test_unrelated_field_update_does_not_re_derive_the_abbreviation(session):
+    """Bug fix (post-Phase-6 QA, round 2) — updating a field that has
+    nothing to do with the abbreviation (e.g. `icon`, or a device-type's
+    own `stencil_url` from the stencil-upload endpoint) must NOT silently
+    rewrite it — only a change to `full_name`/`trim_mode`/
+    `case_enforcement`/`max_length`/`abbreviation` itself may re-derive."""
+    ndt = await crud.create_item(session, models.NetworkDeviceType, {"full_name": "Firewall"})
+    original = ndt.abbreviation
+    updated = await crud.update_item(
+        session, models.NetworkDeviceType, ndt.id, {"stencil_url": "https://x/fw.svg"}
+    )
+    assert updated.abbreviation == original
+
+
 async def test_datacenter_code_is_not_forced_derived(session):
     """Datacenter uses `code`, not `abbreviation`, and is explicitly out of
     scope for this bug fix — a client-provided code is still respected."""

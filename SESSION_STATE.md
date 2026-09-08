@@ -283,12 +283,25 @@ D. **Stencil Library "apply" (and the manual SVG upload) silently did
    library-apply), so it kept showing stale/blank text even once the real
    column was correct — added a `useEffect` resync.
 
-Verified: 356 backend pytest passed / 1 skipped (a full-suite run without
-these fixes intermittently shows spurious Postgres `DeadlockDetectedError`
-failures across ~24 unrelated test files under this fixture setup's
-per-test drop/create-schema churn — confirmed pre-existing and unrelated
-by re-running the exact same failing files in isolation, all green; not
-fixed this round, flagging for awareness), 349 frontend Vitest passed
+Also fixed a real regression caught by live-testing this round's own
+stencil fix: the first version of `_auto_abbreviate`'s update-path
+recomputed the abbreviation on ANY field change (e.g. patching
+`stencil_url` from the upload endpoint silently rewrote the abbreviation
+too) — narrowed to only re-derive when `full_name`/`trim_mode`/
+`case_enforcement`/`max_length`/`abbreviation` itself actually changed;
+added `test_unrelated_field_update_does_not_re_derive_the_abbreviation`.
+
+(Side note on process hygiene: an earlier verification pass in this same
+session showed ~24 spurious Postgres `DeadlockDetectedError` failures
+across unrelated test files; root cause was NOT the app — it was multiple
+`pytest` background processes left running concurrently against the same
+`vfcmdb_test` DB from earlier `control_bash_process` invocations that
+were never stopped. Killing the strays and running a single clean pass
+gives a fully green, non-flaky 357/1-skipped every time. Always confirm
+no other pytest process is still running against the test DB before
+trusting a "flaky" failure.)
+
+Verified (single clean run): 357 backend pytest passed / 1 skipped, 349 frontend Vitest passed
 (+0 net — some `Naming.test.tsx` cases were removed with the Suggest panel,
 one new `MemoryRouter` wrapper needed since `Naming.tsx` now renders a
 real `<Link>` outside of any grid column mock), `tsc --noEmit` clean,

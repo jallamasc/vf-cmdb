@@ -37,8 +37,12 @@ export default function ContainersApps() {
   const columns = useMemo(
     () => [
       roCol("id", "ID", 70),
-      generatedCol("vf_short_name", "Short Name", 130),
-      textCol("friendly_name", "Friendly Name", 160),
+      // Bug fix (post-Phase-6 QA, round 3) — column-order convention: ID ->
+      // Fantastic Name -> VF Long Name -> VF Short Name -> rest.
+      // ContainerApp has no `vf_long_name`, so this is Fantastic Name
+      // (`friendly_name`) -> VF Short Name.
+      textCol("friendly_name", "Fantastic Name", 160),
+      generatedCol("vf_short_name", "VF Short Name", 130),
       selectCol("container_type", "Type", ["cn", "ap"], { width: 120 }),
       fkCol("host_vm_id", "Host VM", map["virtual-machines"]),
       fkCol("host_server_id", "Host Server", map["physical-servers"]),

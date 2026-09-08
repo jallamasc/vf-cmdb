@@ -61,6 +61,7 @@ const NAV: {
       { to: "/patch-panels", label: "Patch Panels (list)", icon: Rows3 },
       { to: "/power-device-view", label: "Power Device View", icon: Zap },
       { to: "/power", label: "Power (list)", icon: Plug },
+      { to: "/power-outlets", label: "Power Outlets", icon: Plug },
       { to: "/cables", label: "Cables", icon: Cable },
     ],
   },

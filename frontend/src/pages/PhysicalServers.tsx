@@ -35,9 +35,16 @@ export default function PhysicalServers() {
   const columns = useMemo(
     () => [
       roCol("id", "ID", 70),
-      generatedCol("vf_short_name", "Short Name", 130),
+      // Bug fix (post-Phase-6 QA, round 3) — global column-order convention:
+      // ID -> Fantastic Name (editable nickname) -> VF Long Name -> VF
+      // Short Name -> rest. PhysicalServer has no `theme_name` column of
+      // its own (only Site/NetworkDevice do), so `alternative_name` —
+      // already a free-typed nickname field — fills that slot instead of
+      // inventing a new column.
+      textCol("alternative_name", "Fantastic Name", 150),
       // FEAT-7: the long name opens the device detail dashboard.
       deviceLinkCol("vf_long_name", "VF Long Name", "physical_servers", 240),
+      generatedCol("vf_short_name", "VF Short Name", 130),
       fkCol("site_id", "Site", map["sites"]),
       fkCol("rack_id", "Rack", map["racks"]),
       numCol("rack_unit", "U"),
@@ -58,7 +65,6 @@ export default function PhysicalServers() {
       textCol("ilo_ipmi_fqdn", "iLO FQDN", 200),
       textCol("ilo_ipmi_user", "iLO User"),
       textCol("domain", "Domain"),
-      textCol("alternative_name", "Alt Name"),
       textCol("bitwarden_collection_ref", "Bitwarden Ref"),
       textCol("notes", "Notes"),
     ],

@@ -186,6 +186,41 @@ function SimpleList({ rows, render }: { rows: Row[]; render: (r: Row) => string 
  * uses) — there is otherwise no per-record detail view anywhere on this
  * page to attach a "Blueprint tab" to, so a single toggle IS the tab.
  */
+/**
+ * Post-Phase-6 QA (round 3) — inline "Fantastic Name" editor for one row,
+ * expanded the same click-to-expand way `BlueprintField` already is below.
+ * Floor/Room/Section all already carry `theme_name`/`theme_category`
+ * columns (added by an earlier migration) that had zero UI anywhere —
+ * this is the minimal edit surface for them, reusing the SAME resource +
+ * row `EntityGrid`/`api.update` already relies on elsewhere.
+ */
+function ThemeNameEditor({ resource, row }: { resource: string; row: Row }) {
+  const qc = useQueryClient();
+  const [value, setValue] = useState(String(row.theme_name ?? ""));
+  const save = useMutation({
+    mutationFn: () => api.update(resource, row.id, { theme_name: value || null }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [resource] }),
+  });
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        className={inputCls}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="Fantastic name (nickname)"
+      />
+      <button
+        type="button"
+        onClick={() => save.mutate()}
+        disabled={save.isPending}
+        className="px-2.5 py-1 text-xs rounded bg-slate-800 text-white disabled:opacity-50 shrink-0"
+      >
+        {save.isPending ? "Saving…" : "Save"}
+      </button>
+    </div>
+  );
+}
+
 function BlueprintList({
   rows,
   resource,
@@ -196,6 +231,7 @@ function BlueprintList({
   render: (r: Row) => string;
 }) {
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [namingId, setNamingId] = useState<number | null>(null);
   if (rows.length === 0)
     return <div className="text-xs text-slate-400 italic">No records yet.</div>;
   return (
@@ -203,15 +239,34 @@ function BlueprintList({
       {rows.map((r) => (
         <li key={r.id} className="px-3 py-1.5 text-sm text-slate-700">
           <div className="flex items-center justify-between gap-2">
-            <span>{render(r)}</span>
-            <button
-              type="button"
-              onClick={() => setExpandedId((id) => (id === r.id ? null : r.id))}
-              className="px-2 py-0.5 text-xs rounded border border-slate-300 bg-white hover:bg-slate-100"
-            >
-              {expandedId === r.id ? "Hide blueprint" : "Blueprint"}
-            </button>
+            <span>
+              {r.theme_name ? (
+                <span className="font-medium">{String(r.theme_name)} — </span>
+              ) : null}
+              {render(r)}
+            </span>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => setNamingId((id) => (id === r.id ? null : r.id))}
+                className="px-2 py-0.5 text-xs rounded border border-slate-300 bg-white hover:bg-slate-100"
+              >
+                {namingId === r.id ? "Hide fantastic name" : "🎭 Fantastic name"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setExpandedId((id) => (id === r.id ? null : r.id))}
+                className="px-2 py-0.5 text-xs rounded border border-slate-300 bg-white hover:bg-slate-100"
+              >
+                {expandedId === r.id ? "Hide blueprint" : "Blueprint"}
+              </button>
+            </div>
           </div>
+          {namingId === r.id && (
+            <div className="mt-2 pt-2 border-t border-slate-100">
+              <ThemeNameEditor resource={resource} row={r} />
+            </div>
+          )}
           {expandedId === r.id && (
             <div className="mt-2 pt-2 border-t border-slate-100">
               <BlueprintField resource={resource} row={r} />
@@ -224,10 +279,16 @@ function BlueprintList({
 }
 
 // Req 9: airportCol gives the IATA cell an in-cell search/select editor.
+// Post-Phase-6 QA (round 3) — column-order convention: ID -> Code Name ->
+// Fantastic Name (editable) -> VF Long Name -> rest. `theme_name` is a
+// real, independently editable column here (migration
+// 0033_datacenter_theme_name) — it coexists with `code`, same as Site's
+// theme_name/simple_name.
 const DATACENTER_COLUMNS = [
   roCol("id", "ID", 60),
   textCol("name", "Name", 160),
   textCol("code", "Code", 100),
+  textCol("theme_name", "Fantastic Name", 150),
   textCol("city", "City", 140),
   airportCol("iata_code", "Airport (IATA)"),
   namingComputedCol("vf_long_name", "VF Long Name", 220),
@@ -612,6 +673,9 @@ function DatacenterForm({
   // FEAT-5: the city drives the IATA code that goes into the VF long name.
   const [city, setCity] = useState("");
   const [iataCode, setIataCode] = useState("");
+  // Post-Phase-6 QA (round 3) — Datacenter's own "fantastic name", set at
+  // create time or later via the grid's own "Fantastic Name" column.
+  const [themeName, setThemeName] = useState("");
   return (
     <form
       onSubmit={(e) => {
@@ -619,6 +683,7 @@ function DatacenterForm({
         create.mutate({
           name,
           code: code || null,
+          theme_name: themeName.trim() || null,
           case_enforcement: caseEnf,
           site_id: siteId ? Number(siteId) : null,
           city: city.trim() || null,
@@ -632,6 +697,14 @@ function DatacenterForm({
       </Field>
       <Field label="Site (parent)">
         <Select value={siteId} onChange={setSiteId} rows={sites} placeholder="— select site —" />
+      </Field>
+      <Field label="Fantastic name (optional nickname)">
+        <input
+          className={inputCls}
+          value={themeName}
+          onChange={(e) => setThemeName(e.target.value)}
+          placeholder="e.g. Ironforge"
+        />
       </Field>
       <div className="col-span-2">
         <CityAirportField
@@ -688,6 +761,10 @@ function FloorForm({
   const [dcId, setDcId] = useState("");
   const [floorNo, setFloorNo] = useState("");
   const [valid, setValid] = useState(false);
+  // Post-Phase-6 QA (round 3) — Floor already has a `theme_name` column
+  // (it just had no UI); set at create time here, editable later via the
+  // list's own "🎭 Fantastic name" toggle (`ThemeNameEditor`).
+  const [themeName, setThemeName] = useState("");
   // Phase 6 Task 13/14 (Req 6.1/6.3) — `code` is now auto-generated
   // ("F{n}" scoped to the parent Datacenter) by default; this Quick Add
   // form has no grid to make read-only, so the equivalent Code Mode
@@ -704,6 +781,7 @@ function FloorForm({
           case_enforcement: caseEnf,
           datacenter_id: dcId ? Number(dcId) : null,
           floor_number: floorNo ? Number(floorNo) : null,
+          theme_name: themeName.trim() || null,
           ...(autoCode ? {} : { naming_mode: "manual", code: code || null }),
         });
       }}
@@ -720,6 +798,14 @@ function FloorForm({
       </Field>
       <Field label="Case enforcement">
         <CaseSelect value={caseEnf} onChange={setCaseEnf} />
+      </Field>
+      <Field label="Fantastic name (optional nickname)">
+        <input
+          className={inputCls}
+          value={themeName}
+          onChange={(e) => setThemeName(e.target.value)}
+          placeholder="e.g. Ironforge"
+        />
       </Field>
       <label className="col-span-2 flex items-center gap-2 text-sm text-slate-600 vf-mode-toggle-cell px-2 py-1 rounded w-fit">
         <input
@@ -772,6 +858,10 @@ function RoomForm({
   const [caseEnf, setCaseEnf] = useState("mixed");
   const [floorId, setFloorId] = useState("");
   const [valid, setValid] = useState(false);
+  // Post-Phase-6 QA (round 3) — Room already has a `theme_name` column;
+  // set at create time here, editable later via the list's own
+  // "🎭 Fantastic name" toggle.
+  const [themeName, setThemeName] = useState("");
   return (
     <form
       onSubmit={(e) => {
@@ -781,6 +871,7 @@ function RoomForm({
           code: code || null,
           case_enforcement: caseEnf,
           datacenter_floor_id: floorId ? Number(floorId) : null,
+          theme_name: themeName.trim() || null,
         });
       }}
       className="grid grid-cols-2 gap-3"
@@ -790,6 +881,14 @@ function RoomForm({
       </Field>
       <Field label="Floor (parent)">
         <Select value={floorId} onChange={setFloorId} rows={floors} placeholder="— select floor —" />
+      </Field>
+      <Field label="Fantastic name (optional nickname)">
+        <input
+          className={inputCls}
+          value={themeName}
+          onChange={(e) => setThemeName(e.target.value)}
+          placeholder="e.g. Ironforge"
+        />
       </Field>
       <div className="col-span-2 grid grid-cols-2 gap-3">
         <AbbrevField
@@ -835,6 +934,10 @@ function SectionForm({
   const [caseEnf, setCaseEnf] = useState("mixed");
   const [roomId, setRoomId] = useState("");
   const [valid, setValid] = useState(false);
+  // Post-Phase-6 QA (round 3) — Section already has a `theme_name`
+  // column; set at create time here, editable later via the list's own
+  // "🎭 Fantastic name" toggle.
+  const [themeName, setThemeName] = useState("");
   // Phase 6 Task 13/14 (Req 6.2/6.3) — `code` is now auto-generated
   // ("S{n}" scoped to the parent Room) by default; same Code Mode toggle
   // idiom as FloorForm above.
@@ -847,6 +950,7 @@ function SectionForm({
           name,
           case_enforcement: caseEnf,
           room_id: roomId ? Number(roomId) : null,
+          theme_name: themeName.trim() || null,
           ...(autoCode ? {} : { naming_mode: "manual", code: code || null }),
         });
       }}
@@ -857,6 +961,14 @@ function SectionForm({
       </Field>
       <Field label="Room (parent)">
         <Select value={roomId} onChange={setRoomId} rows={rooms} placeholder="— select room —" />
+      </Field>
+      <Field label="Fantastic name (optional nickname)">
+        <input
+          className={inputCls}
+          value={themeName}
+          onChange={(e) => setThemeName(e.target.value)}
+          placeholder="e.g. Ironforge"
+        />
       </Field>
       <label className="col-span-2 flex items-center gap-2 text-sm text-slate-600 vf-mode-toggle-cell px-2 py-1 rounded w-fit">
         <input

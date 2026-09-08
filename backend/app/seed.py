@@ -259,6 +259,124 @@ async def _log_create(session, obj) -> None:
     )
 
 
+async def _seed_subnets_from_json(session: AsyncSession, site: "models.Site") -> dict[int, int]:
+    """Create every VLAN + Subnet(v4/v6) + role assignment described in
+    ``seed_subnets.json``, attached to *site*. Returns ``vlan_by_id``
+    (seed_subnets.json's ``vlan_id`` -> the created ``Vlan`` row's own
+    primary key), which the rest of ``seed()`` still needs for the network
+    device / port-config section below.
+
+    Post-Phase-6 QA (round 3) — extracted out of ``seed()`` unchanged so
+    ``_backfill_missing_subnets`` (below) can reuse the exact same
+    construction logic instead of duplicating it.
+    """
+    with open(os.path.join(HERE, "seed_subnets.json")) as f:
+        subnet_data = json.load(f)
+
+    vlan_by_id: dict[int, int] = {}
+    subnet4_by_vlan: dict[int, int] = {}
+    for s in subnet_data["subnets_ipv4"]:
+        vid = s["vlan_id"]
+        vlan_pk = None
+        if vid is not None and vid not in vlan_by_id:
+            vlan = models.Vlan(vlan_id=vid, name=s["description"],
+                               description=s["description"], zone=s["zone"],
+                               site_id=site.id)
+            session.add(vlan)
+            await session.flush()
+            vlan_by_id[vid] = vlan.id
+            vlan_pk = vlan.id
+        elif vid is not None:
+            vlan_pk = vlan_by_id[vid]
+
+        cidr = None
+        if s["network"] and s["prefix"]:
+            import ipaddress as _ip
+            try:
+                cidr = str(_ip.ip_network(f"{s['network']}/{s['prefix']}", strict=False))
+            except ValueError:
+                cidr = None
+        sub = models.SubnetIpv4(
+            vlan_id=vlan_pk, site_id=site.id, network_cidr=cidr,
+            gateway=s.get("gateway"),
+            range_from=s.get("range_from"), range_to=s.get("range_to"),
+            expansion_ceiling=s.get("expansion_ceiling"),
+            reserved_count=s.get("reserved_count", 0),
+            reservation_anchor=s.get("reservation_anchor", "from_end"),
+            description=s["description"],
+        )
+        session.add(sub)
+        await session.flush()
+        if vid is not None:
+            subnet4_by_vlan[vid] = sub.id
+        for r in s["roles"]:
+            session.add(models.SubnetRoleAssignment(
+                subnet_ipv4_id=sub.id, role=r["role"], slot_number=r["slot"],
+                ipv4_address=r["ipv4"],
+            ))
+        # Auto-create a locked Gateway reservation (decision Q6) whenever the
+        # segment carries a gateway and one is not already present as a role.
+        gw = s.get("gateway")
+        if gw:
+            gw_ip = str(gw).split("/")[0]
+            have_gw = any(
+                str(r.get("ipv4") or "").split("/")[0] == gw_ip for r in s["roles"]
+            )
+            if not have_gw:
+                session.add(models.SubnetRoleAssignment(
+                    subnet_ipv4_id=sub.id, role="gateway", label="Gateway",
+                    ipv4_address=gw_ip, is_locked=True,
+                ))
+
+    for s in subnet_data["subnets_ipv6"]:
+        vid = s["vlan_id"]
+        vlan_pk = vlan_by_id.get(vid) if vid is not None else None
+        session.add(models.SubnetIpv6(
+            vlan_id=vlan_pk, site_id=site.id, network_cidr=s["network"],
+            range_from=s.get("range_from"), range_to=s.get("range_to"),
+            reserved_count=s.get("reserved_count", 0),
+            reservation_anchor=s.get("reservation_anchor", "from_end"),
+            description=s["description"],
+        ))
+
+    return vlan_by_id
+
+
+async def _backfill_missing_subnets(session: AsyncSession) -> int:
+    """Post-Phase-6 QA (round 3) — "Subnets (IPAM) is always completely
+    empty and I can't add anything, what is this for?"
+
+    The demo-topology seed block (which includes subnet seeding) only ever
+    runs ONCE, gated by the `Organization` row count (see `seed()` below).
+    A database that reached "already seeded" status before subnets
+    existed in `seed_subnets.json` — or one where an `Organization` row
+    was created by hand before the demo topology ever ran — is locked out
+    of ever getting subnet rows from a normal `seed()` run again, even
+    though the feature and the grid (`Subnets.tsx`) work fine; there is
+    simply no data. This is why the Subnets page can appear "always
+    completely empty" on some deployments while working fine on others
+    that happened to seed before any Organization existed.
+
+    This backfill is narrowly scoped to be always safe to run on every
+    startup: it only acts when the WHOLE database has ZERO subnet rows of
+    EITHER family (so it can never duplicate, or interfere with, a
+    topology that already has real — possibly hand-edited — subnet data)
+    and at least one `Site` already exists to attach them to. Returns the
+    number of VLANs it created (0 when it did nothing), for the caller's
+    log message.
+    """
+    v4_count = (await session.execute(select(func.count()).select_from(models.SubnetIpv4))).scalar_one()
+    v6_count = (await session.execute(select(func.count()).select_from(models.SubnetIpv6))).scalar_one()
+    if v4_count or v6_count:
+        return 0
+    site = (await session.execute(select(models.Site).order_by(models.Site.id))).scalars().first()
+    if site is None:
+        return 0
+    vlan_by_id = await _seed_subnets_from_json(session, site)
+    await session.commit()
+    return len(vlan_by_id)
+
+
 async def seed() -> None:
     async with AsyncSessionLocal() as session:
         existing = await session.execute(select(func.count()).select_from(models.Organization))
@@ -278,6 +396,15 @@ async def seed() -> None:
                 print("Lookups already up to date; nothing to add.")
             if backfilled_coords:
                 print(f"Backfilled latitude/longitude on {backfilled_coords} region row(s).")
+            # Post-Phase-6 QA (round 3) — see `_backfill_missing_subnets`'s
+            # docstring: recovers a database stuck with zero subnets from
+            # an Organization row existing before subnets did.
+            backfilled_vlans = await _backfill_missing_subnets(session)
+            if backfilled_vlans:
+                print(
+                    f"Backfilled subnets from seed_subnets.json ({backfilled_vlans} VLAN(s)) "
+                    "— none existed yet."
+                )
             print("Demo topology already present; skipping.")
             return
 
@@ -444,74 +571,7 @@ async def seed() -> None:
             session.add(models.PatchPanelPort(patch_panel_id=pp.id, port_number=p))
 
         # ---- VLANs + subnets + role assignments ----
-        with open(os.path.join(HERE, "seed_subnets.json")) as f:
-            subnet_data = json.load(f)
-
-        vlan_by_id: dict[int, int] = {}
-        subnet4_by_vlan: dict[int, int] = {}
-        for s in subnet_data["subnets_ipv4"]:
-            vid = s["vlan_id"]
-            vlan_pk = None
-            if vid is not None and vid not in vlan_by_id:
-                vlan = models.Vlan(vlan_id=vid, name=s["description"],
-                                   description=s["description"], zone=s["zone"],
-                                   site_id=site.id)
-                session.add(vlan)
-                await session.flush()
-                vlan_by_id[vid] = vlan.id
-                vlan_pk = vlan.id
-            elif vid is not None:
-                vlan_pk = vlan_by_id[vid]
-
-            cidr = None
-            if s["network"] and s["prefix"]:
-                import ipaddress as _ip
-                try:
-                    cidr = str(_ip.ip_network(f"{s['network']}/{s['prefix']}", strict=False))
-                except ValueError:
-                    cidr = None
-            sub = models.SubnetIpv4(
-                vlan_id=vlan_pk, site_id=site.id, network_cidr=cidr,
-                gateway=s.get("gateway"),
-                range_from=s.get("range_from"), range_to=s.get("range_to"),
-                expansion_ceiling=s.get("expansion_ceiling"),
-                reserved_count=s.get("reserved_count", 0),
-                reservation_anchor=s.get("reservation_anchor", "from_end"),
-                description=s["description"],
-            )
-            session.add(sub)
-            await session.flush()
-            if vid is not None:
-                subnet4_by_vlan[vid] = sub.id
-            for r in s["roles"]:
-                session.add(models.SubnetRoleAssignment(
-                    subnet_ipv4_id=sub.id, role=r["role"], slot_number=r["slot"],
-                    ipv4_address=r["ipv4"],
-                ))
-            # Auto-create a locked Gateway reservation (decision Q6) whenever the
-            # segment carries a gateway and one is not already present as a role.
-            gw = s.get("gateway")
-            if gw:
-                gw_ip = str(gw).split("/")[0]
-                have_gw = any(
-                    str(r.get("ipv4") or "").split("/")[0] == gw_ip for r in s["roles"]
-                )
-                if not have_gw:
-                    session.add(models.SubnetRoleAssignment(
-                        subnet_ipv4_id=sub.id, role="gateway", label="Gateway",
-                        ipv4_address=gw_ip, is_locked=True,
-                    ))
-
-        for s in subnet_data["subnets_ipv6"]:
-            vid = s["vlan_id"]
-            vlan_pk = vlan_by_id.get(vid) if vid is not None else None
-            session.add(models.SubnetIpv6(
-                vlan_id=vlan_pk, site_id=site.id, network_cidr=s["network"],
-                range_from=s.get("range_from"), range_to=s.get("range_to"),
-                reserved_count=s.get("reserved_count", 0),
-                reservation_anchor=s.get("reservation_anchor", "from_end"),
-                description=s["description"],
-            ))
+        vlan_by_id = await _seed_subnets_from_json(session, site)
 
         # ---- Network devices ----
         nd_specs = [

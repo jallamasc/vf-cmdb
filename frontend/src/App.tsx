@@ -6,6 +6,7 @@ import Hierarchy from "./pages/Hierarchy";
 import RackView from "./pages/RackView";
 import PatchPanelView from "./pages/PatchPanelView";
 import PowerDeviceView from "./pages/PowerDeviceView";
+import PowerOutlets from "./pages/PowerOutlets";
 import PortConfigView from "./pages/PortConfigView";
 import PhysicalServers from "./pages/PhysicalServers";
 import VirtualMachines from "./pages/VirtualMachines";
@@ -41,6 +42,7 @@ export default function App() {
         <Route path="patch-panels" element={<SimpleGridPage kind="patch-panels" />} />
         <Route path="power-device-view" element={<PowerDeviceView />} />
         <Route path="power" element={<SimpleGridPage kind="power" />} />
+        <Route path="power-outlets" element={<PowerOutlets />} />
         <Route path="cables" element={<CablesViewer />} />
         <Route path="physical-servers" element={<PhysicalServers />} />
         <Route path="virtual-machines" element={<VirtualMachines />} />

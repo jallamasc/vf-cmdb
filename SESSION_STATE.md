@@ -354,6 +354,112 @@ vars to exercise the live external-integration paths (all gracefully
 degrade to "unconfigured" without them, per this phase's non-functional
 requirement).
 
+**Post-Phase-6 QA round 3 (2026-09-08, same day, later still)** — the rest
+of the same feedback batch (short-name detail, global column ordering,
+Datacenter/Floor naming, IP assignment/port-config/power-outlet gaps,
+Subnets-empty investigation). All implemented, tested, and verified:
+
+1. **Site short-name enrichment** — `naming.site_short_name()` used to stop
+   packing components as soon as org+campus reached 4 characters, so a
+   site with both set (the common case) read as just "cloud + placement"
+   and nothing else. Now greedily packs as many distinct hierarchy levels
+   (org, campus, region, building, floor/section, cloud — in that
+   priority order) as fit inside the unchanged 8-char cap, skipping a
+   piece whole rather than truncating it mid-abbreviation if it wouldn't
+   fully fit. Existing rows only get the richer name once they're next
+   saved (naming.apply_naming re-runs on update, not retroactively) —
+   live-verified on Site #1: `VFHM` -> `VFHMM1VS` after a no-op PATCH.
+2. **Global column order** (`ID -> Fantastic Name -> VF Long Name -> VF
+   Short Name -> rest`) applied to `PhysicalServers.tsx`/`Workstations.tsx`/
+   `VirtualMachines.tsx`/`ContainersApps.tsx`/`NetworkDevices.tsx`
+   (`Sites.tsx` already matched). None of these 5 models has a real
+   `theme_name` column (only Site/NetworkDevice do, and NetworkDevice's
+   stayed as its existing `alternative_name` + 🎭 picker, just moved up
+   front) — the existing freeform nickname field (`alternative_name`/
+   `friendly_name`) fills the "Fantastic Name" slot instead of inventing a
+   new column.
+3. **Datacenter/Floor fantastic + coded names** — Datacenter had no
+   `theme_name`/`theme_category` at all (migration
+   `0033_datacenter_theme_name`, applied live); Floor/Room/Section already
+   had the columns from an earlier migration but zero UI. `Hierarchy.tsx`:
+   `DATACENTER_COLUMNS` gained an editable Fantastic Name column;
+   Datacenter/Floor/Room/Section Quick-Add forms all gained a "Fantastic
+   name" input; a new shared `ThemeNameEditor` + a "🎭 Fantastic name"
+   toggle on `BlueprintList` (Floor/Room/Section's shared list component)
+   let an existing row's nickname be set/edited after creation. Datacenter's
+   real coded name (`code`) and Floor's auto-generated `code` (`F{n}`) are
+   both untouched/independent of the new theme fields.
+4. **IP Assignments were "completely manual"** — added a `SuggestIpPanel`
+   (shown once a row is selected) with "Suggest next free IPv4" (calls the
+   existing `/ipam/subnets/{id}/next-ip`) and "...IPv6" (`/next-reserved?
+   family=ipv6`) buttons that write the result straight into that row.
+   Deliberately did NOT build a dropdown enumerating every free address
+   (no endpoint does that, and it wouldn't be usable for anything bigger
+   than a tiny subnet) or an IPv4-to-IPv6 correspondence table (**does not
+   exist in this schema** — the user was misremembering; only
+   `IpAssignment` carries both address columns on one row).
+5. **Port Config was "a very unmanageable list"** — AG Grid Community (this
+   app's edition) has no row-grouping module, so `PortConfig.tsx` got the
+   same "filter by X" idiom `Vlans.tsx` already uses for the identical
+   problem: a Device filter dropdown + a default sort on the Device column
+   so even "All devices" visually clusters each device's ports together.
+6. **Bulk port creation** — new `BulkPortCreator` in `PortConfig.tsx`
+   ("+ Generate ports"): device + start port + count + mode, loops
+   `api.create` sequentially (no bulk-create endpoint exists) to generate
+   a whole range of `DeviceInterface` rows in one action.
+7. **PowerOutlet had no CRUD page anywhere** — it had full generic-CRUD
+   backend support (`registry.py`) and was already read from by
+   `RackView.tsx`/`PowerDeviceView.tsx`, but could only ever exist if
+   seeded. New `pages/PowerOutlets.tsx` (+ route `/power-outlets` + nav
+   entry) fixes that; live-verified create/delete round-trip.
+8. **"Subnets (IPAM) is always completely empty"** — not reproducible in
+   this dev DB (56 IPv4 / 47 IPv6 / 44 VLANs already present, confirmed
+   live) — Subnets.tsx's CRUD already works. Root-caused the real footgun
+   instead: `seed.py`'s one-shot demo-topology block (VLANs+subnets
+   included) is gated by the `Organization` row count and runs at most
+   ONCE ever — a database where an `Organization` existed before subnets
+   were added to `seed_subnets.json` (or any partial-seed history) is
+   permanently locked out of ever getting subnets from a normal `seed()`
+   run again. Extracted the inline subnet/VLAN construction into
+   `_seed_subnets_from_json()` (pure refactor) and added
+   `_backfill_missing_subnets()`, called from the "already seeded" early
+   return path — it only acts when the WHOLE database has zero subnets of
+   EITHER family (so it can never duplicate or clobber real, possibly
+   hand-edited data) and at least one `Site` exists to attach them to.
+
+Also fixed a self-inflicted process-hygiene issue found while verifying:
+an earlier backend pytest run in this same session showed ~24 spurious
+Postgres `DeadlockDetectedError` failures; root cause was multiple
+`pytest` background processes left running concurrently against the same
+`vfcmdb_test` DB from earlier `control_bash_process` invocations that were
+never stopped (confirmed via `ps aux` — `list_processes` itself can show a
+stale "running" status for a terminal whose underlying process already
+exited). Always kill stray pytest processes before trusting a "flaky"
+failure; a single clean run is fully green.
+
+Verified: 369 backend pytest passed / 1 skipped (single clean run — new
+test files `test_backfill_missing_subnets.py`, `test_full_seed_run.py`,
+`test_hierarchy_theme_names.py`; `test_short_name_length_cap.py` gained 2
+cases), 366 frontend Vitest passed across 55 files (new: `IpAssignments.
+test.tsx`, `PortConfig.test.tsx` additions, `PowerOutlets.test.tsx`),
+`tsc --noEmit` clean, `vite build` clean. Live-verified against the
+running containerized dev backend (`vf_cmdb_backend_dev`, migration 0033
+applied via `podman cp` + `alembic upgrade head` since the container's
+fswatch loop only syncs `backend/app/`, not `backend/alembic/`): Datacenter
+theme_name round-trip, site short-name re-derivation on update,
+power-outlets create/delete, subnet counts unchanged (confirming the
+backfill correctly stayed a no-op against real data).
+
+**Next** (from the same feedback batch, still not started/confirmed):
+- `PortConfigView.tsx` (the breadcrumb/SVG diagram page) and the
+  `owner_device_type`/`owner_device_id` polymorphism gap on
+  `DeviceInterface` — ports owned by a physical server/workstation/
+  generic-entity (not a network device) can't be created/edited from
+  either Port Config page today; this round only fixed the
+  network-device-owned case's "unmanageable list" complaint.
+- The Ansible/Semaphore usage explanation from the earlier round still
+  stands (no code path for ad-hoc/group playbook runs inside vf-cmdb).
+
 ---
 
 ## 🆕 (2026-09-04): FEAT-6 spec + Kiro memory infrastructure

@@ -10,7 +10,9 @@ import {
   ipCol,
   deviceLinkCol,
   generatedCol,
+  withThemeDisplay,
 } from "../lib/columns";
+import { useThemePicker } from "../lib/useThemePicker";
 import { Row } from "../api";
 
 const LK = [
@@ -30,17 +32,19 @@ export default function Workstations() {
     (rows: Row[]) => setSelected(rows.length === 1 ? rows[0] : null),
     []
   );
+  // Round 6 QA — a real catalogue-backed `theme_name` + one-click picker.
+  // `alternative_name` below is now just a plain free-text alias ("Alt
+  // Name") since `theme_name` is the real catalogue-picked field.
+  const theme = useThemePicker("workstations");
   const columns = useMemo(
     () => [
       roCol("id", "ID", 70),
-      // Bug fix (post-Phase-6 QA, round 3) — column-order convention: ID ->
-      // Fantastic Name -> VF Long Name -> VF Short Name -> rest. No
-      // `theme_name` column exists on Workstation, so the existing
-      // freeform `alternative_name` fills that slot.
-      textCol("alternative_name", "Fantastic Name", 150),
+      textCol("alternative_name", "Alt Name", 140),
+      textCol("theme_name", "Fantastic Name", 150),
+      theme.column,
       // FEAT-7: the long name opens the device detail dashboard.
       deviceLinkCol("vf_long_name", "VF Long Name", "workstations", 240),
-      generatedCol("vf_short_name", "VF Short Name", 130),
+      withThemeDisplay(generatedCol("vf_short_name", "VF Short Name", 130), "vf_short_name"),
       fkCol("site_id", "Site", map["sites"]),
       fkCol("device_type_id", "Device Type", map["compute-device-types"]),
       fkCol("brand_id", "Brand", map["brands"]),
@@ -54,17 +58,20 @@ export default function Workstations() {
       textCol("bitwarden_collection_ref", "Bitwarden Ref"),
       textCol("notes", "Notes"),
     ],
-    [map]
+    [map, theme.column]
   );
   if (isLoading) return <div className="text-slate-500">Loading…</div>;
   return (
-    <EntityGrid
-      resource="workstations"
-      title="Workstations"
-      description="End-user workstations, laptops and thin clients. Click a long name to open that workstation’s dashboard."
-      columns={columns}
-      panel={<DevicePhotoPanel resource="workstations" selected={selected} />}
-      onSelectionChanged={handleSelection}
-    />
+    <>
+      <EntityGrid
+        resource="workstations"
+        title="Workstations"
+        description="End-user workstations, laptops and thin clients. Click a long name to open that workstation’s dashboard. Pick a Fantastic Name from the themed catalogue with the 🎭 button."
+        columns={columns}
+        panel={<DevicePhotoPanel resource="workstations" selected={selected} />}
+        onSelectionChanged={handleSelection}
+      />
+      {theme.picker}
+    </>
   );
 }

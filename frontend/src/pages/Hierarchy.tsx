@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, Row } from "../api";
 import AbbrevField, { CASE_MODES } from "../components/AbbrevField";
@@ -14,8 +14,11 @@ import {
   modeToggleCol,
   withThemeDisplay,
 } from "../lib/columns";
+import { useThemePicker } from "../lib/useThemePicker";
+import ThemeNamePicker from "../components/ThemeNamePicker";
 import { NAMING_MODE_VALUES } from "../lib/namingMode";
 import { useNamePreview } from "../lib/useNamePreview";
+import type { ColDef } from "ag-grid-community";
 
 // ---------------------------------------------------------------------------
 // Small building blocks
@@ -198,8 +201,9 @@ function SimpleList({ rows, render }: { rows: Row[]; render: (r: Row) => string 
 function ThemeNameEditor({ resource, row }: { resource: string; row: Row }) {
   const qc = useQueryClient();
   const [value, setValue] = useState(String(row.theme_name ?? ""));
+  const [pickerOpen, setPickerOpen] = useState(false);
   const save = useMutation({
-    mutationFn: () => api.update(resource, row.id, { theme_name: value || null }),
+    mutationFn: (payload: Row) => api.update(resource, row.id, payload),
     onSuccess: () => qc.invalidateQueries({ queryKey: [resource] }),
   });
   return (
@@ -212,12 +216,35 @@ function ThemeNameEditor({ resource, row }: { resource: string; row: Row }) {
       />
       <button
         type="button"
-        onClick={() => save.mutate()}
+        onClick={() => save.mutate({ theme_name: value || null })}
         disabled={save.isPending}
         className="px-2.5 py-1 text-xs rounded bg-slate-800 text-white disabled:opacity-50 shrink-0"
       >
         {save.isPending ? "Saving…" : "Save"}
       </button>
+      {/* Round 6 QA — "check that every field... has a fantastic name
+          with a totally enabled dropdown to select fantastic names just
+          like other places". The manual text input above still works for
+          a hand-typed nickname; this adds the SAME catalogue-backed
+          picker every other themed resource has. */}
+      <button
+        type="button"
+        onClick={() => setPickerOpen(true)}
+        className="px-2.5 py-1 text-xs rounded border border-slate-300 bg-white hover:bg-slate-100 shrink-0"
+      >
+        🎭 Pick
+      </button>
+      <ThemeNamePicker
+        open={pickerOpen}
+        initialCategory={row.theme_category}
+        selectedName={row.theme_name ?? null}
+        onSelect={(selection) => {
+          setValue(selection.name);
+          setPickerOpen(false);
+          save.mutate({ theme_name: selection.name, theme_category: selection.category });
+        }}
+        onClose={() => setPickerOpen(false)}
+      />
     </div>
   );
 }
@@ -285,7 +312,10 @@ function BlueprintList({
 // real, independently editable column here (migration
 // 0033_datacenter_theme_name) — it coexists with `code`, same as Site's
 // theme_name/simple_name.
-const DATACENTER_COLUMNS = [
+// Round 6 QA — `themeCol` is `useThemePicker("datacenters").column`, built
+// inside the `Hierarchy` component (hooks can't run at module scope) and
+// passed in here so the "🎭 Pick" button sits right next to Fantastic Name.
+const datacenterColumns = (themeCol: ColDef) => [
   roCol("id", "ID", 60),
   textCol("name", "Name", 160),
   // Bug fix (round 5 QA) — same fix as Sites.tsx's Site Code column: the
@@ -293,6 +323,7 @@ const DATACENTER_COLUMNS = [
   // name ("FANTASTICNAME-code") instead of only ever showing the raw code.
   withThemeDisplay(textCol("code", "Code", 100), "code"),
   textCol("theme_name", "Fantastic Name", 150),
+  themeCol,
   textCol("city", "City", 140),
   airportCol("iata_code", "Airport (IATA)"),
   namingComputedCol("vf_long_name", "VF Long Name", 220),
@@ -321,6 +352,13 @@ export default function Hierarchy() {
 
   const [err, setErr] = useState<string>("");
   const onErr = (msg: string) => setErr(msg);
+
+  // Round 6 QA — the Datacenter grid's own "🎭 Pick" column + modal.
+  const datacenterTheme = useThemePicker("datacenters");
+  const DATACENTER_COLUMNS = useMemo(
+    () => datacenterColumns(datacenterTheme.column),
+    [datacenterTheme.column]
+  );
 
   return (
     <div className="max-w-4xl">
@@ -375,14 +413,17 @@ export default function Hierarchy() {
           // Req 9: an editable grid (not a read-only list) so an existing
           // datacenter's IATA code can be fixed after creation, searched
           // in-cell instead of typed from memory.
-          <EntityGrid
-            resource="datacenters"
-            title=""
-            columns={DATACENTER_COLUMNS}
-            allowAdd={false}
-            minHeight={220}
-            footerHint={null}
-          />
+          <>
+            <EntityGrid
+              resource="datacenters"
+              title=""
+              columns={DATACENTER_COLUMNS}
+              allowAdd={false}
+              minHeight={220}
+              footerHint={null}
+            />
+            {datacenterTheme.picker}
+          </>
         }
         renderForm={(onDone) => (
           <DatacenterForm

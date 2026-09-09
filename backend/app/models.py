@@ -618,6 +618,12 @@ class Rack(Base):
     description: Mapped[Optional[str]] = mapped_column(Text)
     vf_long_name: Mapped[Optional[str]] = mapped_column(String(200))
     simple_name: Mapped[Optional[str]] = mapped_column(String(120))
+    # Round 6 QA — a real, catalogue-backed "fantastic name", same shape as
+    # Site.theme_name/theme_category (migration 0037_physical_asset_theme_
+    # names). Independent of `simple_name`: naming.generate_rack never
+    # touches either.
+    theme_name: Mapped[Optional[str]] = mapped_column(String(120))
+    theme_category: Mapped[Optional[str]] = mapped_column(String(40))
     # Phase 5 Task 28 (Req 23.1/23.2/23.3) — gates vf_long_name.
     naming_mode: Mapped[str] = mapped_column(
         _naming_mode_enum("rack_naming_mode"), nullable=False,
@@ -669,6 +675,11 @@ class PowerDevice(Base):
     model: Mapped[Optional[str]] = mapped_column(String(120))
     serial_number: Mapped[Optional[str]] = mapped_column(String(120))
     vf_long_name: Mapped[Optional[str]] = mapped_column(String(200))
+    # Round 6 QA — a real, catalogue-backed "fantastic name" (migration
+    # 0037_physical_asset_theme_names); PowerDevice had no nickname field
+    # at all before this.
+    theme_name: Mapped[Optional[str]] = mapped_column(String(120))
+    theme_category: Mapped[Optional[str]] = mapped_column(String(40))
     # Phase 5 Task 23 (Req 19.1) — an uploaded photo of this specific unit,
     # set by POST /photos/power-devices/{id} (backend/app/photos.py).
     photo_url: Mapped[Optional[str]] = mapped_column(String(500))
@@ -703,6 +714,11 @@ class PowerOutlet(Base):
     port_number: Mapped[Optional[int]] = mapped_column(Integer)
     outlet_type: Mapped[Optional[str]] = mapped_column(String(20))
     label: Mapped[Optional[str]] = mapped_column(String(120))
+    # Round 6 QA — a real, catalogue-backed "fantastic name" (migration
+    # 0037_physical_asset_theme_names); PowerOutlet had no nickname field
+    # of its own before this (`label` is a plain free-text field).
+    theme_name: Mapped[Optional[str]] = mapped_column(String(120))
+    theme_category: Mapped[Optional[str]] = mapped_column(String(40))
     notes: Mapped[Optional[str]] = mapped_column(Text)
 
 
@@ -714,6 +730,11 @@ class PatchPanel(Base):
     rack_unit: Mapped[Optional[int]] = mapped_column(Integer)
     port_count: Mapped[int] = mapped_column(Integer, default=24)
     panel_id_label: Mapped[Optional[str]] = mapped_column(String(40))
+    # Round 6 QA — a real, catalogue-backed "fantastic name" (migration
+    # 0037_physical_asset_theme_names); PatchPanel had no nickname field
+    # at all before this.
+    theme_name: Mapped[Optional[str]] = mapped_column(String(120))
+    theme_category: Mapped[Optional[str]] = mapped_column(String(40))
     side: Mapped[str] = mapped_column(String(10), default="front")
     # Phase 5 Task 23 (Req 19.1) — an uploaded photo of this specific panel.
     photo_url: Mapped[Optional[str]] = mapped_column(String(500))
@@ -997,6 +1018,13 @@ class PhysicalServer(Base):
     vf_long_name: Mapped[Optional[str]] = mapped_column(String(200))
     vf_short_name: Mapped[Optional[str]] = mapped_column(String(120))
     alternative_name: Mapped[Optional[str]] = mapped_column(String(120))
+    # Round 6 QA — a real, catalogue-backed "fantastic name" (migration
+    # 0037_physical_asset_theme_names). `alternative_name` above used to be
+    # the only stand-in for this ("Fantastic Name" in the grid) since there
+    # was no theme_name column; it stays as a plain free-text alias field
+    # now that theme_name is the real catalogue-picked one.
+    theme_name: Mapped[Optional[str]] = mapped_column(String(120))
+    theme_category: Mapped[Optional[str]] = mapped_column(String(40))
     management_ipv4: Mapped[Optional[str]] = mapped_column(INET)
     management_ipv6: Mapped[Optional[str]] = mapped_column(INET)
     management_fqdn: Mapped[Optional[str]] = mapped_column(String(200))
@@ -1040,6 +1068,12 @@ class VirtualMachine(Base):
     sequence_number: Mapped[Optional[int]] = mapped_column(Integer)
     vf_short_name: Mapped[Optional[str]] = mapped_column(String(120))
     friendly_name: Mapped[Optional[str]] = mapped_column(String(120))
+    # Round 6 QA — a real, catalogue-backed "fantastic name" (migration
+    # 0037_physical_asset_theme_names); `friendly_name` above stays a plain
+    # free-text alias field now that theme_name is the real catalogue-
+    # picked one.
+    theme_name: Mapped[Optional[str]] = mapped_column(String(120))
+    theme_category: Mapped[Optional[str]] = mapped_column(String(40))
     description: Mapped[Optional[str]] = mapped_column(Text)
     management_ipv4: Mapped[Optional[str]] = mapped_column(INET)
     management_ipv6: Mapped[Optional[str]] = mapped_column(INET)
@@ -1077,6 +1111,12 @@ class ContainerApp(Base):
     sequence_number: Mapped[Optional[int]] = mapped_column(Integer)
     vf_short_name: Mapped[Optional[str]] = mapped_column(String(120))
     friendly_name: Mapped[Optional[str]] = mapped_column(String(120))
+    # Round 6 QA — a real, catalogue-backed "fantastic name" (migration
+    # 0037_physical_asset_theme_names); `friendly_name` above stays a plain
+    # free-text alias field now that theme_name is the real catalogue-
+    # picked one.
+    theme_name: Mapped[Optional[str]] = mapped_column(String(120))
+    theme_category: Mapped[Optional[str]] = mapped_column(String(40))
     description: Mapped[Optional[str]] = mapped_column(Text)
     ipv4_address: Mapped[Optional[str]] = mapped_column(INET)
     ipv6_address: Mapped[Optional[str]] = mapped_column(INET)
@@ -1116,6 +1156,12 @@ class Workstation(Base):
     vf_long_name: Mapped[Optional[str]] = mapped_column(String(200))
     vf_short_name: Mapped[Optional[str]] = mapped_column(String(120))
     alternative_name: Mapped[Optional[str]] = mapped_column(String(120))
+    # Round 6 QA — a real, catalogue-backed "fantastic name" (migration
+    # 0037_physical_asset_theme_names); `alternative_name` above stays a
+    # plain free-text alias field now that theme_name is the real
+    # catalogue-picked one.
+    theme_name: Mapped[Optional[str]] = mapped_column(String(120))
+    theme_category: Mapped[Optional[str]] = mapped_column(String(40))
     management_ipv4: Mapped[Optional[str]] = mapped_column(INET)
     management_fqdn: Mapped[Optional[str]] = mapped_column(String(200))
     bitwarden_collection_ref: Mapped[Optional[str]] = mapped_column(String(120))

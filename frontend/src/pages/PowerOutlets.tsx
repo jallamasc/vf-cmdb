@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import EntityGrid from "../components/EntityGrid";
-import { useLookups, textCol, roCol, numCol, fkCol } from "../lib/columns";
+import { useLookups, textCol, roCol, numCol, fkCol, withThemeDisplay } from "../lib/columns";
+import { useThemePicker } from "../lib/useThemePicker";
 
 /**
  * Post-Phase-6 QA (round 3) — PowerOutlet already had full generic-CRUD
@@ -21,11 +22,17 @@ import { useLookups, textCol, roCol, numCol, fkCol } from "../lib/columns";
  */
 export default function PowerOutlets() {
   const { map, isLoading } = useLookups(["power-devices", "sites", "racks", "sections"]);
+  // Round 6 QA — a real catalogue-backed "fantastic name", same one-click
+  // in-grid picker every other themed resource has (PowerOutlet had no
+  // nickname field at all before this).
+  const theme = useThemePicker("power-outlets");
 
   const columns = useMemo(
     () => [
       roCol("id", "ID", 70),
-      textCol("label", "Label", 160),
+      withThemeDisplay(textCol("label", "Label", 160), "label"),
+      textCol("theme_name", "Fantastic Name", 150),
+      theme.column,
       fkCol("power_device_id", "Power Device", map["power-devices"] ?? []),
       fkCol("site_id", "Site", map["sites"] ?? []),
       fkCol("rack_id", "Rack", map["racks"] ?? []),
@@ -34,15 +41,18 @@ export default function PowerOutlets() {
       textCol("outlet_type", "Outlet Type", 140),
       textCol("notes", "Notes"),
     ],
-    [map]
+    [map, theme.column]
   );
   if (isLoading) return <div className="text-slate-500">Loading…</div>;
   return (
-    <EntityGrid
-      resource="power-outlets"
-      title="Power Outlets"
-      description="Individual power receptacles — on a rack-mounted PDU/power device, or a bare wall/receptacle location. Shown read-only in the Rack View / Power Device View diagrams; managed here."
-      columns={columns}
-    />
+    <>
+      <EntityGrid
+        resource="power-outlets"
+        title="Power Outlets"
+        description="Individual power receptacles — on a rack-mounted PDU/power device, or a bare wall/receptacle location. Shown read-only in the Rack View / Power Device View diagrams; managed here."
+        columns={columns}
+      />
+      {theme.picker}
+    </>
   );
 }

@@ -145,4 +145,20 @@ describe("Hierarchy — Room/Section blueprint + Section level (Req 21.3, 22.1, 
 
     expect(within(racksCard).getByText(/Section \(or Floor, or Room/i)).toBeTruthy();
   });
+
+  // Round 6 QA — "check that every field ... has a fantastic name with a
+  // totally enabled dropdown to select fantastic names". Floor/Room/
+  // Section's ThemeNameEditor used to be a plain text input only; it now
+  // also offers the same catalogue-backed "🎭 Pick" picker every other
+  // themed resource has.
+  it("offers a 🎭 Pick catalogue picker (not just free text) in a Room's Fantastic Name editor", async () => {
+    wrap(<Hierarchy />);
+    await waitFor(() => expect(screen.getByText(/Room1/)).toBeTruthy());
+
+    const roomsCard = getCard("Rooms");
+    fireEvent.click(within(roomsCard).getByText("🎭 Fantastic name"));
+
+    expect(within(roomsCard).getByPlaceholderText("Fantastic name (nickname)")).toBeTruthy();
+    expect(within(roomsCard).getByText("🎭 Pick")).toBeTruthy();
+  });
 });

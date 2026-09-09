@@ -12,7 +12,9 @@ import {
   selectCol,
   namingComputedCol,
   modeToggleCol,
+  withThemeDisplay,
 } from "../lib/columns";
+import { useThemePicker } from "../lib/useThemePicker";
 import { NAMING_MODE_VALUES } from "../lib/namingMode";
 import { Row } from "../api";
 import type { ColDef } from "ag-grid-community";
@@ -24,7 +26,7 @@ interface Config {
   title: string;
   description: string;
   lookups: string[];
-  build: (l: Record<string, any[]>) => ColDef[];
+  build: (l: Record<string, any[]>, themeCol?: ColDef) => ColDef[];
   defaults: Record<string, any>;
   /** Phase 5 Task 23 (Req 19.1) — PowerDevice/PatchPanel support an
    * uploaded photo; Cable/Rack rows don't. */
@@ -33,6 +35,10 @@ interface Config {
    * carry their own per-record Stencil_Override (Task 26); Cable doesn't
    * (it isn't a stencil-rendered device). */
   stencilPanel?: boolean;
+  /** Round 6 QA — this resource has a real theme_name/theme_category pair
+   * with a catalogue-backed picker (Cable is the one Kind here that
+   * doesn't — see naming.py/models.py comments for why). */
+  themeName?: boolean;
 }
 
 const CONFIGS: Record<Kind, Config> = {
@@ -42,12 +48,17 @@ const CONFIGS: Record<Kind, Config> = {
     description:
       "Structured cabling patch panels mounted in racks. Panel ID is auto-generated from the parent rack and a per-rack sequence.",
     lookups: ["racks"],
-    build: (l) => [
+    build: (l, themeCol) => [
       roCol("id", "ID", 70),
       fkCol("rack_id", "Rack", l.racks),
       numCol("rack_unit", "Rack U"),
       numCol("port_count", "Ports"),
-      namingComputedCol("panel_id_label", "Panel ID", 160),
+      withThemeDisplay(namingComputedCol("panel_id_label", "Panel ID", 160), "panel_id_label"),
+      // Round 6 QA — PatchPanel had no nickname field at all before; a
+      // real catalogue-backed one now coexists with the auto-generated
+      // Panel ID above (never overwrites it — see naming.py's
+      // generate_patch_panel, which only ever writes panel_id_label).
+      ...(themeCol ? [textCol("theme_name", "Fantastic Name", 150), themeCol] : []),
       // Phase 5 Task 28 (Req 23.1) — switch to "manual" to type a Panel ID
       // directly.
       modeToggleCol("naming_mode", "Naming Mode", [...NAMING_MODE_VALUES]),
@@ -57,6 +68,7 @@ const CONFIGS: Record<Kind, Config> = {
     defaults: { port_count: 24, side: "front" },
     photoPanel: true,
     stencilPanel: true,
+    themeName: true,
   },
   power: {
     resource: "power-devices",
@@ -64,7 +76,7 @@ const CONFIGS: Record<Kind, Config> = {
     description:
       "UPS units and PDUs supplying rack power. VF Long Name is auto-generated from the parent site/rack, device type, and a sequence number.",
     lookups: ["sites", "racks"],
-    build: (l) => [
+    build: (l, themeCol) => [
       roCol("id", "ID", 70),
       fkCol("site_id", "Site", l.sites),
       fkCol("rack_id", "Rack", l.racks),
@@ -73,7 +85,9 @@ const CONFIGS: Record<Kind, Config> = {
       textCol("brand", "Brand"),
       textCol("model", "Model"),
       textCol("serial_number", "Serial"),
-      namingComputedCol("vf_long_name", "VF Long Name", 200),
+      withThemeDisplay(namingComputedCol("vf_long_name", "VF Long Name", 200), "vf_long_name"),
+      // Round 6 QA — PowerDevice had no nickname field at all before.
+      ...(themeCol ? [textCol("theme_name", "Fantastic Name", 150), themeCol] : []),
       // Phase 5 Task 28 (Req 23.1) — switch to "manual" to type a VF Long
       // Name directly.
       modeToggleCol("naming_mode", "Naming Mode", [...NAMING_MODE_VALUES]),
@@ -82,6 +96,7 @@ const CONFIGS: Record<Kind, Config> = {
     defaults: { device_type: "pdu" },
     photoPanel: true,
     stencilPanel: true,
+    themeName: true,
   },
   cables: {
     resource: "cables",
@@ -111,10 +126,14 @@ const CONFIGS: Record<Kind, Config> = {
     description:
       "Rack inventory. VF Long Name is auto-generated from the parent site and the rack's grid coordinates; use the Rack View page for the elevation diagram.",
     lookups: ["sites", "datacenter-floors", "rooms", "sections", "rack-types"],
-    build: (l) => [
+    build: (l, themeCol) => [
       roCol("id", "ID", 70),
-      textCol("simple_name", "Simple Name", 170),
+      withThemeDisplay(textCol("simple_name", "Simple Name", 170), "simple_name"),
       textCol("code", "Code", 120),
+      // Round 6 QA — a real catalogue-backed nickname alongside
+      // `simple_name` (never overwritten by naming.generate_rack, which
+      // only ever writes vf_long_name).
+      ...(themeCol ? [textCol("theme_name", "Fantastic Name", 150), themeCol] : []),
       namingComputedCol("vf_long_name", "VF Long Name", 220),
       // Phase 5 Task 28 (Req 23.1) — switch to "manual" to type a VF Long
       // Name directly.
@@ -131,6 +150,7 @@ const CONFIGS: Record<Kind, Config> = {
     ],
     defaults: { total_units: 42 },
     stencilPanel: true,
+    themeName: true,
   },
 };
 
@@ -138,7 +158,13 @@ export default function SimpleGridPage({ kind }: { kind: Kind }) {
   const cfg = CONFIGS[kind];
   const qc = useQueryClient();
   const { map, isLoading } = useLookups(cfg.lookups);
-  const columns = useMemo(() => cfg.build(map), [cfg, map]);
+  // Round 6 QA — always called (hooks can't be conditional), only actually
+  // wired into `columns`/rendered below for kinds that have `themeName`.
+  const theme = useThemePicker(cfg.resource);
+  const columns = useMemo(
+    () => cfg.build(map, cfg.themeName ? theme.column : undefined),
+    [cfg, map, theme.column]
+  );
   // Phase 5 Task 23 (Req 19.1) — photo manager for the selected row, only on
   // the kinds whose model actually has a photo_url column. Phase 6 Task 27
   // (Req 10.2-10.4) — same selection drives the stencil-override panel too.
@@ -151,30 +177,33 @@ export default function SimpleGridPage({ kind }: { kind: Kind }) {
   if (isLoading && cfg.lookups.length)
     return <div className="text-slate-500">Loading…</div>;
   return (
-    <EntityGrid
-      resource={cfg.resource}
-      title={cfg.title}
-      description={cfg.description}
-      columns={columns}
-      newRowDefaults={cfg.defaults}
-      panel={
-        needsSelection ? (
-          <div className="space-y-3">
-            {cfg.stencilPanel && (
-              <StencilPanel
-                resource={cfg.resource}
-                label={cfg.title.toLowerCase()}
-                selected={selected}
-                onChanged={() => qc.invalidateQueries({ queryKey: [cfg.resource] })}
-              />
-            )}
-            {cfg.photoPanel && (
-              <DevicePhotoPanel resource={cfg.resource} selected={selected} />
-            )}
-          </div>
-        ) : undefined
-      }
-      onSelectionChanged={needsSelection ? handleSelection : undefined}
-    />
+    <>
+      <EntityGrid
+        resource={cfg.resource}
+        title={cfg.title}
+        description={cfg.description}
+        columns={columns}
+        newRowDefaults={cfg.defaults}
+        panel={
+          needsSelection ? (
+            <div className="space-y-3">
+              {cfg.stencilPanel && (
+                <StencilPanel
+                  resource={cfg.resource}
+                  label={cfg.title.toLowerCase()}
+                  selected={selected}
+                  onChanged={() => qc.invalidateQueries({ queryKey: [cfg.resource] })}
+                />
+              )}
+              {cfg.photoPanel && (
+                <DevicePhotoPanel resource={cfg.resource} selected={selected} />
+              )}
+            </div>
+          ) : undefined
+        }
+        onSelectionChanged={needsSelection ? handleSelection : undefined}
+      />
+      {cfg.themeName && theme.picker}
+    </>
   );
 }

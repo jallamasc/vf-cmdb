@@ -11,7 +11,9 @@ import {
   ipCol,
   selectCol,
   generatedCol,
+  withThemeDisplay,
 } from "../lib/columns";
+import { useThemePicker } from "../lib/useThemePicker";
 import { Row } from "../api";
 
 const LK = [
@@ -34,15 +36,17 @@ export default function ContainersApps() {
     (rows: Row[]) => setSelected(rows.length === 1 ? rows[0] : null),
     []
   );
+  // Round 6 QA — a real catalogue-backed `theme_name` + one-click picker.
+  // `friendly_name` below is now just a plain free-text alias ("Alt
+  // Name") since `theme_name` is the real catalogue-picked field.
+  const theme = useThemePicker("containers-apps");
   const columns = useMemo(
     () => [
       roCol("id", "ID", 70),
-      // Bug fix (post-Phase-6 QA, round 3) — column-order convention: ID ->
-      // Fantastic Name -> VF Long Name -> VF Short Name -> rest.
-      // ContainerApp has no `vf_long_name`, so this is Fantastic Name
-      // (`friendly_name`) -> VF Short Name.
-      textCol("friendly_name", "Fantastic Name", 160),
-      generatedCol("vf_short_name", "VF Short Name", 130),
+      textCol("friendly_name", "Alt Name", 140),
+      textCol("theme_name", "Fantastic Name", 150),
+      theme.column,
+      withThemeDisplay(generatedCol("vf_short_name", "VF Short Name", 130), "vf_short_name"),
       selectCol("container_type", "Type", ["cn", "ap"], { width: 120 }),
       fkCol("host_vm_id", "Host VM", map["virtual-machines"]),
       fkCol("host_server_id", "Host Server", map["physical-servers"]),
@@ -56,25 +60,28 @@ export default function ContainersApps() {
       textCol("description", "Description", 200),
       textCol("notes", "Notes"),
     ],
-    [map]
+    [map, theme.column]
   );
   if (isLoading) return <div className="text-slate-500">Loading…</div>;
   return (
-    <EntityGrid
-      resource="containers-apps"
-      title="Containers & Applications"
-      description="Containerised workloads and applications running on VMs or servers."
-      columns={columns}
-      newRowDefaults={{ container_type: "cn" }}
-      panel={
-        <StencilPanel
-          resource="containers-apps"
-          label="container/app"
-          selected={selected}
-          onChanged={() => qc.invalidateQueries({ queryKey: ["containers-apps"] })}
-        />
-      }
-      onSelectionChanged={handleSelection}
-    />
+    <>
+      <EntityGrid
+        resource="containers-apps"
+        title="Containers & Applications"
+        description="Containerised workloads and applications running on VMs or servers. Pick a Fantastic Name from the themed catalogue with the 🎭 button."
+        columns={columns}
+        newRowDefaults={{ container_type: "cn" }}
+        panel={
+          <StencilPanel
+            resource="containers-apps"
+            label="container/app"
+            selected={selected}
+            onChanged={() => qc.invalidateQueries({ queryKey: ["containers-apps"] })}
+          />
+        }
+        onSelectionChanged={handleSelection}
+      />
+      {theme.picker}
+    </>
   );
 }

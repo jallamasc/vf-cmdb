@@ -61,4 +61,25 @@ describe("PowerOutlets — new CRUD page", () => {
     expect(fields).toContain("port_number");
     expect(fields).toContain("outlet_type");
   });
+
+  // Round 6 QA — PowerOutlet had no nickname field at all before; it now
+  // gets a real theme_name column + the same "🎭 Pick" picker column
+  // every other themed resource has.
+  it("gives PowerOutlet a theme_name column plus a 🎭 Pick button column", async () => {
+    wrap();
+    await waitFor(() => expect(capturedProps).not.toBeNull());
+    expect(capturedProps.columns.some((c: any) => c.field === "theme_name")).toBe(true);
+    expect(capturedProps.columns.some((c: any) => c.colId === "theme_pick")).toBe(true);
+  });
+
+  it("combines the theme name into the Label cell", async () => {
+    wrap();
+    await waitFor(() => expect(capturedProps).not.toBeNull());
+    const col = capturedProps.columns.find((c: any) => c.field === "label");
+    expect(
+      (col.valueFormatter as (p: any) => string)({
+        data: { label: "Outlet A1", theme_name: "Everest" },
+      })
+    ).toBe("Everest-Outlet A1");
+  });
 });

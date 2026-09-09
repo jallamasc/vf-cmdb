@@ -88,3 +88,47 @@ describe("SimpleGridPage — photo manager panel (Req 19.1)", () => {
     expect(screen.queryByText("Upload photo")).toBeNull();
   });
 });
+
+// Round 6 QA — "check that every field ... has a fantastic name with a
+// totally enabled dropdown". racks/power/patch-panels each get a real
+// theme_name column + the "🎭 Pick" picker column; cables deliberately
+// don't (Cable.label is fully computed, not a themed physical asset).
+describe("SimpleGridPage — theme_name picker (round 6 QA)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    capturedProps = [];
+  });
+
+  it.each(["racks", "power", "patch-panels"] as const)(
+    "gives %s a theme_name text column plus a 🎭 Pick button column",
+    async (kind) => {
+      wrap(<SimpleGridPage kind={kind} />);
+      await waitFor(() => expect(capturedProps.length).toBeGreaterThan(0));
+      const props = capturedProps[capturedProps.length - 1];
+      expect(props.columns.some((c: any) => c.field === "theme_name")).toBe(true);
+      expect(props.columns.some((c: any) => c.colId === "theme_pick")).toBe(true);
+    }
+  );
+
+  it("does NOT give cables a theme_name column or picker (Cable.label is fully computed)", async () => {
+    wrap(<SimpleGridPage kind="cables" />);
+    await waitFor(() =>
+      expect(capturedProps.some((p) => p.resource === "cables")).toBe(true)
+    );
+    const props = capturedProps.find((p) => p.resource === "cables");
+    expect(props.columns.some((c: any) => c.field === "theme_name")).toBe(false);
+    expect(props.columns.some((c: any) => c.colId === "theme_pick")).toBe(false);
+  });
+
+  it("combines the theme name into rack's Simple Name cell", async () => {
+    wrap(<SimpleGridPage kind="racks" />);
+    await waitFor(() => expect(capturedProps.length).toBeGreaterThan(0));
+    const props = capturedProps[capturedProps.length - 1];
+    const col = props.columns.find((c: any) => c.field === "simple_name");
+    expect(
+      (col.valueFormatter as (p: any) => string)({
+        data: { simple_name: "vfrack1", theme_name: "Kilimanjaro" },
+      })
+    ).toBe("Kilimanjaro-vfrack1");
+  });
+});

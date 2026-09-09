@@ -17,6 +17,7 @@ import {
   ipCol,
   deviceLinkCol,
   deviceTypeIconCol,
+  withThemeDisplay,
 } from "../lib/columns";
 
 const LK = [
@@ -94,7 +95,12 @@ export default function NetworkDevices() {
           },
           // FEAT-7: the long name opens the device detail dashboard.
           deviceLinkCol("vf_long_name", "VF Long Name", "network_devices", 240),
-          textCol("vf_friendly_name", "VF Short Name", 150),
+          // Bug fix (round 5 QA) — same "combine the real code with the
+          // theme name" fix as Sites.tsx's Site Code column: this is the
+          // device's own identity field, so it should read
+          // "FANTASTICNAME-vf_friendly_name" whenever a theme name is set,
+          // not just the raw value.
+          withThemeDisplay(textCol("vf_friendly_name", "VF Short Name", 150), "vf_friendly_name"),
           fkCol("site_id", "Site", map["sites"]),
           fkCol("rack_id", "Rack", map["racks"]),
           numCol("rack_unit", "U"),

@@ -105,6 +105,52 @@ export function lookupLabel(o: Row): string {
   return String(fallback);
 }
 
+/**
+ * Bug fix (round 5 QA) — "the column on site code shows only the fantastic
+ * name, I should see e.g. 'Alderaan - vfsite1'". `lookupLabel` above
+ * already builds "FANTASTICNAME-REALCODE" for a row referenced as a
+ * *foreign key elsewhere* (its fallback chain checks a fixed list of
+ * possible name fields), but no page combined a row's OWN identity column
+ * with its OWN `theme_name` the same way — so a grid's "Site Code" /
+ * "Code" cell only ever showed the raw generated/coded value, and a
+ * legacy row whose real code field happened to literally equal an old
+ * theme name (a pre-fix data artifact) looked exactly like "just the
+ * fantastic name" with no code at all.
+ *
+ * Unlike `lookupLabel`, this takes the code field explicitly instead of
+ * guessing from a fixed fallback chain, so it works for any resource's own
+ * identity field (Site.simple_name, Datacenter.code, NetworkDevice.
+ * vf_friendly_name, …) — not just the handful of names `lookupLabel` knows
+ * about for *reference* rows.
+ */
+export function combineWithTheme(row: Row, codeField: string): string {
+  if (row == null) return "";
+  const raw = row[codeField];
+  const codeStr = raw == null || raw === "" ? "" : String(raw);
+  const theme = row.theme_name;
+  if (theme && codeStr && String(theme) !== codeStr) {
+    return `${theme}-${codeStr}`;
+  }
+  return codeStr || (theme ? String(theme) : "");
+}
+
+/**
+ * Wrap an existing column definition so its cell (and its quick-search
+ * value) show `combineWithTheme(row, field)` instead of the raw field —
+ * without touching `editable`/`cellClass`/anything else the caller already
+ * set, so a manually-typed field (Datacenter.code) stays editable and a
+ * naming-engine field (Site.simple_name) stays read-only, exactly as
+ * before. Editing itself is unaffected: AG Grid's cell editor always reads
+ * the raw field value, `valueFormatter` only changes what is *displayed*.
+ */
+export function withThemeDisplay(col: ColDef, field: string): ColDef {
+  return {
+    ...col,
+    valueFormatter: (p) => combineWithTheme(p.data ?? {}, field),
+    filterValueGetter: (p) => combineWithTheme(p.data ?? {}, field),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // UX-2: dropdown affordance
 // ---------------------------------------------------------------------------

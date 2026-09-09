@@ -8,6 +8,9 @@ import {
   generatedCol,
   modeToggleCol,
   lookupLabel,
+  combineWithTheme,
+  withThemeDisplay,
+  textCol,
 } from "./columns";
 
 const TYPES = [
@@ -150,5 +153,66 @@ describe("lookupLabel (naming-convention modifications, item 10)", () => {
 
   it("returns just the id as a string when nothing else is available", () => {
     expect(lookupLabel({ id: 42 })).toBe("42");
+  });
+});
+
+// Round 5 QA — "I keep seeing the column on site code showing only the
+// fantastic name, I should see e.g. 'Alderaan - vfsite1'". Unlike
+// lookupLabel (fixed fallback chain, for FK reference rows), these take an
+// explicit field name so they work for ANY resource's own identity column
+// (Site.simple_name, Datacenter.code, NetworkDevice.vf_friendly_name, …).
+describe("combineWithTheme / withThemeDisplay (round 5 QA)", () => {
+  it("combines the theme name with the given code field, same convention as lookupLabel", () => {
+    expect(combineWithTheme({ simple_name: "vfsite1", theme_name: "Alderaan" }, "simple_name")).toBe(
+      "Alderaan-vfsite1"
+    );
+  });
+
+  it("works for a field lookupLabel's fallback chain doesn't know about (Datacenter.code)", () => {
+    expect(combineWithTheme({ code: "M1DC1", theme_name: "Olympus", name: "Main DC" }, "code")).toBe(
+      "Olympus-M1DC1"
+    );
+  });
+
+  it("falls back to the raw code when there is no theme name", () => {
+    expect(combineWithTheme({ simple_name: "vfsite1" }, "simple_name")).toBe("vfsite1");
+  });
+
+  it("falls back to just the theme name when the code field is empty", () => {
+    expect(combineWithTheme({ simple_name: "", theme_name: "Alderaan" }, "simple_name")).toBe(
+      "Alderaan"
+    );
+  });
+
+  it("never duplicates the theme name if it happens to equal the code", () => {
+    expect(combineWithTheme({ simple_name: "alderaan", theme_name: "alderaan" }, "simple_name")).toBe(
+      "alderaan"
+    );
+  });
+
+  it("returns an empty string for an empty row", () => {
+    expect(combineWithTheme({}, "simple_name")).toBe("");
+  });
+
+  it("withThemeDisplay adds the combined valueFormatter without touching editable/cellClass", () => {
+    const base = generatedCol("simple_name", "Site Code", 160);
+    const col = withThemeDisplay(base, "simple_name");
+    expect(col.editable).toBe(false);
+    expect(col.cellClass).toBe("vf-generated-cell");
+    expect(col.width).toBe(160);
+    const formatted = (col.valueFormatter as (p: any) => string)({
+      data: { simple_name: "vfsite1", theme_name: "Alderaan" },
+    });
+    expect(formatted).toBe("Alderaan-vfsite1");
+  });
+
+  it("withThemeDisplay preserves an editable textCol's editability (Datacenter.code)", () => {
+    const base = textCol("code", "Code", 100);
+    const col = withThemeDisplay(base, "code");
+    expect(col.editable).toBe(true);
+    const formatted = (col.valueFormatter as (p: any) => string)({
+      data: { code: "M1DC1", theme_name: "Olympus" },
+    });
+    expect(formatted).toBe("Olympus-M1DC1");
   });
 });

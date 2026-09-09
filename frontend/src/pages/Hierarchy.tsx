@@ -12,6 +12,7 @@ import {
   airportCol,
   namingComputedCol,
   modeToggleCol,
+  withThemeDisplay,
 } from "../lib/columns";
 import { NAMING_MODE_VALUES } from "../lib/namingMode";
 import { useNamePreview } from "../lib/useNamePreview";
@@ -287,7 +288,10 @@ function BlueprintList({
 const DATACENTER_COLUMNS = [
   roCol("id", "ID", 60),
   textCol("name", "Name", 160),
-  textCol("code", "Code", 100),
+  // Bug fix (round 5 QA) — same fix as Sites.tsx's Site Code column: the
+  // Datacenter's own coded identity should combine with its fantastic
+  // name ("FANTASTICNAME-code") instead of only ever showing the raw code.
+  withThemeDisplay(textCol("code", "Code", 100), "code"),
   textCol("theme_name", "Fantastic Name", 150),
   textCol("city", "City", 140),
   airportCol("iata_code", "Airport (IATA)"),

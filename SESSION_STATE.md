@@ -2,8 +2,8 @@
 ## Living Document - Read on Every Interaction
 
 **Last Updated**: 2026-09-09 (Current session)
-**Project Phase**: Phase 6 ("Data Quality & Hardware Intelligence") COMPLETE — all 41 tasks done, all 4 checkpoints (I/J/K/L) verified and committed. Post-Phase-6 QA rounds 1-5 all fixed and verified (see below).
-**Status**: ✅ Phases 1-5 shipped and stable. Phase 6 fully implemented, tested, and verified end-to-end against live Podman Postgres + running dev backend/frontend. HEAD `f270b77` on `master` (working tree clean, not pushed — this repo has no configured push target for this checkout; see "Everything below this section" for the full Phase 1-5 history, which is stale in its specifics — e.g. paths/ports — but the architecture/decisions remain valid).
+**Project Phase**: Phase 6 ("Data Quality & Hardware Intelligence") COMPLETE — all 41 tasks done, all 4 checkpoints (I/J/K/L) verified and committed. Post-Phase-6 QA rounds 1-6 all fixed and verified (see below).
+**Status**: ✅ Phases 1-5 shipped and stable. Phase 6 fully implemented, tested, and verified end-to-end against live Podman Postgres + running dev backend/frontend. HEAD `08e4ec5` on `master` (working tree clean, not pushed — this repo has no configured push target for this checkout; see "Everything below this section" for the full Phase 1-5 history, which is stale in its specifics — e.g. paths/ports — but the architecture/decisions remain valid).
 
 ---
 
@@ -680,6 +680,71 @@ migration). Live-verified against the running dev backend: `GET
 `"vfsite1"` via `curl -X PATCH` to reproduce the user's own example, so
 the grid now genuinely renders "Alderaan-vfsite1" for that row instead of
 "Alderaan" alone.
+
+**Post-Phase-6 QA round 6 (2026-09-09, same day, later)** — "Check that
+every field in reference sections and sites & physical sections has a
+fantastic name with a totally enabled dropdown to select fantastic names
+just like other places where those can be selected. For example, in
+Physical Servers I can't select a name, just manually write it."
+
+Scope decision (confirmed by reading the actual pages, not assumed):
+**Reference** section (Naming Conventions, Reference Data, Entity Type
+Builder, Ansible Inventory, Changelog) manages lookup/taxonomy dictionaries
+and audit data (brands, rack types, field-visibility overrides, ...) —
+none of it is a per-record physical asset an operator would nickname, so
+it's out of scope. Everything else in **Sites & Physical** plus
+**Compute** (the user's own example) got the treatment: Rack, PatchPanel,
+PowerDevice, PowerOutlet, PhysicalServer, VirtualMachine, ContainerApp,
+Workstation — none of these had a real `theme_name` column before; two
+(PhysicalServer/Workstation's `alternative_name`, VirtualMachine/
+ContainerApp's `friendly_name`) had a plain free-text field mislabeled
+"Fantastic Name" as a stand-in (their own code comments said so). `Cable`
+was deliberately left out — its `label` is fully computed from the two
+connected (already-themed) devices' own names, so it isn't a standalone
+asset with its own identity the way the others are.
+
+1. **`backend/alembic/versions/0037_physical_asset_theme_names.py`** +
+   matching `models.py` columns — adds `theme_name`/`theme_category`
+   (String(120)/String(40), nullable, the exact shape used everywhere
+   else) to `racks`, `patch_panels`, `power_devices`, `power_outlets`,
+   `physical_servers`, `virtual_machines`, `containers_apps`,
+   `workstations`. Confirmed via `naming.py` that no `generate_*` function
+   touches any of these fields — independence from the real code is
+   guaranteed by construction, not by convention.
+2. **`frontend/src/lib/useThemePicker.tsx`** (new) — factors Sites.tsx/
+   NetworkDevices.tsx's identical inline "🎭 Pick" button + mutation +
+   `<ThemeNamePicker>` pattern into one hook (`{ column, picker }`) so the
+   8 resources above didn't each need it hand-rolled.
+3. Wired into **`SimpleGridPage.tsx`** (racks/power/patch-panels — cables
+   deliberately excluded), **`PowerOutlets.tsx`**, **`PhysicalServers.tsx`**,
+   **`VirtualMachines.tsx`**, **`ContainersApps.tsx`**, **`Workstations.tsx`**:
+   each gets a real `theme_name` text column + the 🎭 Pick button; the
+   pre-existing mislabeled `alternative_name`/`friendly_name` column is
+   relabeled "Alt Name" (data untouched, just no longer claims to be the
+   catalogue-backed field). `withThemeDisplay` (round 5) applied to each
+   resource's primary plain-cell identity column (`simple_name`,
+   `panel_id_label`, `vf_long_name`, `label`, `vf_short_name` where it's a
+   `generatedCol` rather than a dashboard-link cell — combining into the
+   `deviceLinkCol` cells themselves is deferred, lower priority than the
+   picker itself).
+4. **`Hierarchy.tsx`**: Datacenter's grid gets the same 🎭 Pick column
+   (via `useThemePicker("datacenters")`, since `DATACENTER_COLUMNS` had to
+   become a function taking the picker column — hooks can't run at module
+   scope). Floor/Room/Section's `ThemeNameEditor` (round-3-era, plain text
+   input only) now also has a 🎭 Pick button opening the same catalogue
+   modal, so the manual box and the real picker coexist there too.
+
+Verified: frontend 405 Vitest passed across 61 files (+2 new
+`useThemePicker.test.tsx`, +4 `SimpleGridPage.test.tsx`, +2
+`PowerOutlets.test.tsx`, +1 `Hierarchy.test.tsx`, +4 new page test files —
+`PhysicalServers`/`VirtualMachines`/`ContainersApps`/`Workstations.test.tsx`),
+`tsc -b` clean, `vite build` clean. Backend 387 passed / 1 skipped
+(unchanged — no backend logic touched, only new nullable columns). Applied
+migration 0037 to the live dev container (`podman cp` + `alembic upgrade
+head`) and confirmed via curl: `GET /api/v1/physical-servers` (and racks/
+power-outlets/patch-panels) now return `theme_name`/`theme_category`;
+`PATCH /api/v1/physical-servers/1 {theme_name: "Odin", ...}` persisted
+without touching `vf_short_name`.
 
 ---
 

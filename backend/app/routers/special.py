@@ -591,16 +591,34 @@ async def naming_site_code(
     campus_id: Optional[int] = None,
     region_id: Optional[int] = None,
     site_id: Optional[int] = None,
+    cloud_id: Optional[int] = None,
+    building_id: Optional[int] = None,
+    floor_section_id: Optional[int] = None,
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     """Derive the automatic ``simple_name`` for a site (e.g. ``vfhmcc1``).
 
-    The code is ``organization + campus + region + sequence``. Pass ``site_id``
-    when editing an existing site so its own code is not counted as taken.
-    Nothing is written — this is a pure preview used by the tri-mode selector.
+    Bug fix (round 4) — the code is now the exact same conformation
+    ``vf_short_name`` itself uses (organization + cloud + region + campus
+    + building + floor/section, greedily packed, see
+    ``naming._short_name_prefix``) plus a trailing sequence number, not a
+    separately-derived org+campus+region-only value. ``cloud_id``/
+    ``building_id``/``floor_section_id`` are optional so an existing
+    caller that only ever tracked org/campus/region keeps working — those
+    two levels just don't contribute to the preview if omitted. Pass
+    ``site_id`` when editing an existing site so its own code is not
+    counted as taken. Nothing is written — this is a pure preview used by
+    the tri-mode selector.
     """
     code = await naming.auto_site_code(
-        session, org_id, campus_id, region_id, exclude_site_id=site_id
+        session,
+        org_id,
+        campus_id,
+        region_id,
+        exclude_site_id=site_id,
+        cloud_id=cloud_id,
+        building_id=building_id,
+        floor_section_id=floor_section_id,
     )
     return {
         "org_id": org_id,

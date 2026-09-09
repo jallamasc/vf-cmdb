@@ -161,6 +161,41 @@ async def _conflict(
     return None
 
 
+async def disambiguate(
+    session: AsyncSession,
+    base: str,
+    max_length: Optional[int] = None,
+    case_enforcement: Optional[str] = "lowercase",
+    entity_type: Optional[str] = None,
+    entity_id: Optional[int] = None,
+) -> str:
+    """Round 4 — extracted out of ``suggest_abbreviation`` so a caller that
+    already has a deterministic, STRUCTURED base value (e.g. Building's
+    ``{TypeLetter}{Number}`` composition — see ``crud.py``'s
+    ``_auto_abbreviate`` — instead of one derived from ``full_name`` text)
+    can still reuse the exact same case-normalisation, max-length-fitting
+    and numeric-suffix collision resolution as every mechanically-derived
+    abbreviation in this app, without deriving anything from a name.
+    Never raises — always returns a usable, charset-valid, currently-free
+    value.
+    """
+    base = apply_case(base, case_enforcement) or "x"
+    if max_length:
+        base = base[:max_length] or "x"
+
+    candidate = base
+    suffix_n = 0
+    while True:
+        conflict = await _conflict(session, candidate, entity_type or "", entity_id)
+        if conflict is None:
+            return candidate
+        suffix_n += 1
+        suffix = str(suffix_n)
+        room = max_length - len(suffix) if max_length else None
+        trimmed_base = base[: max(1, room)] if room is not None else base
+        candidate = f"{trimmed_base}{suffix}"
+
+
 async def suggest_abbreviation(
     session: AsyncSession,
     full_name: str,
@@ -190,21 +225,7 @@ async def suggest_abbreviation(
         # Fall back to every alnum character in full_name, then to a
         # single placeholder letter if full_name itself has none.
         base = re.sub(r"[^A-Za-z0-9]", "", full_name or "")
-    base = apply_case(base, case_enforcement) or "x"
-    if max_length:
-        base = base[:max_length] or "x"
-
-    candidate = base
-    suffix_n = 0
-    while True:
-        conflict = await _conflict(session, candidate, entity_type or "", entity_id)
-        if conflict is None:
-            return candidate
-        suffix_n += 1
-        suffix = str(suffix_n)
-        room = max_length - len(suffix) if max_length else None
-        trimmed_base = base[: max(1, room)] if room is not None else base
-        candidate = f"{trimmed_base}{suffix}"
+    return await disambiguate(session, base, max_length, case_enforcement, entity_type, entity_id)
 
 
 async def check_available(

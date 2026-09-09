@@ -408,20 +408,28 @@ export const api = {
   },
   /**
    * FEAT-1 — the automatic site code (``vfhmcc1``) for an org/campus/region
-   * combination. Pass ``siteId`` when editing so the row's own code is not
-   * counted as taken. Nothing is persisted.
+   * (+ optional cloud/building/floor-section — round 4: the same
+   * conformation VF Short Name itself uses) combination. Pass ``siteId``
+   * when editing so the row's own code is not counted as taken. Nothing
+   * is persisted.
    */
   siteCode: (
     orgId?: number | null,
     campusId?: number | null,
     regionId?: number | null,
     siteId?: number | null,
+    cloudId?: number | null,
+    buildingId?: number | null,
+    floorSectionId?: number | null,
   ): Promise<SiteCodeResult> => {
     const qs = new URLSearchParams();
     if (orgId != null) qs.set("org_id", String(orgId));
     if (campusId != null) qs.set("campus_id", String(campusId));
     if (regionId != null) qs.set("region_id", String(regionId));
     if (siteId != null) qs.set("site_id", String(siteId));
+    if (cloudId != null) qs.set("cloud_id", String(cloudId));
+    if (buildingId != null) qs.set("building_id", String(buildingId));
+    if (floorSectionId != null) qs.set("floor_section_id", String(floorSectionId));
     return fetch(`${BASE}/naming/site-code?${qs.toString()}`).then(handle);
   },
   /**

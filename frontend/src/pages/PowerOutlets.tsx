@@ -12,12 +12,15 @@ import { useLookups, textCol, roCol, numCol, fkCol } from "../lib/columns";
  * in this app uses (Vlans.tsx, IpAssignments.tsx, ...).
  *
  * An outlet belongs to EITHER a rack-mounted power device (`power_device_id`)
- * OR a bare wall/receptacle location (`wall_section`, e.g. "Wall — East
- * Corner") — both are optional and independent, mirroring the model's own
- * comment ("for outlets not tied to a rack/PDU").
+ * OR a bare wall-mounted location — round 4: "Treat wall section as
+ * section, according to TIA". That's now a real reference to the `Section`
+ * hierarchy level (`section_id`, migration 0035_power_outlet_section)
+ * instead of the old free-text `wall_section`, so a wall outlet's location
+ * carries the same TIA-606-derived identity (`Section.code`, "S{n}" per
+ * room) every other physical location in this app does.
  */
 export default function PowerOutlets() {
-  const { map, isLoading } = useLookups(["power-devices", "sites", "racks"]);
+  const { map, isLoading } = useLookups(["power-devices", "sites", "racks", "sections"]);
 
   const columns = useMemo(
     () => [
@@ -26,7 +29,7 @@ export default function PowerOutlets() {
       fkCol("power_device_id", "Power Device", map["power-devices"] ?? []),
       fkCol("site_id", "Site", map["sites"] ?? []),
       fkCol("rack_id", "Rack", map["racks"] ?? []),
-      textCol("wall_section", "Wall Section", 160),
+      fkCol("section_id", "Section", map["sections"] ?? []),
       numCol("port_number", "Port"),
       textCol("outlet_type", "Outlet Type", 140),
       textCol("notes", "Notes"),

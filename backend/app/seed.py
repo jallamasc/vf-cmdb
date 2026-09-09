@@ -126,12 +126,27 @@ LOOKUPS: dict = {
         ("Windows", "wn", 2), ("BSD", "bs", 2), ("OpnSense", "op", 2),
         ("Proxmox", "px", 2),
     ],
+    # Post-Phase-6 QA (round 4) — every abbreviation below now follows the
+    # SAME "{family_abbr}-{slug}" convention `endoflife_client.py`'s live
+    # sync already uses (e.g. "wn-s22"), instead of an arbitrary short code
+    # unrelated to its family's own abbreviation. `osVersionGrouping.ts`'s
+    # `familyForVersion`/`latestNPerFamily` match a version to its family
+    # by that exact abbreviation PREFIX — the old seeded rows here
+    # ("s16"/"s19"/... vs family "Windows"/"wn") never actually matched
+    # their family this way, so the Naming page's "latest 4 per family"
+    # grouping silently did nothing for this offline demo data (it only
+    # ever worked for endoflife.date-synced rows). Also adds "Windows
+    # Server 2022" (+2012 R2) and "Ubuntu 20.04"/"22.04" so each family has
+    # more than 4 versions, making the "latest 4" filter meaningful even
+    # fully offline / air-gapped, without requiring the live sync.
     models.OsVersion: [
-        ("Windows 10 Pro", "10p", 4), ("Windows 10 Enterprise", "10e", 4),
-        ("Windows Server 2016", "s16", 4), ("Windows Server 2019", "s19", 4),
-        ("Ubuntu 18", "u18", 4), ("CentOS 8", "c8", 4),
-        ("OpenSense 21", "o21", 4), ("Proxmox 7", "p7", 4),
-        ("Ubuntu 18.04", "v04", 5),
+        ("Windows 10 Pro", "wn-10p", 6), ("Windows 10 Enterprise", "wn-10e", 6),
+        ("Windows Server 2012 R2", "wn-s12r2", 8), ("Windows Server 2016", "wn-s16", 6),
+        ("Windows Server 2019", "wn-s19", 6), ("Windows Server 2022", "wn-s22", 6),
+        ("Ubuntu 18.04", "lx-u1804", 8), ("Ubuntu 20.04", "lx-u2004", 8),
+        ("Ubuntu 22.04", "lx-u2204", 8), ("CentOS 8", "lx-c8", 5),
+        ("OpnSense 21", "op-21", 5), ("OpnSense 22", "op-22", 5),
+        ("Proxmox 7", "px-p7", 5), ("Proxmox 8", "px-p8", 5),
     ],
     models.AppType: [
         ("iTop", "it", 5), ("OCS Inventory", "oi", 5), ("OpenProject", "opj", 5),
@@ -669,7 +684,7 @@ async def seed() -> None:
         psrv = models.PhysicalServer(
             site_id=site.id, rack_id=rack.id, rack_unit=29,
             device_type_id=CDT["ps"], brand_id=BRAND["ge"], role_id=ROLE["hv"],
-            os_family_id=OSF["px"], os_version_id=OSV["p7"], consecutive=1,
+            os_family_id=OSF["px"], os_version_id=OSV["px-p7"], consecutive=1,
             model="HPE ProLiant Gen10 Plus V2", serial_number="MXQ3240CGQ",
             part_number="P54654-001", management_ipv4="10.0.16.106",
             ilo_ipmi_user="Administrator", ilo_ipmi_fqdn="MXQ3240CGQ",

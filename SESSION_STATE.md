@@ -1,9 +1,9 @@
 # Virtualfactor IT CMDB - Session State
 ## Living Document - Read on Every Interaction
 
-**Last Updated**: 2026-09-08 (Current session)
-**Project Phase**: Phase 6 ("Data Quality & Hardware Intelligence") COMPLETE — all 41 tasks done, all 4 checkpoints (I/J/K/L) verified and committed.
-**Status**: ✅ Phases 1-5 shipped and stable. Phase 6 fully implemented, tested, and verified end-to-end against live Podman Postgres + running dev backend/frontend. HEAD `2b0180b` on `master` (working tree clean, not pushed — this repo has no configured push target for this checkout; see "Everything below this section" for the full Phase 1-5 history, which is stale in its specifics — e.g. paths/ports — but the architecture/decisions remain valid).
+**Last Updated**: 2026-09-09 (Current session)
+**Project Phase**: Phase 6 ("Data Quality & Hardware Intelligence") COMPLETE — all 41 tasks done, all 4 checkpoints (I/J/K/L) verified and committed. Post-Phase-6 QA rounds 1-5 all fixed and verified (see below).
+**Status**: ✅ Phases 1-5 shipped and stable. Phase 6 fully implemented, tested, and verified end-to-end against live Podman Postgres + running dev backend/frontend. HEAD `f270b77` on `master` (working tree clean, not pushed — this repo has no configured push target for this checkout; see "Everything below this section" for the full Phase 1-5 history, which is stale in its specifics — e.g. paths/ports — but the architecture/decisions remain valid).
 
 ---
 
@@ -613,6 +613,73 @@ AG Grid DOM test unrelated to any file touched this round) intermittently
 failed only under full-suite load, confirmed via `git stash`/re-run to be
 pre-existing flakiness, not a regression — it and everything else passed
 cleanly on repeated full-suite runs. No backend changes.
+
+**Post-Phase-6 QA round 5 (2026-09-09)** — "I keep seeing the column on
+site code showing only the fantastic name, is the field I should see for
+example 'Alderaan - vfsite1'? Also dropdown to select fantastic name is
+not working, we shall check this everywhere."
+
+Root-caused via a live-data check (`curl /api/v1/sites`), not guesswork:
+site #1 had `site_code_type: "theme"`, `simple_name: "Alderaan"` and
+`theme_name: null` — a pre-round-4-fix row where the old "theme" mode had
+permanently written the fantastic name into the real code column and
+never independently recorded it as `theme_name`, so the two "identities"
+the panel now treats as independent were actually the same single stored
+value shown under two labels. Separately, no grid anywhere combined a
+row's own code with its own `theme_name` for display — `lookupLabel()`
+already builds "FANTASTICNAME-REALCODE" but only for *reference* rows
+shown inside another grid's FK dropdown, never for a row's own identity
+column in its own grid. The picker itself (`ThemeNamePicker.tsx`,
+`SiteCodePanel.tsx`'s "Pick a name…"/"Change…" flow) was exercised
+end-to-end with a real (unmocked) render + click + debounced fetch + a
+live `curl -X PATCH .../sites/1` and never failed — no code bug found
+there. The most plausible explanation for "the dropdown is not working"
+is discoverability: `NetworkDevices.tsx` already has a one-click "🎭
+Pick" button right in its grid, but `Sites.tsx` only had the picker
+tucked into the panel above the grid — the odd one out.
+
+1. **`backend/alembic/versions/0036_site_theme_legacy_repair.py`** — a
+   one-time, idempotent data repair (not a schema change): any row with
+   `site_code_type = 'theme'` and `theme_name IS NULL` gets `theme_name`
+   backfilled from its current `simple_name`; every `site_code_type =
+   'theme'` row is then normalized to `'custom'` (matching what
+   `SiteCodePanel.tsx` already treats it as). `simple_name` is never
+   touched. Applied to the live dev container (`podman cp` + `alembic
+   upgrade head`, since the container only fswatch-syncs `app/`).
+2. **`frontend/src/lib/columns.tsx`** — new `combineWithTheme(row,
+   codeField)` + `withThemeDisplay(col, field)`: unlike `lookupLabel`
+   (fixed fallback chain, for FK reference rows), these take an explicit
+   field name so they work for *any* resource's own identity column, and
+   `withThemeDisplay` only adds a `valueFormatter`/`filterValueGetter` —
+   it never touches `editable`/`cellClass`, so a manually-typed field
+   (`Datacenter.code`) stays editable and a naming-engine field
+   (`Site.simple_name`) stays read-only, exactly as before.
+3. Applied `withThemeDisplay` to the primary identity column on every
+   resource that has a `theme_name`: `Sites.tsx`'s "Site Code"
+   (`simple_name`), `NetworkDevices.tsx`'s "VF Short Name"
+   (`vf_friendly_name`), `Hierarchy.tsx`'s Datacenter "Code". Floor/Room/
+   Section were already combining theme + code in `BlueprintList`'s own
+   render (`"{theme_name} — {name} ({code})"`, added round 3) — no change
+   needed there. Region has no `theme_name` column at all — out of scope.
+4. **`Sites.tsx`**: added a grid-level "🎭 Pick" button column (mirrors
+   `NetworkDevices.tsx`'s `applyTheme` mutation exactly — `api.update`
+   with `{theme_name, theme_category}`), so this page has the same
+   one-click, in-grid entry point every other themed resource has.
+   `SiteCodePanel.tsx`'s own "Pick a name…"/"Change…"/"Clear" flow is
+   unchanged and still the more full-featured place to manage it.
+
+Verified: frontend 386 Vitest passed across 56 files (+8 new
+`columns.test.tsx` cases for `combineWithTheme`/`withThemeDisplay`, +3 new
+`Sites.test.tsx` cases — new file — for the combined display + the 🎭
+Pick button), `tsc -b` clean, `vite build` clean. Backend 387 passed / 1
+skipped (unchanged from round 4 — no backend logic touched, only a data
+migration). Live-verified against the running dev backend: `GET
+/api/v1/sites/1` before the migration showed `site_code_type: "theme"`,
+`theme_name: null`; after `alembic upgrade head` it shows `site_code_type:
+"custom"`, `theme_name: "Alderaan"`; `simple_name` was then set to
+`"vfsite1"` via `curl -X PATCH` to reproduce the user's own example, so
+the grid now genuinely renders "Alderaan-vfsite1" for that row instead of
+"Alderaan" alone.
 
 ---
 

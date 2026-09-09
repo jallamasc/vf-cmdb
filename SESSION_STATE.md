@@ -568,6 +568,52 @@ create/delete round-trip via `POST /api/v1/device-interfaces` with
 up). Frontend: 372 Vitest passed across 55 files (+2 new `PortConfig.
 test.tsx` cases), `tsc --noEmit` clean, `vite build` clean.
 
+**Round 4 follow-up 2 (2026-09-08, same day)** — "We need to reorganize
+the fields available on entity type builder, only slug and label are not
+enough fields to create a type of devices. Also this page behaves
+strange, adding a new entity create a row under a white space, is this
+normal?"
+
+Root-caused BOTH complaints to the same underlying gap: `EntityGrid.tsx`'s
+"+ Add row" never selected the row it just created, so on a
+selection-driven detail panel (`EntityTypeBuilder.tsx`'s Capabilities +
+Custom Fields panel, `Sites.tsx`'s tri-mode panel, etc.) the panel kept
+showing its empty "select a row" placeholder right above the grid after
+adding — reading as a blank gap the new row appeared "under". It also
+meant a newly-created Entity Type's REAL configuration surface
+(Capabilities: 9 toggles; Custom Fields: an unlimited key/label/type/
+required/order list) stayed invisible until a manual extra click, making
+"slug and label" look like the whole story when it never was.
+
+1. **`EntityGrid.tsx`**: `createMut`'s `onSuccess` now remembers the
+   created row's id; once it actually lands in `rowData` (a new
+   `useEffect` watching `gridRowData`), that row is selected via AG
+   Grid's own `getRowNode(id).setSelected(true, true)` — firing the
+   normal `onSelectionChanged` wiring, so any page's detail panel opens
+   immediately. This benefits every page using the
+   add-then-configure-in-panel pattern, not just Entity Type Builder.
+2. **`EntityTypeBuilder.tsx`**: reordered columns (ID -> Label -> Slug ->
+   Icon -> Description -> **Capabilities** -> **Fields** -> Records
+   link); the two new read-only summary columns surface what's actually
+   configured in the detail panel below (comma-joined capability labels;
+   a count of `entity-field-defs` rows for that type) directly in the
+   grid, so a fully-configured type no longer looks identical to a bare
+   one at a glance. Still edited in the panel (a JSONB array and a
+   one-to-many list don't fit a single grid cell) — these are summaries,
+   not new editable fields. Updated the page description + the panel's
+   empty-state text to spell out the 2-step flow ("add a row for its
+   Label/Slug/Icon/Description, then use the panel for Capabilities/
+   Custom Fields") instead of leaving that implicit.
+
+Verified: frontend 375 Vitest passed across 55 files (+2 new `EntityGrid.
+test.tsx` cases for the auto-select behavior, +1 new `EntityTypeBuilder.
+test.tsx` case for the summary columns), `tsc --noEmit` clean, `vite
+build` clean. `AgGridPopupEditor.integration.test.tsx` (a real, unmocked
+AG Grid DOM test unrelated to any file touched this round) intermittently
+failed only under full-suite load, confirmed via `git stash`/re-run to be
+pre-existing flakiness, not a regression — it and everything else passed
+cleanly on repeated full-suite runs. No backend changes.
+
 ---
 
 ## 🆕 (2026-09-04): FEAT-6 spec + Kiro memory infrastructure

@@ -5,13 +5,14 @@
 // actually rendering/measuring a real grid in a DOM-less test environment.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import React from "react";
-import { render, waitFor, act } from "@testing-library/react";
+import { render, waitFor, act, screen, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import EntityGrid, { friendlyError } from "./EntityGrid";
 import { api } from "../api";
 
 let latestGridProps: any = null;
 let fakeEditingCells: unknown[] = [];
+let fakeRowNodes: Record<string, any> = {};
 
 vi.mock("ag-grid-react", () => ({
   AgGridReact: React.forwardRef((props: any, ref: any) => {
@@ -22,6 +23,7 @@ vi.mock("ag-grid-react", () => ({
         getSelectedRows: () => [],
         autoSizeAllColumns: () => {},
         onFilterChanged: () => {},
+        getRowNode: (id: string) => fakeRowNodes[id],
       },
     }));
     return null;
@@ -36,6 +38,7 @@ vi.mock("../api", async (orig) => {
       ...actual.api,
       list: vi.fn(),
       update: vi.fn(),
+      create: vi.fn(),
     },
   };
 });
@@ -163,6 +166,60 @@ describe("EntityGrid — grid edit integrity (Req 1)", () => {
         { id: 1, rack_id: "AA01", panel_id_label: null },
       ])
     );
+  });
+});
+
+describe("EntityGrid — auto-select a freshly created row", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    latestGridProps = null;
+    fakeEditingCells = [];
+    fakeRowNodes = {};
+  });
+
+  // Bug fix — "adding a new entity creates a row under a white space, is
+  // this normal?" Root cause: a new row was never selected, so a
+  // selection-driven panel above the grid kept showing its empty
+  // placeholder. The new row must be selected as soon as it lands in
+  // rowData, so any onSelectionChanged-driven panel opens immediately.
+  it("selects the newly created row once it appears in rowData, firing onSelectionChanged", async () => {
+    const row1 = { id: 1, rack_id: "A", panel_id_label: "p1" };
+    const row2 = { id: 2, rack_id: null, panel_id_label: null };
+    (api.list as any)
+      .mockResolvedValueOnce([row1])
+      .mockResolvedValue([row1, row2]);
+    (api.create as any).mockResolvedValue(row2);
+
+    const setSelected = vi.fn();
+    fakeRowNodes["2"] = { setSelected };
+    const onSelectionChanged = vi.fn();
+
+    wrap(
+      <EntityGrid
+        resource="patch-panels"
+        title="Patch Panels"
+        columns={COLUMNS}
+        onSelectionChanged={onSelectionChanged}
+      />
+    );
+    await waitFor(() => expect(latestGridProps?.rowData?.length).toBe(1));
+
+    fireEvent.click(screen.getByText("+ Add row"));
+
+    await waitFor(() => expect(setSelected).toHaveBeenCalledWith(true, true));
+  });
+
+  it("does not blow up when the created row is not (yet) rendered by the grid", async () => {
+    const row1 = { id: 1, rack_id: "A", panel_id_label: "p1" };
+    const row2 = { id: 2, rack_id: null, panel_id_label: null };
+    (api.list as any).mockResolvedValue([row1, row2]);
+    (api.create as any).mockResolvedValue(row2);
+    // Deliberately leave fakeRowNodes empty — getRowNode returns undefined.
+
+    wrap(<EntityGrid resource="patch-panels" title="Patch Panels" columns={COLUMNS} />);
+    await waitFor(() => expect(latestGridProps?.rowData?.length).toBeGreaterThan(0));
+
+    expect(() => fireEvent.click(screen.getByText("+ Add row"))).not.toThrow();
   });
 });
 

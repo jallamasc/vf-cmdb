@@ -92,10 +92,15 @@ const CATEGORIES: { name: string; description: string; lookups: Lookup[] }[] = [
   },
   {
     name: "Operating Systems",
-    description: "OS families and versions.",
+    description: "OS versions and families.",
+    // Post-Phase-6 QA (round 4 follow-up) — "OS versions has more
+    // importance than OS families... simply put versions first on the
+    // menu." OS Version is the level that actually identifies what a
+    // device runs (e.g. "Windows Server 2022"), so it's listed — and
+    // opened by default — before the coarser OS Family category.
     lookups: [
-      { slug: "os-families", label: "OS Families" },
       { slug: "os-versions", label: "OS Versions" },
+      { slug: "os-families", label: "OS Families" },
     ],
   },
   {

@@ -179,10 +179,29 @@ export default function PortConfig() {
   const columns = useMemo(
     () => [
       roCol("id", "ID", 70),
-      // DeviceInterface.network_device_id is NOT NULL — required on insert.
       // `sort: "asc"` gives every device's ports a default visual grouping
-      // even when "All devices" is selected below.
+      // even when "All devices" is selected below. `network_device_id` is
+      // now nullable (models.py's own comment: "relaxed to nullable so a
+      // data port can be owned by any device class") — the legacy/default
+      // path for a network device's own ports, still shown first.
       fkCol("network_device_id", "Device", deviceOpts, { sort: "asc" }),
+      // Bug fix (round 4 follow-up) — the polymorphic owner pair
+      // (`owner_device_type`/`owner_device_id`) was completely absent from
+      // this grid, so a port belonging to a physical server, workstation
+      // or generic entity (not a network device) could never be created
+      // or edited here at all — `ports.py`'s `interface_owner()` already
+      // resolves this pair (winning over `network_device_id` when both
+      // are set), the UI just never exposed it. Plain type+id columns,
+      // mirroring the SAME polymorphic-reference idiom
+      // `IpAssignments.tsx`'s `assigned_to_type`/`assigned_to_id` already
+      // uses, rather than a dynamic per-row FK dropdown.
+      selectCol(
+        "owner_device_type",
+        "Owner Type",
+        [null, "network-devices", "physical-servers", "workstations", "generic-entities"],
+        { width: 170 }
+      ),
+      numCol("owner_device_id", "Owner ID"),
       numCol("port_number", "Port"),
       selectCol(
         "port_mode",
@@ -209,20 +228,13 @@ export default function PortConfig() {
     <EntityGrid
       resource="device-interfaces"
       title="Device Port Configuration"
-      description="Switch/router interface configuration, grouped by Device. Pick a device below to focus on just its ports, or leave it on “All devices” — the Device column stays sorted so each device's ports still cluster together."
+      description="Switch/router interface configuration, grouped by Device. Pick a device below to focus on just its ports, or leave it on “All devices” — the Device column stays sorted so each device's ports still cluster together. A port on a physical server, workstation or generic entity (not a network device) uses Owner Type + Owner ID instead of Device."
       columns={columns}
       newRowDefaults={() => ({
         admin_status: "up",
         port_mode: "access",
         network_device_id: deviceFilter || deviceOpts[0]?.id || null,
       })}
-      requiredFields={[
-        {
-          field: "network_device_id",
-          label: "Device",
-          hint: "Create a Network Device first — a port cannot exist without one.",
-        },
-      ]}
       externalFilter={deviceFilter === "" ? undefined : (row) => row.network_device_id === deviceFilter}
       toolbarExtra={
         <div className="flex items-center gap-3 flex-wrap">

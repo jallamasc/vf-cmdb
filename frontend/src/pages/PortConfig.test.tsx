@@ -63,6 +63,31 @@ describe("PortConfig — device grouping (filter + default sort)", () => {
     expect(deviceCol.sort).toBe("asc");
   });
 
+  // Bug fix (round 4 follow-up) — "owner_device_type"/"owner_device_id"
+  // polymorphism gap: a port on a physical server/workstation/generic
+  // entity (not a network device) could never be created/edited here.
+  it("exposes the polymorphic Owner Type / Owner ID columns", async () => {
+    wrap();
+    await waitFor(() => expect(capturedProps).not.toBeNull());
+    const fields = capturedProps.columns.map((c: any) => c.field);
+    expect(fields).toContain("owner_device_type");
+    expect(fields).toContain("owner_device_id");
+    const ownerTypeCol = capturedProps.columns.find((c: any) => c.field === "owner_device_type");
+    expect(ownerTypeCol.cellEditorParams.values).toEqual([
+      null,
+      "network-devices",
+      "physical-servers",
+      "workstations",
+      "generic-entities",
+    ]);
+  });
+
+  it("no longer hard-requires network_device_id (it is nullable — a port can use Owner Type/ID instead)", async () => {
+    wrap();
+    await waitFor(() => expect(capturedProps).not.toBeNull());
+    expect(capturedProps.requiredFields ?? []).toEqual([]);
+  });
+
   it("offers a device filter listing every network device", async () => {
     wrap();
     await waitFor(() => expect(screen.getByLabelText("Filter by device")).toBeTruthy());

@@ -76,6 +76,26 @@ async def test_network_device_friendly_name_never_exceeds_the_cap(session):
 
 
 @pytest.mark.asyncio
+async def test_site_short_name_follows_the_same_hierarchy_order_as_long_name(session):
+    """Bug fix (round 4) — vf_short_name must summarize vf_long_name using
+    the SAME component order (org, cloud, region, campus, building,
+    floor/section) so sorting a list by either name groups sites
+    consistently, instead of the two disagreeing on relative order."""
+    org = await crud.create_item(session, models.Organization, {"full_name": "Virtualfactor", "max_length": 2})
+    cloud = await crud.create_item(session, models.Cloud, {"full_name": "Private", "max_length": 2})
+    campus = await crud.create_item(session, models.Campus, {"full_name": "Home", "max_length": 2})
+    site = await crud.create_item(
+        session,
+        models.Site,
+        {"organization_id": org.id, "cloud_id": cloud.id, "campus_id": campus.id},
+    )
+    # vf_long_name concatenates org+cloud+...+campus in that order (upper);
+    # vf_short_name (same order, lowercased) must appear as a substring at
+    # the START of it.
+    assert site.vf_long_name.lower().startswith(site.vf_short_name.lower())
+
+
+@pytest.mark.asyncio
 async def test_site_short_name_never_exceeds_the_cap(session):
     org = await crud.create_item(
         session, models.Organization, {"full_name": "A Very Long Org Name", "abbreviation": "avlong"}

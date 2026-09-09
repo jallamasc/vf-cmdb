@@ -3,15 +3,20 @@ constraint instead of purely decorative metadata:
 
 1. A LookupMixin row's own `max_length` must be within 1-9 (the frontend's
    new dropdown range).
-2. The forced, server-derived abbreviation (Bug fix, post-Phase-6 QA — see
-   crud.py's `_auto_abbreviate`) is always trimmed to fit its row's own
-   `max_length`, never rejected. `abbrev.validate_abbreviation_length`
-   itself (unit-tested below) still rejects a too-long value outright, and
-   remains the guard for the "code"-based hierarchy models
-   (Datacenter/Room/Rack) whose code is still client-set via
-   `AbbrevField.tsx` on the Hierarchy page — LookupMixin's `abbreviation`
-   is no longer client-set at all, so this path can't be hit via
-   `crud.create_item`/`update_item` for it anymore.
+2. On CREATE, the forced, server-derived abbreviation (Bug fix,
+   post-Phase-6 QA — see crud.py's `_auto_abbreviate`) is trimmed to fit
+   the row's own `max_length`, never rejected.
+3. Bug fix (round 4) — on UPDATE, lowering `max_length` alone (full_name
+   unchanged) does NOT re-derive/re-trim the abbreviation. An operator
+   changing Max Length must never silently mangle an already-meaningful,
+   already-unique abbreviation (e.g. "vsw" for "Virtual switch", chosen
+   to stay distinguishable from a plain "sw" Switch type) just because
+   they lowered a limit — that value only ever gets touched by
+   `_auto_abbreviate` again once `full_name`/`trim_mode`/
+   `case_enforcement` itself changes. So a `max_length` lowered below the
+   CURRENT abbreviation's length is instead rejected outright by
+   `abbrev.validate_abbreviation_length` (unit-tested below), the same
+   422 a client-typed too-long value used to get.
 
 Both checks are `None`-safe: an unset `max_length` never constrains
 anything (pre-existing rows created before this change keep working).
@@ -76,11 +81,35 @@ async def test_max_length_out_of_range_is_rejected_on_update(session):
 
 
 @pytest.mark.asyncio
-async def test_lowering_max_length_re_derives_a_shorter_abbreviation(session):
-    """Changing `max_length` alone still re-triggers `_auto_abbreviate`
-    (it's part of the update's changed-field set), so the abbreviation is
-    re-derived/re-trimmed to fit the new bound — never left stale, and
-    never rejected the way a client-typed value used to be."""
-    org = await crud.create_item(session, models.Organization, {"full_name": "Acme", "max_length": 4})
-    updated = await crud.update_item(session, models.Organization, org.id, {"max_length": 2})
-    assert len(updated.abbreviation) <= 2
+async def test_lowering_max_length_below_the_current_abbreviation_is_rejected(session):
+    org = await crud.create_item(session, models.Organization, {"full_name": "Acmecorp", "max_length": 4})
+    original_abbrev = org.abbreviation
+    assert len(original_abbrev) == 4
+    with pytest.raises(HTTPException) as exc:
+        await crud.update_item(session, models.Organization, org.id, {"max_length": 2})
+    assert exc.value.status_code == 422
+    assert "Max Length" in exc.value.detail
+    # The rejected attempt must never have reached the database —
+    # `refresh()` re-queries and overwrites the in-memory attributes,
+    # instead of `get()` returning the same (locally mutated, never
+    # flushed) Python instance straight out of the identity map.
+    await session.refresh(org)
+    assert org.abbreviation == original_abbrev
+    assert org.max_length == 4
+
+
+@pytest.mark.asyncio
+async def test_raising_max_length_never_touches_the_existing_abbreviation(session):
+    org = await crud.create_item(session, models.Organization, {"full_name": "Acmecorp", "max_length": 4})
+    original = org.abbreviation
+    updated = await crud.update_item(session, models.Organization, org.id, {"max_length": 9})
+    assert updated.abbreviation == original
+    assert updated.max_length == 9
+
+
+@pytest.mark.asyncio
+async def test_lowering_max_length_to_a_value_the_current_abbreviation_still_fits_is_allowed(session):
+    org = await crud.create_item(session, models.Organization, {"full_name": "Ab"})  # -> "b" (1 char)
+    updated = await crud.update_item(session, models.Organization, org.id, {"max_length": 3})
+    assert updated.abbreviation == org.abbreviation
+    assert updated.max_length == 3

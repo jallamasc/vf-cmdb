@@ -460,6 +460,113 @@ backfill correctly stayed a no-op against real data).
 - The Ansible/Semaphore usage explanation from the earlier round still
   stands (no code path for ad-hoc/group playbook runs inside vf-cmdb).
 
+**Post-Phase-6 QA round 4 (2026-09-08, same day, yet later)** — a further
+feedback batch on the naming engine + a few UI gaps. All implemented,
+tested, and verified:
+
+1. **Max Length silently mangled a meaningful abbreviation instead of
+   rejecting the change.** Lowering `max_length` alone used to re-trigger
+   `_auto_abbreviate`, which would happily re-derive (and thus destroy) an
+   already-unique, hand-meaningful abbreviation like "vsw" for "Virtual
+   switch" (chosen to stay distinguishable from a plain "sw" Switch type).
+   `crud.py`'s update-path trigger set no longer includes `max_length` —
+   only `full_name`/`trim_mode`/`case_enforcement`/`abbreviation` (+
+   Building's own `building_type`/`number`, see below) re-derive; a
+   `max_length` lowered below the CURRENT abbreviation's length is now
+   rejected outright by the existing `abbrev.validate_abbreviation_length`
+   422, exactly the same way a client-typed too-long value already was.
+   Live-verified on the real "Virtual switch"/"vsw" row.
+2. **Region detail page couldn't add/modify anything** — the Overview
+   section was a plain read-only `<dl>`. Rebuilt as a lightweight
+   "commit on blur" editable form (`OverviewField`, mirroring
+   `DeviceOverviewForm.tsx`'s idiom) for Full Name, Fantastic Name
+   (`theme_name`), Max Length, Latitude, Longitude, Description.
+   Abbreviation stays read-only (still forced/derived, per round 2).
+3. **"How did the app deduce that 'Main Building 1' equals M1... do not
+   guess."** Building gets two new structured columns, `building_type` +
+   `number` (migration `0034_building_structured_code`), and
+   `crud.py`'s `_auto_abbreviate` now has a Building-specific branch:
+   when both are set, the abbreviation is COMPOSED deterministically
+   (`{first letter of building_type}{number}` — "Main"+1 -> "m1"), not
+   guessed from `full_name` text. Falls back to the generic consonant
+   derivation for a legacy/incomplete row that hasn't set them yet, so
+   nothing breaks. `abbrev.py` gained a `disambiguate()` helper (extracted
+   from `suggest_abbreviation`) so this reuses the exact same case/
+   max-length/collision-suffix handling without deriving from a name.
+4. **OS Families/Versions: the "latest 4 per family" feature silently did
+   nothing for the seeded demo data.** `osVersionGrouping.ts` matches a
+   version to its family by abbreviation PREFIX (`"{family_abbr}-..."` —
+   the convention the live endoflife.date sync already follows), but the
+   coarse seeded `OsVersion` rows used arbitrary unrelated abbreviations
+   (e.g. "Windows Server 2016" -> "s16" vs family "Windows" -> "wn") that
+   never actually matched. Every seeded `OsVersion` abbreviation now
+   follows that same prefix convention, plus added "Windows Server 2022"
+   (+ 2012 R2) and a few more Ubuntu/OpnSense/Proxmox versions so each
+   family has more than 4 entries — the grouping/filter is now meaningful
+   fully offline, not just after a live sync. (Did not implement a
+   "select version from a family dropdown" UI, or reorder device grids to
+   put OS Version before OS Family — both read as much larger, separate
+   asks; flagging as deferred rather than guessing at scope.)
+5. **"The conformed name and the fantastic name are not together... the
+   site code shows the fantastic name instead of the conformed name."**
+   Root cause: `naming.generate_site`'s old `site_code_type == "theme"`
+   branch mirrored `theme_name` STRAIGHT INTO `simple_name`, replacing the
+   real code instead of coexisting with it. That branch is now removed —
+   `simple_name` is always either the auto-generated code ("auto") or
+   whatever was typed ("custom"); any other value (including legacy
+   "theme" data — confirmed none exists in this DB) behaves like "custom"
+   and is left untouched. `theme_name` is set independently via
+   `SiteCodePanel.tsx`'s own separate mutation and now always coexists.
+6. **"vf short should be a summary... to preserve order on the lists"** +
+   **"Simple Name should result by conformation of vf short, everywhere."**
+   `site_short_name`'s greedy-packing order now matches `site_long_name`'s
+   own hierarchy order exactly (organization, cloud, region, campus,
+   building, floor/section) instead of a separately-reordered priority
+   list from the previous round — `vf_short_name` is now a true truncated
+   PREFIX of `vf_long_name`. `auto_site_code`/the `/naming/site-code`
+   preview endpoint were refactored to share the exact same
+   `naming._short_name_prefix` core `site_short_name` uses (extracted
+   helper), so `simple_name` (in "auto" mode) is now `vf_short_name`
+   (lowercased) + a trailing uniqueness sequence number, not an
+   independently-derived org+campus+region-only value. Live-verified: a
+   fresh auto-mode site got `simple_name="vf1"`/`vf_short_name="VF"`.
+7. **"Treat wall section as section, according to TIA."** `PowerOutlet`
+   gains `section_id` (migration `0035_power_outlet_section`), a real FK
+   to the `Section` hierarchy level (which already carries a TIA-606-
+   derived `code`, `naming.generate_section`'s sequential "S{n}" per
+   room) — replacing the old free-text `wall_section` in
+   `PowerOutlets.tsx`'s grid (the DB column itself is kept, unused, for
+   backward compatibility with any existing hand-typed data).
+
+Verified: 387 backend pytest passed / 1 skipped (single clean run — new
+test files `test_building_structured_abbreviation.py`,
+`test_site_code_theme_coexistence.py`,
+`test_seed_os_version_family_prefix.py`, `test_power_outlet_section.py`;
+`test_max_length.py`/`test_short_name_length_cap.py`/`RegionDetail.test.tsx`/
+`PowerOutlets.test.tsx` gained cases), 370 frontend Vitest passed across 55
+files, `tsc --noEmit` clean, `vite build` clean. Migrations 0034/0035
+applied live via `podman cp` + `alembic upgrade head`; re-ran `python -m
+app.seed` inside the container to pick up the corrected OS version
+abbreviations (additive — added the new "wn-"/"lx-"/"op-"/"px-"-prefixed
+rows alongside the old ones) and manually deleted the now-superseded old
+rows (all but one — "Proxmox 7"/"p7" is still FK-referenced by a seeded
+demo PhysicalServer and Postgres correctly blocked that one delete with a
+409; left in place, harmless). Live-verified every fix above against the
+running dev backend and cleaned up all test data created during
+verification (test Building, test Site).
+
+**Next** (from this round, not started/confirmed):
+- Building's structured Type+Number composition was NOT extended to any
+  other lookup — only Building was explicitly named in the feedback.
+- The seeded demo `PhysicalServer` referencing the old "Proxmox 7"/"p7"
+  `OsVersion` row was not repointed to the new "px-p7" row (blocked
+  delete, not a functional problem — both rows resolve to the same real
+  OS, just two ids now exist for it in this one dev DB).
+- "OS Versions has more importance than OS Families" (e.g. reordering
+  device-grid FK columns, or a family-scoped version picker) is
+  unaddressed pending a clearer spec of what "more importance" should
+  concretely change in the UI.
+
 ---
 
 ## 🆕 (2026-09-04): FEAT-6 spec + Kiro memory infrastructure

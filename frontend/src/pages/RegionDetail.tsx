@@ -1,9 +1,120 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import EntityGrid from "../components/EntityGrid";
-import { api } from "../api";
+import { api, Row } from "../api";
 import { roCol, fkCol, generatedCol, useLookups } from "../lib/columns";
+
+const INPUT_CLASS =
+  "w-full border border-slate-300 rounded px-2 py-1 text-sm focus:outline-none " +
+  "focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 disabled:bg-slate-50";
+
+/**
+ * Bug fix (round 4) — "On the details of the regions I can't add or modify
+ * the data." The Overview section used to be a plain read-only `<dl>` with
+ * no way to edit anything, even though this page is meant to mirror the
+ * device dashboard's editable-overview idiom (`DeviceOverviewForm.tsx`).
+ * This is a lighter-weight version of that same "commit on blur" pattern —
+ * Region is a flat `LookupMixin` row, not a device schema, so it doesn't
+ * need that component's per-device-type machinery.
+ */
+function OverviewField({
+  label,
+  field,
+  region,
+  onSaved,
+  kind = "text",
+  editable = true,
+  help,
+}: {
+  label: string;
+  field: string;
+  region: Row;
+  onSaved: () => void;
+  kind?: "text" | "number" | "textarea";
+  editable?: boolean;
+  help?: string;
+}) {
+  const [value, setValue] = useState(String(region[field] ?? ""));
+  const [status, setStatus] = useState<string | null>(null);
+  useEffect(() => setValue(String(region[field] ?? "")), [region, field]);
+
+  const save = useMutation({
+    mutationFn: (raw: string) => {
+      const trimmed = raw.trim();
+      const payload =
+        kind === "number"
+          ? { [field]: trimmed === "" ? null : Number(trimmed) }
+          : { [field]: trimmed === "" ? null : trimmed };
+      return api.update("regions", region.id as number, payload);
+    },
+    onSuccess: () => {
+      setStatus("saved");
+      onSaved();
+    },
+    onError: (e: unknown) => {
+      setStatus(e instanceof Error ? e.message : "Save failed");
+      setValue(String(region[field] ?? ""));
+    },
+  });
+
+  const commit = () => {
+    setStatus(null);
+    const current = String(region[field] ?? "");
+    if (current === value.trim()) return;
+    save.mutate(value);
+  };
+
+  if (!editable) {
+    return (
+      <div className="flex justify-between gap-3">
+        <dt className="text-slate-500">{label}</dt>
+        <dd className="text-right font-mono">{String(region[field] ?? "—")}</dd>
+      </div>
+    );
+  }
+
+  const inputId = `region-overview-${field}`;
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center justify-between">
+        <label htmlFor={inputId} className="text-xs font-medium text-slate-500">
+          {label}
+        </label>
+        {status === "saved" && <span className="text-[10px] text-green-600">saved</span>}
+        {status && status !== "saved" && (
+          <span className="text-[10px] text-red-600">{status}</span>
+        )}
+      </div>
+      {kind === "textarea" ? (
+        <textarea
+          id={inputId}
+          className={INPUT_CLASS}
+          rows={2}
+          value={value}
+          disabled={save.isPending}
+          onChange={(e) => setValue(e.target.value)}
+          onBlur={commit}
+        />
+      ) : (
+        <input
+          id={inputId}
+          className={INPUT_CLASS}
+          type={kind === "number" ? "number" : "text"}
+          value={value}
+          disabled={save.isPending}
+          onChange={(e) => setValue(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            if (e.key === "Escape") setValue(String(region[field] ?? ""));
+          }}
+        />
+      )}
+      {help && <p className="text-[11px] text-slate-400">{help}</p>}
+    </div>
+  );
+}
 
 const RegionMap = lazy(() => import("../components/RegionMap"));
 
@@ -24,12 +135,17 @@ const RegionMap = lazy(() => import("../components/RegionMap"));
 export default function RegionDetail() {
   const { id } = useParams<{ id: string }>();
   const regionId = Number(id);
+  const qc = useQueryClient();
 
   const { data: region, isLoading } = useQuery({
     queryKey: ["regions", regionId],
     queryFn: () => api.get("regions", regionId),
     enabled: !Number.isNaN(regionId),
   });
+  const refetchRegion = () => {
+    qc.invalidateQueries({ queryKey: ["regions", regionId] });
+    qc.invalidateQueries({ queryKey: ["regions"] });
+  };
 
   const { map, isLoading: lookupsLoading } = useLookups([
     "organizations",
@@ -77,21 +193,42 @@ export default function RegionDetail() {
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 mb-2">
             Overview
           </h2>
-          <dl className="text-sm space-y-1.5">
-            {[
-              ["Full Name", region.full_name ?? "—"],
-              ["Abbreviation", region.abbreviation ?? "—"],
-              ["Max Length", region.max_length ?? "—"],
-              ["Latitude", region.latitude ?? "—"],
-              ["Longitude", region.longitude ?? "—"],
-              ["Description", region.description ?? "—"],
-            ].map(([label, value]) => (
-              <div key={String(label)} className="flex justify-between gap-3">
-                <dt className="text-slate-500">{label}</dt>
-                <dd className="text-right font-mono">{String(value)}</dd>
+          <div className="space-y-3">
+            <OverviewField label="Full Name" field="full_name" region={region} onSaved={refetchRegion} />
+            <OverviewField
+              label="Fantastic Name"
+              field="theme_name"
+              region={region}
+              onSaved={refetchRegion}
+              help="An optional nickname — coexists with, never replaces, the Abbreviation."
+            />
+            {/* Abbreviation is forced/derived from Full Name server-side
+                (see crud.py's `_auto_abbreviate`) — read-only everywhere,
+                same as the Naming Conventions grid. */}
+            <dl>
+              <div className="flex justify-between gap-3">
+                <dt className="text-xs font-medium text-slate-500 self-center">Abbreviation</dt>
+                <dd className="text-right font-mono text-sm">{region.abbreviation ?? "—"}</dd>
               </div>
-            ))}
-          </dl>
+            </dl>
+            <OverviewField
+              label="Max Length"
+              field="max_length"
+              region={region}
+              onSaved={refetchRegion}
+              kind="number"
+              help="1-9. Rejected if the current Abbreviation no longer fits."
+            />
+            <OverviewField label="Latitude" field="latitude" region={region} onSaved={refetchRegion} kind="number" />
+            <OverviewField label="Longitude" field="longitude" region={region} onSaved={refetchRegion} kind="number" />
+            <OverviewField
+              label="Description"
+              field="description"
+              region={region}
+              onSaved={refetchRegion}
+              kind="textarea"
+            />
+          </div>
         </div>
         <div className="border border-slate-200 rounded-lg p-2 bg-white">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 mb-2 px-2 pt-1">

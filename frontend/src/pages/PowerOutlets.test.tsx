@@ -57,7 +57,7 @@ describe("PowerOutlets — new CRUD page", () => {
     expect(fields).toContain("power_device_id");
     expect(fields).toContain("site_id");
     expect(fields).toContain("rack_id");
-    expect(fields).toContain("wall_section");
+    expect(fields).toContain("section_id");
     expect(fields).toContain("port_number");
     expect(fields).toContain("outlet_type");
   });

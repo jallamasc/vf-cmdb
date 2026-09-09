@@ -227,6 +227,15 @@ class Building(LookupMixin, Base):
     __tablename__ = "buildings"
 
     icon: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+    # Post-Phase-6 QA (round 4) — structured composition instead of
+    # guessing the abbreviation from `full_name` text: "Main Building 1"
+    # (building_type="Main", number=1) -> abbreviation "m1", deterministic
+    # via crud.py's `_auto_abbreviate` (Building-specific branch), not
+    # consonant-derived like every other LookupMixin lookup. Both optional
+    # so an existing/legacy row without them keeps working (falls back to
+    # the generic full_name-derived path).
+    building_type: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    number: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
 
 class FloorSection(LookupMixin, Base):
@@ -683,6 +692,13 @@ class PowerOutlet(Base):
     power_device_id: Mapped[Optional[int]] = mapped_column(ForeignKey("power_devices.id"))
     site_id: Mapped[Optional[int]] = mapped_column(ForeignKey("sites.id"))
     rack_id: Mapped[Optional[int]] = mapped_column(ForeignKey("racks.id"))
+    # Post-Phase-6 QA (round 4) — "Treat wall section as section, according
+    # to TIA": a real reference to the `Section` hierarchy level (which
+    # already carries a TIA-606-derived `code`, naming.generate_section's
+    # "S{n}" per room), replacing the old free-text `wall_section`. That
+    # column is kept (not dropped) for backward compatibility with any
+    # existing hand-typed data, but the frontend no longer edits it.
+    section_id: Mapped[Optional[int]] = mapped_column(ForeignKey("sections.id"))
     wall_section: Mapped[Optional[str]] = mapped_column(String(40))
     port_number: Mapped[Optional[int]] = mapped_column(Integer)
     outlet_type: Mapped[Optional[str]] = mapped_column(String(20))

@@ -186,6 +186,27 @@ async def _auto_abbreviate(session: AsyncSession, obj, entity_id) -> Optional[st
     """
     if abbrev.ABBR_FIELDS.get(type(obj)) != "abbreviation":
         return None
+    # Round 4 — Building is composed from explicit structured fields
+    # (building_type + number), never guessed from full_name text, when
+    # both are set. See models.py's Building.building_type/number
+    # docstring. Falls through to the generic full_name-derived path below
+    # for a legacy/incomplete row that hasn't set them yet.
+    if isinstance(obj, models.Building):
+        building_type = (getattr(obj, "building_type", None) or "").strip()
+        number = getattr(obj, "number", None)
+        if building_type and number is not None:
+            base = f"{building_type[0].upper()}{number}"
+            case_enforcement = getattr(obj, "case_enforcement", None) or "lowercase"
+            derived = await abbrev.disambiguate(
+                session,
+                base,
+                max_length=getattr(obj, "max_length", None),
+                case_enforcement=case_enforcement,
+                entity_type=obj.__tablename__,
+                entity_id=entity_id,
+            )
+            obj.abbreviation = derived
+            return derived
     if not hasattr(obj, "full_name") or not hasattr(obj, "trim_mode"):
         return None
     full_name = getattr(obj, "full_name", None)
@@ -812,8 +833,25 @@ async def update_item(
         # update (e.g. a device-type's unrelated `stencil_url` PATCH from
         # the stencil-upload endpoint) silently rewrote the abbreviation
         # every time, which is a worse bug than the one being fixed here.
+        #
+        # Bug fix (round 4) — `max_length` is deliberately EXCLUDED from
+        # this trigger set. Re-deriving on a max_length-only change used to
+        # silently replace a meaningful, already-unique abbreviation (e.g.
+        # "vsw" for "Virtual switch", chosen to stay distinguishable from a
+        # plain "sw" Switch type) with a mechanically-shortened one the
+        # moment an operator lowered Max Length — exactly the kind of
+        # silent identity change "forced" derivation is supposed to
+        # prevent, just triggered from the other direction. Leaving
+        # `abbreviation` untouched here means `_validate_abbrev` below (via
+        # `abbrev.validate_abbreviation_length`) checks the CURRENT,
+        # unchanged abbreviation against the NEW max_length and correctly
+        # rejects the update with a clear 422 if it no longer fits, instead
+        # of silently mangling the identity to make it fit.
         changed_fields = {c[0] for c in changes}
-        if changed_fields & {"full_name", "trim_mode", "case_enforcement", "max_length", "abbreviation"}:
+        if changed_fields & {
+            "full_name", "trim_mode", "case_enforcement", "abbreviation",
+            "building_type", "number",
+        }:
             # Force-derive from (possibly just-updated) full_name — this
             # must win over whatever the client attempted to set the field
             # to directly.

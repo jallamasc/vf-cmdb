@@ -55,11 +55,13 @@ async def test_a_collision_gets_a_numeric_suffix(session):
 
 
 async def test_unrelated_field_update_does_not_re_derive_the_abbreviation(session):
-    """Bug fix (post-Phase-6 QA, round 2) — updating a field that has
+    """Bug fix (post-Phase-6 QA, round 2/4) — updating a field that has
     nothing to do with the abbreviation (e.g. `icon`, or a device-type's
-    own `stencil_url` from the stencil-upload endpoint) must NOT silently
-    rewrite it — only a change to `full_name`/`trim_mode`/
-    `case_enforcement`/`max_length`/`abbreviation` itself may re-derive."""
+    own `stencil_url` from the stencil-upload endpoint, or `max_length` —
+    round 4: lowering it must reject rather than re-derive, see
+    test_max_length.py) must NOT silently rewrite it — only a change to
+    `full_name`/`trim_mode`/`case_enforcement`/`abbreviation` itself may
+    re-derive."""
     ndt = await crud.create_item(session, models.NetworkDeviceType, {"full_name": "Firewall"})
     original = ndt.abbreviation
     updated = await crud.update_item(

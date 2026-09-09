@@ -65,33 +65,30 @@ async def site_long_name(session: AsyncSession, site: models.Site) -> str:
     return "".join(p for p in parts).upper()
 
 
-async def site_short_name(session: AsyncSession, site: models.Site) -> str:
-    """Recognisable short name for a site.
-
-    Bug fix (post-Phase-6 QA) — this used to stop as soon as organization +
-    campus reached ``SHORT_NAME_MIN_LENGTH`` (4 characters), so a site with
-    both set (the common case) ended up as just those two pieces — "the name
-    of the cloud and the placement" and nothing else, per the reported
-    complaint. It now greedily PACKS as many distinct hierarchy levels as
-    fit within ``SHORT_NAME_MAX_LENGTH`` (still 8 — the cap itself is
-    unchanged), in priority order: organization, campus, region, building,
-    floor/section, cloud. Region/building/floor-section rank above cloud
-    because they carry real physical "place" detail (the user's own
-    example), whereas cloud is often the same value across many sites and
-    adds the least distinguishing information per character spent. A piece
-    that would only PARTIALLY fit is skipped entirely rather than being cut
-    mid-abbreviation (e.g. skip a 3-char piece with only 2 chars of room
-    left) so every included piece stays a whole, recognisable code — the
-    final `[:SHORT_NAME_MAX_LENGTH]` slice is just a safety net for the
-    pathological case where the FIRST piece alone already exceeds the cap.
+async def _short_name_prefix(
+    session: AsyncSession,
+    organization_id: Optional[int],
+    cloud_id: Optional[int],
+    region_id: Optional[int],
+    campus_id: Optional[int],
+    building_id: Optional[int] = None,
+    floor_section_id: Optional[int] = None,
+) -> str:
+    """Round 4 — the shared greedy-packing core of ``site_short_name``,
+    extracted so ``auto_site_code`` (below) can compute the exact same
+    value from raw FK ids — a not-yet-saved candidate (the tri-mode
+    preview endpoint) has no persisted ``Site`` row to read attributes off
+    of. Same hierarchy order as ``site_long_name``: organization, cloud,
+    region, campus, building, floor/section. Not upper/lower-cased here —
+    callers apply whichever case their own output needs.
     """
     components = (
-        (models.Organization, site.organization_id),
-        (models.Campus, site.campus_id),
-        (models.Region, site.region_id),
-        (models.Building, site.building_id),
-        (models.FloorSection, site.floor_section_id),
-        (models.Cloud, site.cloud_id),
+        (models.Organization, organization_id),
+        (models.Cloud, cloud_id),
+        (models.Region, region_id),
+        (models.Campus, campus_id),
+        (models.Building, building_id),
+        (models.FloorSection, floor_section_id),
     )
     short = ""
     for model, pk in components:
@@ -101,7 +98,44 @@ async def site_short_name(session: AsyncSession, site: models.Site) -> str:
         if len(short) + len(piece) > SHORT_NAME_MAX_LENGTH and short:
             continue
         short += piece
-    return short[:SHORT_NAME_MAX_LENGTH].upper()
+    return short[:SHORT_NAME_MAX_LENGTH]
+
+
+async def site_short_name(session: AsyncSession, site: models.Site) -> str:
+    """Recognisable short name for a site.
+
+    Bug fix (post-Phase-6 QA) — this used to stop as soon as organization +
+    campus reached ``SHORT_NAME_MIN_LENGTH`` (4 characters), so a site with
+    both set (the common case) ended up as just those two pieces — "the name
+    of the cloud and the placement" and nothing else, per the reported
+    complaint. It now greedily PACKS as many distinct hierarchy levels as
+    fit within ``SHORT_NAME_MAX_LENGTH`` (still 8 — the cap itself is
+    unchanged).
+
+    Bug fix (round 4) — "vf short should be a summary (repeatable on other
+    names) of the vf long to preserve order on the lists." The packing
+    order is now the EXACT SAME hierarchy order ``site_long_name`` itself
+    uses (organization, cloud, region, campus, building, floor/section),
+    not a separately-reordered priority list — ``vf_short_name`` is a true
+    truncated PREFIX-summary of ``vf_long_name`` this way, so sorting a
+    list by either one groups sites in the same relative order instead of
+    the two names disagreeing on what "comes first". A piece that would
+    only PARTIALLY fit is skipped entirely rather than being cut
+    mid-abbreviation (e.g. skip a 3-char piece with only 2 chars of room
+    left) so every included piece stays a whole, recognisable code — the
+    final `[:SHORT_NAME_MAX_LENGTH]` slice is just a safety net for the
+    pathological case where the FIRST piece alone already exceeds the cap.
+    """
+    short = await _short_name_prefix(
+        session,
+        site.organization_id,
+        site.cloud_id,
+        site.region_id,
+        site.campus_id,
+        site.building_id,
+        site.floor_section_id,
+    )
+    return short.upper()
 
 
 async def auto_site_code(
@@ -110,19 +144,32 @@ async def auto_site_code(
     campus_id: Optional[int],
     region_id: Optional[int],
     exclude_site_id: Optional[int] = None,
+    cloud_id: Optional[int] = None,
+    building_id: Optional[int] = None,
+    floor_section_id: Optional[int] = None,
 ) -> str:
     """FEAT-1: derive the automatic site code, e.g. ``vfhmcc1``.
 
-    Composition is ``organization + campus + region + sequence``, lowercased.
-    The sequence is the lowest positive integer not already taken by another
-    site sharing the same prefix, so codes stay stable and gaps get reused
-    instead of drifting upwards. Returns ``""`` when no component resolves
-    (nothing meaningful can be derived yet).
+    Bug fix (round 4) — "Everywhere Simple Name should result by
+    conformation of vf short." The prefix used to be independently
+    recomputed as ``organization + campus + region`` (a DIFFERENT, smaller
+    component set/order than ``vf_short_name``). It now reuses the exact
+    same ``_short_name_prefix`` helper ``site_short_name`` itself calls, so
+    Simple Name is always a direct conformation of VF Short Name, not a
+    separately-derived value that happens to look similar. ``cloud_id``/
+    ``building_id``/``floor_section_id`` are optional purely for backward
+    source-compatibility with existing callers that only ever had
+    org/campus/region on hand; omitting them just means those two levels
+    don't contribute to the prefix for that call. A trailing sequence
+    number is still always appended — the lowest positive integer not
+    already taken by another site sharing the same prefix, so codes stay
+    stable and gaps get reused instead of drifting upwards. Returns ``""``
+    when no component resolves (nothing meaningful can be derived yet).
     """
     prefix = (
-        await _abbr(session, models.Organization, organization_id)
-        + await _abbr(session, models.Campus, campus_id)
-        + await _abbr(session, models.Region, region_id)
+        await _short_name_prefix(
+            session, organization_id, cloud_id, region_id, campus_id, building_id, floor_section_id
+        )
     ).lower()
     if not prefix:
         return ""
@@ -168,13 +215,25 @@ async def generate_site(session: AsyncSession, site: models.Site) -> None:
             site.campus_id,
             site.region_id,
             exclude_site_id=getattr(site, "id", None),
+            cloud_id=site.cloud_id,
+            building_id=site.building_id,
+            floor_section_id=site.floor_section_id,
         )
         if code:
             site.simple_name = code
-    elif code_type == "theme":
-        theme_name = (getattr(site, "theme_name", None) or "").strip()
-        if theme_name:
-            site.simple_name = theme_name
+    # Bug fix (round 4) — "the conformed name and the fantastic name are
+    # not together... the site code shows the fantastic name instead of
+    # the conformed name." The old "theme" branch mirrored `theme_name`
+    # STRAIGHT INTO `simple_name`, so picking a fantastic name silently
+    # replaced the real conformed code instead of coexisting alongside it
+    # (`lib/columns.tsx`'s `lookupLabel()` shows "FANTASTICNAME-REALCODE"
+    # precisely because the two are supposed to stay distinct values).
+    # `site_code_type` intentionally has no "theme" branch here anymore —
+    # `simple_name` is now ALWAYS either the auto-generated code ("auto")
+    # or whatever the operator typed ("custom"); "theme"/any other value
+    # behaves like "custom" (leave `simple_name` untouched). `theme_name`
+    # itself is set independently via `SiteCodePanel.tsx`'s own, separate
+    # mutation and always coexists.
 
 
 async def generate_datacenter(session: AsyncSession, dc: models.Datacenter) -> None:

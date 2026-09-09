@@ -95,7 +95,9 @@ export default function SiteCodePanel({ site }: Props) {
     site?.theme_category,
   ]);
 
-  // What the server would generate for this row's org / campus / region.
+  // What the server would generate for this row — round 4: the same
+  // conformation VF Short Name itself uses (org + cloud + region + campus
+  // + building + floor/section), not just org/campus/region.
   useEffect(() => {
     if (!site) {
       setAutoCode("");
@@ -110,6 +112,9 @@ export default function SiteCodePanel({ site }: Props) {
         site.campus_id,
         site.region_id,
         site.id,
+        site.cloud_id,
+        site.building_id,
+        site.floor_section_id,
       )
       .then((r) => {
         if (seq.current !== mine) return;
@@ -124,7 +129,15 @@ export default function SiteCodePanel({ site }: Props) {
       .finally(() => {
         if (seq.current === mine) setAutoLoading(false);
       });
-  }, [siteId, site?.organization_id, site?.campus_id, site?.region_id]);
+  }, [
+    siteId,
+    site?.organization_id,
+    site?.campus_id,
+    site?.region_id,
+    site?.cloud_id,
+    site?.building_id,
+    site?.floor_section_id,
+  ]);
 
   const saveMut = useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: Row }) =>

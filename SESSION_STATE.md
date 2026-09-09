@@ -312,37 +312,11 @@ behavior (collisions are now seeded directly in `AbbreviationRegistry`
 rather than via `crud.create_item`, since that no longer accepts a literal
 client-supplied abbreviation for these models).
 
-**Next** (from the same feedback batch, not yet started/confirmed):
-- Short-name enrichment vs the 8-char cap — user wants `vf_short_name` to
-  carry more identifying detail ("device, place, etc.") while still
-  capped at 8 chars; these pull in opposite directions and need either a
-  smarter component-priority order or a renegotiated cap — flag explicitly
-  before implementing.
-- Global column reordering: ID -> Code Name -> Fantastic Name (editable)
-  -> VF long name -> VF short name -> rest, applied consistently across
-  Sites AND every device grid (PhysicalServers/VirtualMachines/
-  Workstations/NetworkDevices/ContainersApps) — audit each grid's current
-  order.
-- Datacenter/DatacenterFloor need their own fantastic name + coded short
-  name (Room/Section already have `theme_name`/`theme_category` columns,
-  schema-only, no UI wired; Datacenter has neither column nor generator
-  yet — needs a migration + `naming.py` generator + UI).
-- IP Assignment creation should offer a dropdown of available IPs (reuse
-  the existing, currently-unused `/ipam/subnets/{id}/next-ip` /
-  `/next-reserved` endpoints) instead of a raw manual IP field.
-- Port Config grid should group rows by owning device (no AG-Grid
-  `rowGroup`/`masterDetail` used anywhere in the app yet).
-- `PowerOutlet` has full generic-CRUD backend support but zero frontend
-  page/route — can't be created via the UI at all.
-- Bulk "generate N ports" action for `DeviceInterface` (currently one row
-  at a time).
-- IPAM/Subnets page appearing empty — likely stale/unseeded data rather
-  than a code bug (`SubnetIpv4`/`SubnetIpv6` have no blocking required
-  FK); verify against the live DB row count before changing any code.
-- The claimed "IPv4-to-IPv6 mapping table" does not exist in this schema
-  (only `IpAssignment` carrying both address columns on one row) — this
-  needs to be reconciled with the user before building anything against
-  it.
+**All of the "Next" items originally listed here were resolved in later
+rounds** (short-name enrichment + column reordering + Datacenter/Floor
+theming in round 3; the IPv4-to-IPv6-table claim was reconciled — no such
+table exists — in round 3 too). See the round 3/4/4-follow-up entries
+below for what actually shipped for each.
 
 **Next for the user**: browser-test Phase 6 at `http://localhost:5173` —
 particularly the Naming Conventions page's new Hardware Spec panel
@@ -562,10 +536,37 @@ verification (test Building, test Site).
   `OsVersion` row was not repointed to the new "px-p7" row (blocked
   delete, not a functional problem — both rows resolve to the same real
   OS, just two ids now exist for it in this one dev DB).
-- "OS Versions has more importance than OS Families" (e.g. reordering
-  device-grid FK columns, or a family-scoped version picker) is
-  unaddressed pending a clearer spec of what "more importance" should
-  concretely change in the UI.
+
+**Round 4 follow-up (2026-09-08, same day)** — clarified + resolved:
+1. **"OS Versions has more importance than OS Families... simply put
+   versions first on the menu."** `Naming.tsx`'s "Operating Systems"
+   category now lists "OS Versions" before "OS Families" (both the
+   sidebar entry order and, since `ALL_LOOKUPS` is built by flattening
+   categories in order, wherever that list is otherwise consumed).
+2. **`DeviceInterface` owner-polymorphism gap** (flagged as deferred in
+   round 3's own "Next", never explicitly re-requested but picked up as
+   a "continue pending tasks" item) — `PortConfig.tsx` never exposed
+   `owner_device_type`/`owner_device_id` at all, so a port belonging to a
+   physical server, workstation or generic entity (anything but a
+   network device) could never be created or edited from the UI, even
+   though the backend (`ports.py`'s `interface_owner()`, generic CRUD)
+   already fully supported it — confirmed via `test_ports.py`/
+   `test_schema.py`, which round-trip exactly this. Added plain
+   `owner_device_type` (select) + `owner_device_id` (number) columns,
+   mirroring the SAME polymorphic-reference idiom `IpAssignments.tsx`'s
+   `assigned_to_type`/`assigned_to_id` already uses (not a dynamic
+   per-row FK dropdown). Also removed the grid's stale `requiredFields`
+   entry for `network_device_id` — that column has been nullable at the
+   DB level since FEAT-6 (6C); nothing on `DeviceInterface` is actually
+   required. `PortConfigView.tsx` (the breadcrumb/SVG diagram page)
+   remains scoped to network devices only — extending its graphical view
+   to other device classes is a separate, larger redesign, not attempted.
+
+Verified: no backend changes this pass (pure frontend + a live
+create/delete round-trip via `POST /api/v1/device-interfaces` with
+`owner_device_type="physical-servers"`, confirmed working and cleaned
+up). Frontend: 372 Vitest passed across 55 files (+2 new `PortConfig.
+test.tsx` cases), `tsc --noEmit` clean, `vite build` clean.
 
 ---
 

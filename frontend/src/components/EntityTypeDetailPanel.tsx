@@ -74,9 +74,11 @@ export default function EntityTypeDetailPanel({ entityType }: Props) {
   if (!entityType) {
     return (
       <div className="mb-3 px-3 py-2 border border-dashed border-slate-300 rounded text-sm text-slate-500">
-        <span className="font-medium text-slate-600">Type details</span> —
-        select an Entity Type above to toggle its capabilities and manage its
-        fields.
+        <span className="font-medium text-slate-600">Step 2 of defining a device type</span> —
+        select an Entity Type above (a newly-added one is selected
+        automatically) to toggle its Capabilities and manage its Custom
+        Fields — Slug/Label/Icon/Description alone don't fully describe a
+        device type.
       </div>
     );
   }

@@ -257,6 +257,15 @@ export default function EntityGrid({
    */
   const [gridRowData, setGridRowData] = useState<Row[] | undefined>(data);
   const pendingSyncRef = useRef(false);
+  // Bug fix — "adding a new entity creates a row under a white space, is
+  // this normal?" It WAS: a freshly-created row was never selected, so on
+  // a page that drives a detail/config panel off the grid's selection
+  // (Sites.tsx's tri-mode panel, EntityTypeBuilder's capabilities+fields
+  // panel, ...) the panel kept showing its empty "select a row" placeholder
+  // right above the grid — visually reading as a blank gap the new row
+  // appeared "under". Track the id of a row this grid itself just created
+  // so it can be auto-selected once it actually lands in `rowData`.
+  const pendingSelectIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     const editing = (gridRef.current?.api?.getEditingCells()?.length ?? 0) > 0;
@@ -267,6 +276,20 @@ export default function EntityGrid({
     setGridRowData(data);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
+
+  // Runs once `gridRowData` (and therefore AG Grid's own row model) actually
+  // contains the row just created, then selects it — firing AG Grid's own
+  // `onSelectionChanged` (already wired to `publishSelection` below), so any
+  // page-level panel driven by selection opens immediately instead of
+  // requiring a manual click on the new row.
+  useEffect(() => {
+    if (pendingSelectIdRef.current == null) return;
+    const node = gridRef.current?.api?.getRowNode(String(pendingSelectIdRef.current));
+    if (node) {
+      node.setSelected(true, true);
+      pendingSelectIdRef.current = null;
+    }
+  }, [gridRowData]);
 
   const flushPendingRowDataSync = () => {
     if (pendingSyncRef.current) {
@@ -310,7 +333,10 @@ export default function EntityGrid({
 
   const createMut = useMutation({
     mutationFn: (payload: Row) => api.create(resource, payload),
-    onSuccess: refresh,
+    onSuccess: (created) => {
+      if (created?.id != null) pendingSelectIdRef.current = created.id as number;
+      refresh();
+    },
     onError: (e: Error) => fail(e),
   });
 

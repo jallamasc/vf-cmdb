@@ -98,6 +98,35 @@ describe("EntityTypeBuilder — create-type-with-fields flow (Req 15.1)", () => 
     expect(fieldsProps.externalFilter({ entity_type_id: 2 })).toBe(false);
   });
 
+  // Bug fix — "only slug and label are not enough fields to create a type
+  // of devices." Capabilities/Fields summary columns surface what's
+  // configured in the panel without a click into it.
+  it("summarizes capabilities and counts custom fields directly in the grid", async () => {
+    (api.list as any).mockImplementation((resource: string) =>
+      resource === "entity-field-defs"
+        ? Promise.resolve([
+            { id: 1, entity_type_id: 1, key: "a" },
+            { id: 2, entity_type_id: 1, key: "b" },
+            { id: 3, entity_type_id: 2, key: "c" },
+          ])
+        : Promise.resolve([])
+    );
+    wrap(<EntityTypeBuilder />);
+    const latestColumns = () =>
+      capturedProps.filter((p) => p.resource === "entity-type-defs").pop().columns;
+    const fieldsCol = () => latestColumns().find((c: any) => c.colId === "fields_count");
+
+    await waitFor(() => expect(fieldsCol().valueGetter({ data: { id: 1 } })).toBe(2));
+    expect(fieldsCol().valueGetter({ data: { id: 2 } })).toBe(1);
+    expect(fieldsCol().valueGetter({ data: { id: 999 } })).toBe(0);
+
+    const capsCol = latestColumns().find((c: any) => c.colId === "capabilities_summary");
+    expect(capsCol.valueGetter({ data: { capabilities: ["photo", "rack_placement"] } })).toBe(
+      "Photo, Rack placement"
+    );
+    expect(capsCol.valueGetter({ data: { capabilities: [] } })).toBe("");
+  });
+
   it("toggling a capability enables Save, and saving PATCHes the full capability list", async () => {
     wrap(<EntityTypeBuilder />);
     fireEvent.click(screen.getByTestId("select-entity-type-defs"));

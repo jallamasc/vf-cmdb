@@ -1,9 +1,69 @@
 # Virtualfactor IT CMDB - Session State
 ## Living Document - Read on Every Interaction
 
-**Last Updated**: 2026-09-09 (Current session)
-**Project Phase**: Phase 6 ("Data Quality & Hardware Intelligence") COMPLETE — all 41 tasks done, all 4 checkpoints (I/J/K/L) verified and committed. Post-Phase-6 QA rounds 1-6 all fixed and verified (see below).
-**Status**: ✅ Phases 1-5 shipped and stable. Phase 6 fully implemented, tested, and verified end-to-end against live Podman Postgres + running dev backend/frontend. HEAD `08e4ec5` on `master` (working tree clean, not pushed — this repo has no configured push target for this checkout; see "Everything below this section" for the full Phase 1-5 history, which is stale in its specifics — e.g. paths/ports — but the architecture/decisions remain valid).
+**Last Updated**: 2026-09-10 (Current session)
+**Project Phase**: Phase 6 ("Data Quality & Hardware Intelligence") COMPLETE. The `deploy-and-auto-update` feature (deploy-anywhere from pre-built ghcr.io images + in-app version awareness + one-click/notify-and-apply update) is COMPLETE — FEAT-002..005 all shipped.
+**Status**: ✅ Phases 1-5 shipped and stable. Phase 6 fully implemented, tested, and verified. `deploy-and-auto-update` shipped (backend version/update endpoints, frontend version footer + update badge, pull-not-build host script + systemd `.path`/`.timer`, CI build/release workflows → ghcr.io, Quadlet repoint, and docs). HEAD on `master` after this round is `0b7b9d0` (the FEAT-005 docs commit; working tree otherwise carries only pre-existing unrelated changes, not pushed — this checkout has no configured push target; see "Everything below this section" for the full Phase 1-5 history, which is stale in its specifics — e.g. paths/ports — but the architecture/decisions remain valid). Open work tracked in `BACKLOG.md`.
+
+---
+
+## 🆕 (2026-09-10): `deploy-and-auto-update` COMPLETE — deploy-anywhere + one-click update
+
+Spec: `.kiro/specs/deploy-and-auto-update/` (`requirements.md`, `design.md`,
+`plan.md`, `tasks.md`, and `features/FEAT-00*.json`). Delivered across four
+feature commits on top of the Kiro-alignment commit `0d09120`:
+
+- **FEAT-002 (`48167f9`) — backend version awareness + update endpoints.**
+  New `backend/app/version.py` (`get_version_info()` from `VF_VERSION`/
+  `VF_GIT_SHA`/`VF_BUILT_AT`, fallbacks `dev`/`unknown`) and
+  `backend/app/updates.py` (anonymous 10-min-cached GitHub "latest release"
+  lookup that is silent-on-failure; `parse_semver`/`is_newer` strictly-newer
+  compare; marker/status file I/O under `VF_UPDATE_DIR`, default
+  `/var/lib/vf-cmdb`, camelCase status shape
+  `{state,message,requestedVersion,startedAt,finishedAt}`). Three routes in
+  `special.py` (registered before the generic catch-all):
+  `GET /api/v1/meta/version`, `POST /api/v1/admin/update` (writes marker, 503 if
+  dir unmounted), `GET /api/v1/admin/update/status`. FastAPI app version now
+  sourced from `version.py` (no more `"1.0.0"` literal). Full backend suite
+  green (415 passed / 1 skipped against `vfcmdb_test`).
+- **FEAT-003 (`4f33fa2`) — frontend version footer + update badge.** Vite
+  `define` exposes `__APP_VERSION__`/`__APP_GIT_SHA__` (new key alongside the
+  preserved plugins/server/test blocks — no tsconfig touched); `api.ts` gained
+  `MetaVersion`/`UpdateStatus` + `metaVersion`/`requestUpdate`/`updateStatus`;
+  new `VersionFooter.tsx` (polls `/meta/version` every 60s, silent-degrade on
+  failure) renders the running version and an unobtrusive "Update available →
+  vX.Y.Z" pill + one-click **Update now** button that polls the status every 3s,
+  treats the restart window as "still starting" (finding 4), and greys the
+  button while `running` (finding 3). Build + full Vitest green.
+- **FEAT-004 (`68952e3`) — deploy infra (host script + CI + Quadlet).**
+  `vf-cmdb-update.sh` reworked to pull-not-build registry mode (legacy git flow
+  preserved behind `VF_UPDATE_MODE=source`): preflight jq/curl, flock, pre-update
+  backup, `podman auto-update`, restart, then a 180s version-advanced health
+  check (HTTP 200 **and** parseable `.version`, not merely `/health`). New
+  `vf-cmdb-update.path` watches `%h/vf-cmdb/state/update.request`;
+  `vf-cmdb-update.service` is a `oneshot` with **no `[Install]`** (pulled by the
+  `.path` + daily `.timer`). Containerfiles bake the version build args.
+  `.github/workflows/build.yml` (push master → `:edge`/`:sha-*`) and
+  `release.yml` (tag `v*` or dispatch → `:latest`/`:v<version>` + a Release).
+  Quadlet units repointed to `ghcr.io/jallamasc/vf-cmdb-{backend,frontend}:latest`
+  with `AutoUpdate=registry` and the shared state Volume (backend alias
+  preserved). Static verification green.
+- **FEAT-005 (this commit) — docs + finalize.** `docs/DEPLOYMENT_MANUAL.md`
+  gained §9 "Deploy anywhere from pre-built ghcr.io images (Podman Quadlet)":
+  the one-time host state-dir creation that MUST precede both the backend
+  container start (bind-mount) and `vf-cmdb-update.path` enablement, Quadlet
+  install, `.env`, start, and the `.path`+`.timer` enablement. `docs/OPERATIONS.md`
+  rewritten for the ghcr pull model: the release workflow (push master →
+  edge/sha; tag `vX.Y.Z` primary / `workflow_dispatch` fallback → latest +
+  Release) with the **don't-move-latest-backward** caveat; the one-time
+  flip-GHCR-packages-to-PUBLIC step; the notify-and-apply one-click experience
+  with the dropped-in-flight-click note; the **migration-cannot-be-rolled-back**
+  caveat prominently (backup/restore scripts named); and the no-auth trust model.
+  `./cbindex build` run. `MEMORY_BANK.md` left unchanged (no hard rule changed).
+
+Hard-rule note: Alembic head stays `0037_physical_asset_theme_names` — this
+feature added **no** migration. No auth, no DB credentials, generic-CRUD write
+path, Podman/Quadlet-only, and the kebab/snake/camel conventions all preserved.
 
 ---
 

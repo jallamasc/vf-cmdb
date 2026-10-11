@@ -41,6 +41,10 @@ vf-cmdb-backups/
 *.sql.gz
 .env.restored
 
+# Exception: the archived recovery schema dump is an intentional, committed
+# artifact (schema-only, no data/secrets) — see docs/recovery/.
+!docs/recovery/*.sql
+
 # FEAT-6: runtime stencil cache (keep the dir, ignore downloaded SVGs)
 backend/static/stencils/*.svg
 # Phase 4 Sub-phase E: stencil library preview cache (keep the dir, ignore

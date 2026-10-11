@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
+import VersionFooter from "./VersionFooter";
 import {
   Tag,
   Database,
@@ -131,9 +132,7 @@ export default function Layout() {
             );
           })}
         </nav>
-        <div className="px-4 py-3 text-[11px] text-slate-500 border-t border-slate-700">
-          Single-user · No auth · Home network
-        </div>
+        <VersionFooter />
       </aside>
       <main className="flex-1 overflow-auto p-6">
         <Outlet />

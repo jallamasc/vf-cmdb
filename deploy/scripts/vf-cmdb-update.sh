@@ -108,7 +108,7 @@ run_registry_mode() {
     # 0a. Preflight: jq + curl must exist. jq is a NEW host dependency for the
     #     camelCase status writer and the version-advanced health check.
     if ! command -v curl >/dev/null 2>&1; then
-        # Cannot write a JSON status without jq either; log and bail.
+        # Cannot query the registry / health endpoint without curl; log and bail.
         log "ERROR: curl not installed on host"
         exit 1
     fi

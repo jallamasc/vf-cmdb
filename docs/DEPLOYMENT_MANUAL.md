@@ -9,8 +9,15 @@ Once you have done this once, everything here is automated by:
 - `deploy/ansible/site.yml` — repeatable remote deploy from your workstation
 - `deploy/cloud-init/user-data.yaml` — zero-touch VM provisioning
 
-See `docs/OPERATIONS.md` (auto-update & code review) and
+See `docs/OPERATIONS.md` (releases, pull-based updates & one-click update) and
 `docs/DISASTER_RECOVERY.md` (backup & rebuild) for day-2 operations.
+
+> **Two deploy models.** This manual's Proxmox walkthrough (§1–§6) is the
+> original VM-centric path. The CMDB now also ships as **pre-built images on
+> `ghcr.io`**, so the recommended way to deploy anywhere that can run **Podman
+> Quadlet (rootless)** is to **pull** those images rather than clone-and-build.
+> That self-contained procedure is **§9 — Deploy anywhere from pre-built
+> `ghcr.io` images**; read it if you just want the app running on a Podman host.
 
 ---
 
@@ -275,6 +282,117 @@ podman ps --filter name=vf_cmdb_
 
 ## 8. Next steps
 
-- **Day-2 operations & auto-update:** `docs/OPERATIONS.md`
+- **Deploy anywhere from pre-built images:** §9 below
+- **Day-2 operations, releases & one-click update:** `docs/OPERATIONS.md`
 - **Backups & disaster recovery:** `docs/DISASTER_RECOVERY.md`
 - **Repeatable/automated re-deploys:** `deploy/ansible/README.md`, `deploy/cloud-init/README.md`
+
+---
+
+## 9. Deploy anywhere from pre-built `ghcr.io` images (Podman Quadlet)
+
+This is the recommended, build-free way to run the CMDB on **any host that can
+run Podman Quadlet (rootless)** — a Proxmox VM, a bare-metal Linux box, a NUC,
+anything with Podman ≥ 4.4 and a user systemd session. The host **pulls**
+pre-built images from `ghcr.io`; it does not clone the repo or build anything.
+
+### 9.0 Prerequisites
+
+- Podman ≥ 4.4 (Quadlet native) and a user systemd session (`systemctl --user`).
+- `loginctl enable-linger $USER` so services run without an active login.
+- `jq` and `curl` on the host (used by the update script's health check).
+- The `ghcr.io/jallamasc/vf-cmdb-{backend,frontend}` packages must be **PUBLIC**
+  (maintainer flips them once after the first release — see `docs/OPERATIONS.md`
+  §2). Until public, anonymous pulls fail.
+
+The host-runtime layout convention is `$HOME/vf-cmdb/{deploy,state,.env}` (the
+`%h/vf-cmdb/...` paths the Quadlet units reference). This is the **deploy root**,
+distinct from any developer source checkout.
+
+### 9.1 Create the one-time host state directory (REQUIRED before first start)
+
+The backend container **bind-mounts** a host state directory (default
+`~/vf-cmdb/state`, configurable via `VF_UPDATE_DIR`), and the one-click update
+`.path` unit **watches a file inside it**. This directory **MUST exist before**
+the backend container starts and **before** you enable `vf-cmdb-update.path` — a
+`.path` unit whose watched parent directory is missing fails to start.
+
+```bash
+mkdir -p ~/vf-cmdb/state
+```
+
+> The backend's `Volume=%h/vf-cmdb/state:/var/lib/vf-cmdb:Z` mount and the
+> `.path` unit's `PathChanged=%h/vf-cmdb/state/update.request` watch target are
+> the **same directory** — this is the container ↔ host trust boundary.
+
+### 9.2 Install the Quadlet units
+
+Copy the Quadlet unit files to the user Quadlet directory (they reference the
+`ghcr.io` images and carry `AutoUpdate=registry`):
+
+```bash
+mkdir -p ~/.config/containers/systemd
+cp deploy/quadlet/vf-cmdb-*.{container,network} ~/.config/containers/systemd/
+```
+
+### 9.3 Provide `.env`
+
+```bash
+cp .env.example ~/vf-cmdb/.env
+nano ~/vf-cmdb/.env
+```
+
+Set at minimum `POSTGRES_PASSWORD`, `PGADMIN_DEFAULT_PASSWORD`, and
+`CORS_ORIGINS=http://<host-ip>:8080`. The `VF_UPDATE_DIR` key is present only if
+you want the state dir somewhere other than the default `~/vf-cmdb/state`; leave
+it commented to use the default.
+
+### 9.4 Start the services
+
+```bash
+systemctl --user daemon-reload
+systemctl --user start vf-cmdb-db vf-cmdb-backend vf-cmdb-frontend vf-cmdb-pgadmin
+```
+
+The backend waits for Postgres, runs `alembic upgrade head`, and seeds data on
+first boot (`entrypoint.sh`). Watch it come up:
+
+```bash
+journalctl --user -u vf-cmdb-backend.service -f
+```
+
+Reach the UI at `http://<host-ip>:8080` (API docs at `:8000/docs`).
+
+### 9.5 Enable the one-click + daily update units (one-time)
+
+Only **after** the state dir exists (§9.1) and the backend is running:
+
+```bash
+systemctl --user daemon-reload
+systemctl --user enable --now vf-cmdb-update.path    # one-click Update now watcher
+systemctl --user enable --now vf-cmdb-update.timer   # daily scheduled refresh
+```
+
+> `vf-cmdb-update.service` is a `oneshot` with **no `[Install]`** section — do
+> not try to `enable` it directly. It is pulled by the `.path` unit (one-click)
+> and the `.timer` (daily). The `.path` unit fails to start if `~/vf-cmdb/state`
+> does not already exist, which is why §9.1 comes first.
+
+### 9.6 How updates reach this host
+
+- **One-click:** the app footer shows the running version and, when a newer
+  GitHub release exists, an **Update now** button (notify-and-apply, never
+  auto-apply). See `docs/OPERATIONS.md` §3.1.
+- **Daily:** `vf-cmdb-update.timer` runs the same pull-and-health-check script.
+
+> ⚠️ **Migrations cannot be rolled back by re-pulling an older image.**
+> `entrypoint.sh` runs `alembic upgrade head` on every start. The only true
+> rollback is the pre-update DB backup (`deploy/scripts/vf-cmdb-backup.sh`,
+> taken automatically before every applied update) restored via
+> `deploy/scripts/vf-cmdb-restore.sh`. Keep backups.
+
+### 9.7 Trust model
+
+No authentication — single user, private LAN. Image pulls are anonymous (public
+packages). Do not expose this host to the public internet. See
+`docs/OPERATIONS.md` §7.

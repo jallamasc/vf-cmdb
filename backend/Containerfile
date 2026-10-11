@@ -35,6 +35,16 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# Version baked at build time; app/version.py reads these at runtime. The
+# fallbacks in get_version_info() keep a plain `podman build` (no --build-arg)
+# at dev/unknown. CI (release.yml) passes the real X.Y.Z / shortsha / timestamp.
+ARG VF_VERSION=dev
+ARG VF_GIT_SHA=unknown
+ARG VF_BUILT_AT=unknown
+ENV VF_VERSION=${VF_VERSION} \
+    VF_GIT_SHA=${VF_GIT_SHA} \
+    VF_BUILT_AT=${VF_BUILT_AT}
+
 RUN chmod +x entrypoint.sh
 
 EXPOSE 8000

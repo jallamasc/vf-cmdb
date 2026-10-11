@@ -1,13 +1,22 @@
 [Unit]
-Description=Virtualfactor CMDB — pull latest code & redeploy (auto-update)
+Description=Virtualfactor CMDB — pull latest images & redeploy (auto-update)
 Documentation=file:%h/vf-cmdb/docs/OPERATIONS.md
 Wants=network-online.target
 After=network-online.target
 
 [Service]
 Type=oneshot
+# Registry (pull-not-build) mode: podman auto-update against ghcr.io. A
+# source-based host that still wants the legacy git-rebuild sets
+# VF_UPDATE_MODE=source (e.g. via a systemd drop-in).
+Environment=VF_UPDATE_MODE=registry
+Environment=STATE_DIR=%h/vf-cmdb/state
 # %h expands to the user's home. Repo is expected at ~/vf-cmdb.
 ExecStart=%h/vf-cmdb/deploy/scripts/vf-cmdb-update.sh
 # Never let an update run hang forever
 TimeoutStartSec=1800
 Nice=10
+
+# NO [Install] section on purpose: this oneshot service is pulled by
+# vf-cmdb-update.path (one-click) and vf-cmdb-update.timer (daily). It is never
+# enabled directly.

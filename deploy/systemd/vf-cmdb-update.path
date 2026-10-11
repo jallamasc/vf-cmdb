@@ -1,0 +1,13 @@
+[Unit]
+Description=Virtualfactor CMDB — watch for in-app update request
+
+[Path]
+# The backend (rootless, no host access) requests an update by writing this
+# marker file inside its bind-mounted state dir. This host-side .path unit
+# watches the marker and triggers the oneshot update .service — the privileged
+# work (podman/systemctl) stays entirely on the host.
+PathChanged=%h/vf-cmdb/state/update.request
+Unit=vf-cmdb-update.service
+
+[Install]
+WantedBy=default.target

@@ -5,10 +5,13 @@ After=vf-cmdb-db.service
 
 [Container]
 ContainerName=vf_cmdb_backend
-# Build this image first:  podman build -t localhost/vf_cmdb_backend:latest ./backend
-Image=localhost/vf_cmdb_backend:latest
+Image=ghcr.io/jallamasc/vf-cmdb-backend:latest
+AutoUpdate=registry
 # alias "backend" so the frontend nginx proxy_pass http://backend:8000 resolves
 Network=vf-cmdb.network:alias=backend
+# Shared marker/status dir: the backend writes update.request / reads
+# update.status here; the host .path unit watches the same dir on the host side.
+Volume=%h/vf-cmdb/state:/var/lib/vf-cmdb:Z
 EnvironmentFile=%h/vf-cmdb/.env
 Environment=POSTGRES_HOST=vf_cmdb_db
 Environment=POSTGRES_PORT=5432

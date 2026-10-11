@@ -1,5 +1,11 @@
 # CI/CD workflow templates
 
+> **⚠️ SUPERSEDED** — the active CI now lives in `.github/workflows/`
+> (`build.yml` publishes `:edge`/`:sha-*` to ghcr.io on push to `master`;
+> `release.yml` publishes `:latest`/`:vX.Y.Z` and cuts a GitHub Release on a
+> `v*` tag or `workflow_dispatch`). These template files are kept for reference
+> only and are no longer the source of truth.
+
 > **Why are these here and not in `.github/workflows/`?**
 > These files were added via an automated GitHub App that does not hold the
 > `workflows` permission, so it cannot write under `.github/workflows/`. Activate

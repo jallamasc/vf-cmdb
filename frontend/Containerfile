@@ -1,6 +1,14 @@
 # ---- build stage ----
 FROM node:20-alpine AS build
 
+# Version must reach Vite at BUILD time (vite.config.ts reads process.env.VF_*
+# into the __APP_VERSION__/__APP_GIT_SHA__ `define`, baking them into dist/).
+# The nginx serve stage below needs nothing — the version is already compiled in.
+ARG VF_VERSION=dev
+ARG VF_GIT_SHA=unknown
+ENV VF_VERSION=${VF_VERSION} \
+    VF_GIT_SHA=${VF_GIT_SHA}
+
 WORKDIR /app
 
 COPY package.json package-lock.json* ./

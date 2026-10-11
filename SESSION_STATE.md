@@ -3,7 +3,7 @@
 
 **Last Updated**: 2026-09-10 (Current session)
 **Project Phase**: Phase 6 ("Data Quality & Hardware Intelligence") COMPLETE. The `deploy-and-auto-update` feature (deploy-anywhere from pre-built ghcr.io images + in-app version awareness + one-click/notify-and-apply update) is COMPLETE — FEAT-002..005 all shipped.
-**Status**: ✅ Phases 1-5 shipped and stable. Phase 6 fully implemented, tested, and verified. `deploy-and-auto-update` shipped (backend version/update endpoints, frontend version footer + update badge, pull-not-build host script + systemd `.path`/`.timer`, CI build/release workflows → ghcr.io, Quadlet repoint, and docs). HEAD on `master` after this round is `0b7b9d0` (the FEAT-005 docs commit; working tree otherwise carries only pre-existing unrelated changes, not pushed — this checkout has no configured push target; see "Everything below this section" for the full Phase 1-5 history, which is stale in its specifics — e.g. paths/ports — but the architecture/decisions remain valid). Open work tracked in `BACKLOG.md`.
+**Status**: ✅ Phases 1-5 shipped and stable. Phase 6 fully implemented, tested, and verified. `deploy-and-auto-update` shipped (backend version/update endpoints, frontend version footer + update badge, pull-not-build host script + systemd `.path`/`.timer`, CI build/release workflows → ghcr.io, Quadlet repoint, and docs). HEAD on `master` after this round is `0b7b9d0` (the FEAT-005 docs commit; working tree otherwise carries only pre-existing unrelated changes, not pushed — this checkout has no configured push target; see "Everything below this section" for the full Phase 1-5 history, which is stale in its specifics — e.g. paths/ports — but the architecture/decisions remain valid). Open work tracked in the backlog spec `.kiro/specs/backlog/tasks.md`.
 
 ---
 
@@ -1170,18 +1170,18 @@ live here were all resolved during Phases 4–6 and the post-Phase-6 QA rounds
 (see the dated round history above). They are kept only in that history, not as
 live issues.
 
-Current pending / deferred / known-issue work lives in **`BACKLOG.md`** at the
-repo root — Deferred, Won't-do (with reasons), Known issues, Future
-enhancements, and Shipped-but-was-untracked. Consult it instead of a live
-next-steps list here.
+Current pending / deferred / known-issue work lives in the backlog spec
+**`.kiro/specs/backlog/`** (live list: `tasks.md`) — Deferred, Won't-do (with
+reasons), Out of scope, Known issues, Future enhancements, Archived, and
+Shipped-but-was-untracked. Consult it instead of a live next-steps list here.
 
 ---
 
 ## 🎯 Immediate Next Steps
 
-Open work is tracked in **`BACKLOG.md`**. In progress now: the
+Open work is tracked in the backlog spec **`.kiro/specs/backlog/tasks.md`**. The
 `deploy-and-auto-update` feature (deploy-anywhere from pre-built ghcr.io images +
-in-app version awareness + one-click update) — see
+in-app version awareness + one-click update) has SHIPPED — see
 `.kiro/specs/deploy-and-auto-update/` (requirements, design, plan, tasks) and its
 `features/FEAT-00*.json`.
 
@@ -1222,9 +1222,9 @@ in-app version awareness + one-click update) — see
 
 ## 🔧 Technical Debt & Future Enhancements
 
-Future enhancements, known issues, and deferred work moved to **`BACKLOG.md`**
-(Future enhancements + Known issues sections) so this file stays a current-state
-document rather than a long-lived wishlist.
+Future enhancements, known issues, and deferred work moved to the backlog spec
+**`.kiro/specs/backlog/tasks.md`** (Future enhancements + Known issues sections)
+so this file stays a current-state document rather than a long-lived wishlist.
 
 ---
 

@@ -48,7 +48,8 @@ migrated `0037` schema.
 - **`regions`:** `+ airport_code`, `+ city`, `+ theme_name`, `+ theme_category`.
   (Geo fields + fantastic-name support. NOTE: this means the `0038–0043` line
   *did* give Region a `theme_name`, which the current `0037` baseline does not
-  have — see the "Region has no theme_name (out of scope)" item in `BACKLOG.md`.)
+  have — see the "Region has no theme_name (out of scope)" item in the backlog
+  spec `.kiro/specs/backlog/tasks.md`.)
 - **`brands.logo_url`**, **`clouds.logo_url`** — logo/branding support.
 - **`buildings`:** `+ campus_id`, `+ naming_mode`.
 - **`campuses`:** `+ organization_id`, `+ region_id`, `+ naming_mode`.

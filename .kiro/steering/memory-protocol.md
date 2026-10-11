@@ -4,19 +4,22 @@ inclusion: always
 
 # Memory Protocol — Read to Avoid Memory Rot
 
-This project maintains memory across sessions through five artifacts in the
-repo. Honor this protocol so context stays fresh and decisions are never lost.
+This project maintains memory across sessions through these artifacts. Honor
+this protocol so context stays fresh and decisions are never lost.
 
-## The five memory artifacts
+## Memory artifacts
 1. `AGENT_ONBOARDING.md` — how to boot a session + the cbindex tool workflow.
 2. `SESSION_STATE.md` — where we are right now: status, open decisions, next
    steps. Highest-churn; treat as the current-state source of truth.
 3. `MEMORY_BANK.md` — full rebuild spec, architecture rationale, hard rules,
    and the "what NOT to change" list.
-4. `BACKLOG.md` — the tracked home for pending work: Deferred items, Won't-do
-   decisions (with the why), Known issues, Future enhancements, and
-   Shipped-but-was-untracked notes. SESSION_STATE.md points here instead of
-   carrying a long-lived next-steps list.
+4. `.kiro/specs/backlog/` — the tracked home for pending work: Deferred items,
+   Won't-do decisions (with the why), Out-of-scope notes, Known issues, Future
+   enhancements, Archived (preserved) work, and Shipped-but-was-untracked
+   notes. The live list is `.kiro/specs/backlog/tasks.md`. SESSION_STATE.md
+   points here instead of carrying a long-lived next-steps list. (It lives
+   under `.kiro/specs/` — not a loose root `BACKLOG.md` — so Kiro discovers it
+   automatically.)
 5. Codebase index (`tools/codebase_index/` + `./cbindex`) — semantic recall of
    the live code, regenerated on demand so it never goes stale.
 
@@ -35,7 +38,8 @@ repo. Honor this protocol so context stays fresh and decisions are never lost.
 ## At the END of a phase / before ending a session
 - Update `SESSION_STATE.md` (status, decisions made, next steps, current HEAD).
 - Move deferred / won't-do / known-issue / future-enhancement items to
-  `BACKLOG.md` rather than letting them pile up in `SESSION_STATE.md`.
+  `.kiro/specs/backlog/tasks.md` rather than letting them pile up in
+  `SESSION_STATE.md`.
 - Update `MEMORY_BANK.md` only if an architectural decision or hard rule changed.
 - Run `./cbindex build` so the index matches the new code.
 - Commit with a Conventional Commit message. Only commit when the user asks.

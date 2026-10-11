@@ -55,5 +55,5 @@ recreate.
 - **Frontend** (from `frontend/`): `npx vitest run` — never a watcher.
 
 ## After a passing phase
-- Update SESSION_STATE.md (defer open items to BACKLOG.md), run `./cbindex
+- Update SESSION_STATE.md (defer open items to .kiro/specs/backlog/tasks.md), run `./cbindex
   build`, and pause for the user to test.

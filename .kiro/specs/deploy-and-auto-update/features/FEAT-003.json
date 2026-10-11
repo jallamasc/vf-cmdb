@@ -1,0 +1,28 @@
+{
+  "id": "FEAT-003",
+  "type": "feat",
+  "description": "Frontend version footer + update-available badge + one-click 'Update now' affordance (Task D). Vite define for the build-time version, api.ts methods, a VersionFooter component in the Layout footer, and a Vitest test. Depends on FEAT-002 (consumes GET /api/v1/meta/version and the /admin/update endpoints), so it runs after it.",
+  "status": "pending",
+  "steps": [
+    "Edit frontend/vite.config.ts: add `import pkg from './package.json';` and a NEW top-level `define` key ALONGSIDE the existing plugins/server/test keys and the `/// <reference types=\"vitest\" />` header (do NOT remove or alter plugins, server {host:true,port:5173,proxy /api+/health}, or test {happy-dom,globals,setupFiles ['./src/test/setup.ts'],css:false}). define: { __APP_VERSION__: JSON.stringify(process.env.VF_VERSION || pkg.version || 'dev'), __APP_GIT_SHA__: JSON.stringify(process.env.VF_GIT_SHA || 'unknown') }. Do NOT touch any tsconfig — vite.config.ts is outside the tsc -b project and resolveJsonModule is already set for src/** (finding 1).",
+    "Declare the globals in frontend/src/vite-env.d.ts: `declare const __APP_VERSION__: string;` and `declare const __APP_GIT_SHA__: string;` (keep the existing /// <reference types='vite/client' /> line).",
+    "Add to frontend/src/api.ts: interface MetaVersion {version:string; gitSha:string; builtAt:string; latest:string|null; latestTag:string|null; updateAvailable:boolean}; interface UpdateStatus {state:'idle'|'requested'|'running'|'succeeded'|'failed'; message:string; requestedVersion:string|null; startedAt:string|null; finishedAt:string|null}; and on the `api` object: metaVersion():Promise<MetaVersion> => fetch(`${BASE}/meta/version`).then(handle); requestUpdate():Promise<UpdateStatus> => fetch(`${BASE}/admin/update`,{method:'POST'}).then(handle); updateStatus():Promise<UpdateStatus> => fetch(`${BASE}/admin/update/status`).then(handle). Reuse the shared handle(); add NO global QueryCache.onError/error boundary/toast.",
+    "Create frontend/src/components/VersionFooter.tsx: a useQuery(['meta-version'], api.metaVersion, {refetchInterval:60_000, refetchOnWindowFocus:true, retry:false, staleTime:~55_000}); render the existing 'Single-user · No auth · Home network' line plus `v{running}` where running = data?.version ?? __APP_VERSION__; render an UpdateBadge ONLY when data?.updateAvailable && data.latest. UpdateBadge: a small non-modal pill 'Update available → v{latest}' + an accessible 'Update now' <button> (real button semantics + aria-label). The apply flow: useMutation(api.requestUpdate) -> on success start polling api.updateStatus every 3s; treat state 'requested' plus a transient 'idle'/absent/unreachable window right after the POST as 'still starting' (NOT 'failed') (finding 4); disable/grey the 'Update now' button while state==='running' (finding 3); display requestedVersion ?? 'latest' for a null target; stop polling on 'succeeded'/'failed' and invalidate the 'meta-version' query on success. On any metaVersion query failure data is undefined -> show the version only, no badge, no throw (silent degrade, Task D.5/NFR 1).",
+    "Mount VersionFooter in frontend/src/components/Layout.tsx, replacing the static footer div's text with <VersionFooter /> (keep the same footer container classes).",
+    "Create frontend/src/components/VersionFooter.test.tsx (Vitest + happy-dom), stubbing the api methods and wrapping the component in a QueryClientProvider: (1) running==latest (updateAvailable:false) -> no badge, version shown; (2) newer latest (updateAvailable:true) -> badge naming the version; (3) api.metaVersion rejects -> version only, no badge, no crash; (4) post-click: requestUpdate resolves then updateStatus returns requested -> idle -> running -> succeeded, asserting the 'still starting' handling (finding 4) and that the button is disabled while running (finding 3)."
+  ],
+  "acceptance_criteria": [
+    "`cd frontend && npm run build` (tsc -b && vite build) succeeds with the server and test blocks in vite.config.ts intact.",
+    "VersionFooter.test.tsx passes and the full `npx vitest run` suite stays green.",
+    "No new nginx proxy rule and no direct browser->GitHub call are introduced (version info flows through api.ts + the existing /api/ proxy).",
+    "The badge renders only when updateAvailable && latest; a failed version query shows the version only with no badge and no thrown error.",
+    "'Update now' is disabled while state==='running' and a requested/transient-idle window right after POST is shown as still-starting, not failed."
+  ],
+  "verification": [
+    "cd /Volumes/development/vf-cmdb/frontend && npm install && npm run build",
+    "cd /Volumes/development/vf-cmdb/frontend && npx vitest run",
+    "cd /Volumes/development/vf-cmdb && ./cbindex build"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

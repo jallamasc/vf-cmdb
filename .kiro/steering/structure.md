@@ -16,7 +16,7 @@ inclusion: always
         devices.py       device-type resolver + polymorphic relation loaders
         seed.py          idempotent seeder; seed_subnets.json for IPAM
         routers/         generic.py, special.py, ansible.py
-      alembic/versions/  0001..0005 migrations (guarded, idempotent)
+      alembic/versions/  0001..0037 migrations (guarded, idempotent)
     frontend/
       src/
         api.ts           typed fetch client (/api/v1)

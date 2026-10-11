@@ -1,0 +1,28 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Backend version awareness + silent GitHub release detection + one-click-update marker/status endpoints (Task C + Task E backend half). New backend/app/version.py and backend/app/updates.py; new GET /api/v1/meta/version, POST /api/v1/admin/update, GET /api/v1/admin/update/status in special.py; FastAPI version sourced from version.py; pytest. Depends on nothing in this task set but is the backend contract FEAT-003 (frontend) and FEAT-004 (host script) both consume, so it comes before them.",
+  "status": "pending",
+  "steps": [
+    "Create backend/app/version.py: a frozen VersionInfo dataclass {version, git_sha, built_at} and an @lru_cache get_version_info() resolving from env VF_VERSION/VF_GIT_SHA/VF_BUILT_AT with fallbacks 'dev'/'unknown'/'unknown' (treat empty-string env as unset via `or 'dev'` guards).",
+    "Create backend/app/updates.py owning all update concerns: parse_semver (regex ^v?(\\d+)\\.(\\d+)\\.(\\d+); None on <3 components) and is_newer(candidate, running) (strictly newer, False on any None/malformed/'dev'); _normalize_tag('v1.6.0'->'1.6.0' or None); a module-global 10-min-TTL cached latest_release_tag() hitting https://api.github.com/repos/jallamasc/vf-cmdb/releases/latest anonymously with httpx timeout ~4s, catching ALL exceptions and returning the last-good value WITHOUT advancing the cache timestamp (silent-on-failure, NFR 1); UPDATE_DIR = Path(os.getenv('VF_UPDATE_DIR','/var/lib/vf-cmdb')), MARKER=UPDATE_DIR/'update.request', STATUS=UPDATE_DIR/'update.status'; _read_status(default_state) returning the camelCase shape {state, message, requestedVersion, startedAt, finishedAt} (absent/garbage file -> that default_state); a write of the marker JSON {requested_at, from_version, to_tag} with to_tag advisory only. Add a comment stating the migration-cannot-be-rolled-back caveat naming deploy/scripts/vf-cmdb-backup.sh as the only true rollback (code layer of the 3-layer rule).",
+    "In backend/app/main.py replace FastAPI version='1.0.0' with `from .version import get_version_info` and `version=get_version_info().version` (keep title=settings.app_name).",
+    "Add three routes to backend/app/routers/special.py (the router already registered BEFORE the generic catch-all, so concrete paths win): GET /meta/version returning {version, gitSha, builtAt, latest, latestTag, updateAvailable} (latest=null/updateAvailable=false when the GitHub lookup is unavailable; browser calls this endpoint and the backend does the GitHub lookup server-side); POST /admin/update writing the marker via updates.py and returning _read_status(default_state='requested'), raising HTTPException(503, 'Update directory not writable; is /var/lib/vf-cmdb mounted?') on OSError; GET /admin/update/status returning _read_status(default_state='idle').",
+    "Add backend/tests/test_version_updates.py following the httpx.ASGITransport(app=app)+AsyncClient fixture pattern of backend/tests/test_automation_endpoints.py. The semver/version-info/_read_status cases need no DB and run as plain functions. Cover: is_newer AC-10 table (('1.5.0','1.4.0')->True, ('1.5.0','1.5.0')->False, ('1.6.0','1.5.0')->False given candidate first? use the design signature is_newer(candidate,running); malformed/None->False) plus parse_semver('1.2') is None and parse_semver('v1.2.3.4')==(1,2,3); get_version_info with env set/unset/empty (monkeypatch os.environ + clear the lru_cache); latest_release_tag success/timeout/403/404/bad-JSON via httpx.MockTransport or monkeypatch -> each yields latest=null, updateAvailable=false at /meta/version; /meta/version response shape and field names (camelCase); marker-write + _read_status against a tmp_path by monkeypatching updates.UPDATE_DIR/MARKER/STATUS; POST /admin/update returns state 'requested'; GET /admin/update/status before any status file returns 'idle' (finding 4)."
+  ],
+  "acceptance_criteria": [
+    "From backend/: `python -c \"from app.version import get_version_info; print(get_version_info().version)\"` prints 'dev' with no env set.",
+    "grep -n '\"1.0.0\"' backend/app/main.py returns nothing; `python -c \"from app.main import app\"` succeeds from backend/.",
+    "backend/tests/test_version_updates.py passes and the full backend pytest suite stays green against vfcmdb_test.",
+    "GET /api/v1/meta/version returns the six camelCase fields; with GitHub mocked-unreachable it returns latest=null, updateAvailable=false and never raises.",
+    "POST /api/v1/admin/update returns state 'requested'; GET /api/v1/admin/update/status with no status file returns 'idle'."
+  ],
+  "verification": [
+    "cd /Volumes/development/vf-cmdb/backend && python -c \"from app.main import app\"",
+    "ps aux|grep pytest|grep -v grep   # kill any stray pytest first",
+    "cd /Volumes/development/vf-cmdb/backend && POSTGRES_HOST=127.0.0.1 POSTGRES_PORT=55432 POSTGRES_USER=vfcmdb POSTGRES_PASSWORD=vfcmdb POSTGRES_DB=vfcmdb_test .venv/bin/pytest -q",
+    "cd /Volumes/development/vf-cmdb && ./cbindex build"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

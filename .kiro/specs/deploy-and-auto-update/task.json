@@ -1,0 +1,7 @@
+{
+  "task_id": "deploy-and-auto-update",
+  "task_description": "Implement the vf-cmdb deploy-anywhere + in-app version awareness + one-click update feature per the APPROVED design: Kiro/docs alignment, backend version+update endpoints with silent GitHub release detection, a frontend version footer + update badge, a pull-not-build host update script + systemd .path wiring, CI workflows + Containerfile build args + Quadlet repoint to ghcr.io, and deploy/ops docs. All 5 design-review findings are baked in. Work on master, no worktree, never push.",
+  "status": "pending",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004", "FEAT-005"],
+  "blocked_reason": null
+}

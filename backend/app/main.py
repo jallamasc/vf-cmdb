@@ -1,4 +1,5 @@
 """FastAPI application entrypoint for the Virtualfactor IT CMDB."""
+
 from __future__ import annotations
 
 import re
@@ -12,8 +13,9 @@ from .config import settings
 from .crud import humanize_field
 from .registry import ENTITY_REGISTRY, LOOKUP_SLUGS, REFERENCE_SLUGS
 from .routers import ansible, generic, special
+from .version import get_version_info
 
-app = FastAPI(title=settings.app_name, version="1.0.0")
+app = FastAPI(title=settings.app_name, version=get_version_info().version)
 
 app.add_middleware(
     CORSMiddleware,
@@ -50,19 +52,13 @@ def _friendly_integrity_error(message: str) -> tuple[int, str]:
     )
     if not_null:
         field = humanize_field(not_null.group(1))
-        return 422, (
-            f"'{field}' is required — pick a value for it before saving this row."
-        )
+        return 422, (f"'{field}' is required — pick a value for it before saving this row.")
 
     # Key (vlan_id)=(10) already exists.
     dup = re.search(r"Key \(([^)]+)\)=\(([^)]*)\) already exists", message)
     if dup:
-        fields = " + ".join(
-            f"'{humanize_field(f.strip())}'" for f in dup.group(1).split(",")
-        )
-        return 409, (
-            f"{fields} value '{dup.group(2)}' is already in use — it must be unique."
-        )
+        fields = " + ".join(f"'{humanize_field(f.strip())}'" for f in dup.group(1).split(","))
+        return 409, (f"{fields} value '{dup.group(2)}' is already in use — it must be unique.")
     if "duplicate key value violates unique constraint" in message:
         return 409, "That value is already in use — it must be unique."
 
@@ -82,16 +78,11 @@ def _friendly_integrity_error(message: str) -> tuple[int, str]:
                 if table and columns.startswith(f"{table.group(1)}_"):
                     columns = columns[len(table.group(1)) + 1 :]
         if columns:
-            fields = " + ".join(
-                f"'{humanize_field(f.strip())}'" for f in columns.split(",")
-            )
+            fields = " + ".join(f"'{humanize_field(f.strip())}'" for f in columns.split(","))
             return 409, (
-                f"{fields} points at a record that no longer exists — "
-                "pick an existing value."
+                f"{fields} points at a record that no longer exists — pick an existing value."
             )
-        return 409, (
-            "A referenced record no longer exists — refresh and pick an existing value."
-        )
+        return 409, ("A referenced record no longer exists — refresh and pick an existing value.")
 
     check = re.search(r'violates check constraint "([^"]+)"', message)
     if check:
@@ -103,9 +94,7 @@ def _friendly_integrity_error(message: str) -> tuple[int, str]:
                 f"Value rejected by rule '{name}' — codes may only contain "
                 "letters, digits and single hyphens."
             )
-        return 422, (
-            f"Value rejected by database rule '{name}' — check the values on this row."
-        )
+        return 422, (f"Value rejected by database rule '{name}' — check the values on this row.")
 
     return 409, f"Database rejected the change: {message.strip()[:300]}"
 

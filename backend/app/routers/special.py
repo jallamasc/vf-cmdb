@@ -1,4 +1,5 @@
 """Special endpoints: dashboard, IPAM, naming, changelog, Ansible, facts."""
+
 from __future__ import annotations
 
 import ipaddress
@@ -20,23 +21,25 @@ from .. import (
     bitwarden_client,
     crud,
     devices,
+    endoflife_client,
+    icecat_client,
     models,
     naming,
     photos,
     ports,
-    endoflife_client,
-    icecat_client,
     search_client,
     semaphore_client,
     stencil_library,
     stencil_sources,
     stencils,
     themes,
+    updates,
     vendor_stencils,
 )
 from ..config import settings
 from ..database import get_session
 from ..registry import ENTITY_REGISTRY
+from ..version import get_version_info
 
 # Device tables that carry a naming prefix + sequence number.
 _SEQUENCE_MODELS = [
@@ -51,6 +54,63 @@ router = APIRouter(tags=["special"])
 
 
 # ---------------------------------------------------------------------------
+# Version awareness + one-click update (FEAT-002)
+#
+# These concrete paths live in special.router, which main.py registers BEFORE
+# the generic "/{resource}/{item_id}" catch-all, so "meta"/"admin" are never
+# read as a {resource}. The browser calls these endpoints; the backend does the
+# GitHub lookup server-side (the browser never calls api.github.com directly).
+# ---------------------------------------------------------------------------
+@router.get("/meta/version")
+async def meta_version() -> dict[str, Any]:
+    """Return the running version plus the latest GitHub release, if reachable.
+
+    ``latest`` is null and ``updateAvailable`` is false whenever the GitHub
+    lookup is unavailable (silent-on-failure, NFR 1) — this endpoint never
+    raises for an upstream failure.
+    """
+    info = get_version_info()
+    latest_tag = await updates.latest_release_tag()  # cached, bounded, never raises
+    latest = updates._normalize_tag(latest_tag)  # "v1.6.0" -> "1.6.0" or None
+    update_available = updates.is_newer(latest, info.version) if latest else False
+    return {
+        "version": info.version,
+        "gitSha": info.git_sha,
+        "builtAt": info.built_at,
+        "latest": latest,
+        "latestTag": latest_tag,
+        "updateAvailable": update_available,
+    }
+
+
+@router.post("/admin/update")
+async def request_update() -> dict[str, Any]:
+    """Request an update by writing the marker file the host .path unit watches.
+
+    The container NEVER calls podman/systemctl — it only writes the marker.
+    ``to_tag`` is advisory; the host always follows ``:latest``. Returns the
+    current status (default state ``"requested"`` until the host script writes
+    its first ``running`` status). A 503 means the shared update directory is
+    not mounted/writable.
+    """
+    latest_tag = await updates.latest_release_tag()
+    try:
+        updates.write_marker(latest_tag)
+    except OSError:
+        raise HTTPException(
+            status_code=503,
+            detail="Update directory not writable; is /var/lib/vf-cmdb mounted?",
+        )
+    return updates._read_status(default_state="requested")
+
+
+@router.get("/admin/update/status")
+async def update_status() -> dict[str, Any]:
+    """Return the host-written update status, or ``idle`` if no status yet."""
+    return updates._read_status(default_state="idle")
+
+
+# ---------------------------------------------------------------------------
 # Dashboard
 # ---------------------------------------------------------------------------
 async def _count(session: AsyncSession, model) -> int:
@@ -60,29 +120,25 @@ async def _count(session: AsyncSession, model) -> int:
 
 async def _breakdown(session: AsyncSession, group_col) -> dict[str, int]:
     """Count rows grouped by a plain (non-FK) column, e.g. a zone string."""
-    rows = (
-        await session.execute(select(group_col, func.count()).group_by(group_col))
-    ).all()
+    rows = (await session.execute(select(group_col, func.count()).group_by(group_col))).all()
     return {(str(key) if key is not None else "(unset)"): int(count) for key, count in rows}
 
 
-async def _breakdown_by_lookup(
-    session: AsyncSession, group_col, lookup_model
-) -> dict[str, int]:
+async def _breakdown_by_lookup(session: AsyncSession, group_col, lookup_model) -> dict[str, int]:
     """Count rows grouped by a FK id column, keyed by the lookup's abbreviation.
 
     Two cheap queries (group-by-id, then one lookup fetch) instead of a join,
     so this stays simple and works with any ``LookupMixin`` table.
     """
-    rows = (
-        await session.execute(select(group_col, func.count()).group_by(group_col))
-    ).all()
+    rows = (await session.execute(select(group_col, func.count()).group_by(group_col))).all()
     ids = [key for key, _ in rows if key is not None]
     labels: dict[int, str] = {}
     if ids:
         lookup_rows = (
-            await session.execute(select(lookup_model).where(lookup_model.id.in_(ids)))
-        ).scalars().all()
+            (await session.execute(select(lookup_model).where(lookup_model.id.in_(ids))))
+            .scalars()
+            .all()
+        )
         labels = {r.id: (r.full_name or r.abbreviation or str(r.id)) for r in lookup_rows}
     out: dict[str, int] = {}
     for key, count in rows:
@@ -94,10 +150,14 @@ async def _breakdown_by_lookup(
 async def _avg_subnet_utilization(session: AsyncSession) -> float:
     """Rough average IPv4 subnet utilisation across every subnet with a CIDR."""
     subnets = (
-        await session.execute(
-            select(models.SubnetIpv4).where(models.SubnetIpv4.network_cidr.isnot(None))
+        (
+            await session.execute(
+                select(models.SubnetIpv4).where(models.SubnetIpv4.network_cidr.isnot(None))
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     if not subnets:
         return 0.0
     used = await _used_ipv4(session)
@@ -139,9 +199,9 @@ async def dashboard_summary(session: AsyncSession = Depends(get_session)) -> dic
     # bare count. Kept intentionally cheap (a handful of grouped counts).
     since_24h = datetime.now(timezone.utc) - timedelta(hours=24)
     changes_24h = await session.execute(
-        select(func.count()).select_from(models.ChangeLog).where(
-            models.ChangeLog.changed_at >= since_24h
-        )
+        select(func.count())
+        .select_from(models.ChangeLog)
+        .where(models.ChangeLog.changed_at >= since_24h)
     )
     breakdowns: dict[str, dict[str, Any]] = {
         "network_devices": await _breakdown_by_lookup(
@@ -227,11 +287,7 @@ async def next_ip(
         if subnet.range_from
         else next(net.hosts(), None)
     )
-    range_to = (
-        ipaddress.ip_address(str(subnet.range_to).split("/")[0])
-        if subnet.range_to
-        else None
-    )
+    range_to = ipaddress.ip_address(str(subnet.range_to).split("/")[0]) if subnet.range_to else None
     for host in net.hosts():
         if range_from and host < range_from:
             continue
@@ -242,9 +298,7 @@ async def next_ip(
                 "subnet_id": subnet_id,
                 "network": str(net),
                 "next_ip": str(host),
-                "used_count": len(
-                    [u for u in used if ipaddress.ip_address(u) in net]
-                ),
+                "used_count": len([u for u in used if ipaddress.ip_address(u) in net]),
             }
     raise HTTPException(status_code=409, detail="No free IP available in subnet")
 
@@ -263,13 +317,17 @@ async def subnet_utilization(
     total = net.num_addresses - 2 if net.num_addresses > 2 else net.num_addresses
     # Reservations that fall inside this subnet (includes the locked gateway).
     res_rows = (
-        await session.execute(
-            select(models.SubnetRoleAssignment.ipv4_address).where(
-                models.SubnetRoleAssignment.subnet_ipv4_id == subnet_id,
-                models.SubnetRoleAssignment.ipv4_address.isnot(None),
+        (
+            await session.execute(
+                select(models.SubnetRoleAssignment.ipv4_address).where(
+                    models.SubnetRoleAssignment.subnet_ipv4_id == subnet_id,
+                    models.SubnetRoleAssignment.ipv4_address.isnot(None),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     reserved_used = len(
         [r for r in res_rows if r and ipaddress.ip_address(str(r).split("/")[0]) in net]
     )
@@ -330,12 +388,16 @@ async def list_reservations(
         else models.SubnetRoleAssignment.subnet_ipv6_id
     )
     rows = (
-        await session.execute(
-            select(models.SubnetRoleAssignment)
-            .where(id_col == subnet_id)
-            .order_by(models.SubnetRoleAssignment.id)
+        (
+            await session.execute(
+                select(models.SubnetRoleAssignment)
+                .where(id_col == subnet_id)
+                .order_by(models.SubnetRoleAssignment.id)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return [_reservation_dict(r) for r in rows]
 
 
@@ -382,18 +444,16 @@ async def create_reservation(
             raise HTTPException(status_code=400, detail="Invalid CIDR/address")
 
     existing = (
-        await session.execute(
-            select(models.SubnetRoleAssignment).where(id_col == subnet_id)
-        )
-    ).scalars().all()
+        (await session.execute(select(models.SubnetRoleAssignment).where(id_col == subnet_id)))
+        .scalars()
+        .all()
+    )
 
     # Duplicate check.
     for r in existing:
         cur = getattr(r, addr_key)
         if cur and str(cur).split("/")[0] == addr:
-            raise HTTPException(
-                status_code=409, detail=f"{addr} is already reserved"
-            )
+            raise HTTPException(status_code=409, detail=f"{addr} is already reserved")
 
     # Ceiling: manual (non-locked) reservations may not exceed reserved_count.
     ceiling = int(subnet.reserved_count or 0)
@@ -569,9 +629,7 @@ async def naming_generate(
                 ),
             )
 
-    site_long = "".join(
-        [organization, cloud, region, campus, building, floor_section]
-    ).upper()
+    site_long = "".join([organization, cloud, region, campus, building, floor_section]).upper()
     short = "".join([device_type, brand, role, os_family, consecutive]).lower()
     vf_long = f"{site_long}{rack.upper()}{short.upper()}"
     return {
@@ -684,13 +742,17 @@ async def naming_airport_code(
     (and the resolved best match) to that country only, so the frontend's
     City field can offer/accept just the cities that actually belong there.
     """
-    resolved = airports.lookup_city(city, country) if city else {
-        "city": city,
-        "iata_code": None,
-        "airport": None,
-        "country": None,
-        "alternatives": [],
-    }
+    resolved = (
+        airports.lookup_city(city, country)
+        if city
+        else {
+            "city": city,
+            "iata_code": None,
+            "airport": None,
+            "country": None,
+            "alternatives": [],
+        }
+    )
     return {
         "query": city,
         "city": resolved["city"],
@@ -726,9 +788,7 @@ async def naming_preview(
         "full_name": full_name,
         "trim_mode": trim_mode,
         "case_enforcement": case_enforcement,
-        "abbreviation": abbrev.preview_abbreviation(
-            full_name, trim_mode, case_enforcement
-        ),
+        "abbreviation": abbrev.preview_abbreviation(full_name, trim_mode, case_enforcement),
     }
 
 
@@ -868,9 +928,7 @@ async def device_detail(
         "display_name": devices.device_display_name(dt, obj),
         "name_fields": dt.name_fields,
         "relations": dt.relations,
-        "relation_resources": {
-            rel: devices.RELATION_RESOURCES[rel] for rel in dt.relations
-        },
+        "relation_resources": {rel: devices.RELATION_RESOURCES[rel] for rel in dt.relations},
         "context": await devices.device_context(session, dt, obj),
         "record": crud.to_dict(obj),
     }
@@ -959,7 +1017,7 @@ def _parse_owner_slug(model_slug: str) -> Optional[tuple[str, int]]:
     for resource in STENCIL_RESOURCES:
         prefix = f"{resource}-"
         if model_slug.startswith(prefix):
-            tail = model_slug[len(prefix):]
+            tail = model_slug[len(prefix) :]
             if tail.isdigit():
                 return resource, int(tail)
     return None
@@ -1124,9 +1182,7 @@ def _photo_model(resource: str):
     if model is None:
         raise HTTPException(status_code=404, detail=f"Unknown resource '{resource}'.")
     if not hasattr(model, "photo_url"):
-        raise HTTPException(
-            status_code=400, detail=f"'{resource}' records do not support a photo."
-        )
+        raise HTTPException(status_code=400, detail=f"'{resource}' records do not support a photo.")
     return model
 
 
@@ -1258,9 +1314,7 @@ async def _credential_row(session: AsyncSession, resource: str, item_id: int):
     if row is None:
         raise HTTPException(status_code=404, detail=f"'{resource}' #{item_id} not found.")
     if not row.bw_secret_id:
-        raise HTTPException(
-            status_code=404, detail="No credential provisioned for this record."
-        )
+        raise HTTPException(status_code=404, detail="No credential provisioned for this record.")
     return row
 
 
@@ -1512,7 +1566,11 @@ async def stencil_library_fetch(
     """
     try:
         entry = stencil_sources.resolve_file(source, category, file)
-    except (stencil_sources.UnknownSource, stencil_sources.UnknownCategory, FileNotFoundError) as exc:
+    except (
+        stencil_sources.UnknownSource,
+        stencil_sources.UnknownCategory,
+        FileNotFoundError,
+    ) as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except stencil_sources.SourceUnavailable as exc:
         raise HTTPException(status_code=502, detail=str(exc))
@@ -1520,12 +1578,12 @@ async def stencil_library_fetch(
     download_dir = Path(tempfile.mkdtemp(prefix="stencil_fetch_"))
     try:
         try:
-            resp = httpx.get(entry.download_url, timeout=_STENCIL_FETCH_TIMEOUT, follow_redirects=True)
+            resp = httpx.get(
+                entry.download_url, timeout=_STENCIL_FETCH_TIMEOUT, follow_redirects=True
+            )
             resp.raise_for_status()
         except httpx.HTTPError as exc:
-            raise HTTPException(
-                status_code=502, detail=f"Could not download '{entry.name}': {exc}"
-            )
+            raise HTTPException(status_code=502, detail=f"Could not download '{entry.name}': {exc}")
         raw_path = download_dir / Path(entry.name).name
         raw_path.write_bytes(resp.content)
 
@@ -1658,7 +1716,9 @@ FACT_TABLES = {
 PROMOTED_FACT_KEYS = {"cpu_cores", "memory_mb", "os_distribution"}
 
 
-def build_facts_payload(existing_ansible_facts: Optional[dict], facts: dict[str, Any]) -> dict[str, Any]:
+def build_facts_payload(
+    existing_ansible_facts: Optional[dict], facts: dict[str, Any]
+) -> dict[str, Any]:
     """Requirement 21.1/21.2/21.3 — split an incoming facts payload into the
     update dict `ingest_facts` hands to `crud.update_item`.
 
@@ -1693,9 +1753,7 @@ async def ingest_facts(
     if existing is None:
         raise HTTPException(status_code=404, detail="Device not found")
     payload = build_facts_payload(existing.ansible_facts, facts)
-    obj = await crud.update_item(
-        session, model, device_id, payload, source="ansible_callback"
-    )
+    obj = await crud.update_item(session, model, device_id, payload, source="ansible_callback")
     if obj is None:
         raise HTTPException(status_code=404, detail="Device not found")
     return crud.to_dict(obj)

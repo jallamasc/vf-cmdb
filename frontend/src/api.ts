@@ -324,6 +324,34 @@ export interface SemaphoreTaskOutputLine {
   [key: string]: unknown;
 }
 
+/**
+ * FEAT-003 — GET /meta/version. All camelCase. `version`/`gitSha`/`builtAt`
+ * describe the running backend; `latest`/`latestTag`/`updateAvailable` describe
+ * the newest GitHub release (latest/latestTag null + updateAvailable false when
+ * the GitHub lookup is unavailable — never raises).
+ */
+export interface MetaVersion {
+  version: string;
+  gitSha: string;
+  builtAt: string;
+  latest: string | null;
+  latestTag: string | null;
+  updateAvailable: boolean;
+}
+
+/**
+ * FEAT-003 — the update status shape shared by POST /admin/update and
+ * GET /admin/update/status. `requestedVersion` may be null (host always
+ * follows :latest) — render a 'latest' fallback.
+ */
+export interface UpdateStatus {
+  state: "idle" | "requested" | "running" | "succeeded" | "failed";
+  message: string;
+  requestedVersion: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+}
+
 async function handle(res: Response) {
   if (!res.ok) {
     let detail = res.statusText;
@@ -751,4 +779,21 @@ export const api = {
     });
     return fetch(`${BASE}/ports/candidates?${qs.toString()}`).then(handle);
   },
+  /**
+   * FEAT-003 — running backend version + silent GitHub update detection. The
+   * backend does the GitHub lookup server-side; the browser never calls GitHub.
+   * Never raises on an unreachable GitHub (latest null, updateAvailable false).
+   */
+  metaVersion: (): Promise<MetaVersion> =>
+    fetch(`${BASE}/meta/version`).then(handle),
+  /**
+   * FEAT-003 — request a one-click update: writes the host-watched marker and
+   * returns the status (state 'requested' when the marker was written; the
+   * host script picks it up and writes its own 'running'/'succeeded'/'failed').
+   */
+  requestUpdate: (): Promise<UpdateStatus> =>
+    fetch(`${BASE}/admin/update`, { method: "POST" }).then(handle),
+  /** FEAT-003 — poll the current update status ('idle' when no run yet). */
+  updateStatus: (): Promise<UpdateStatus> =>
+    fetch(`${BASE}/admin/update/status`).then(handle),
 };

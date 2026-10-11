@@ -62,3 +62,6 @@ backend/static/blueprints/*.jpeg
 backend/static/blueprints/*.png
 backend/static/blueprints/*.gif
 backend/static/blueprints/*.webp
+
+# Local-only DB dumps (never commit)
+.local-backups/

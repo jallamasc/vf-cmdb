@@ -1,0 +1,11 @@
+{
+  "verdict": "APPROVED",
+  "findings": [
+    {
+      "severity": "NIT",
+      "file": "deploy/scripts/vf-cmdb-update.sh",
+      "detail": "The missing-curl preflight branch logs 'Cannot write a JSON status without jq either', a message copied from the jq branch. The branch exits non-zero correctly so behavior is right; only the log wording references jq instead of curl. Non-blocking."
+    }
+  ],
+  "summary": "The deploy-anywhere + in-app version awareness + one-click update feature is complete and correct against the approved spec. All five review findings are honored and verified: (1) the frontend version is exposed only via a new Vite define key added alongside the preserved plugins/server/test blocks and the vitest reference header, with no tsconfig change (npm run build passes); (2) the shared host state dir is documented to pre-exist with the one-time .path enablement, and the oneshot .service carries no real [Install] section; (3) the in-flight click is dropped by the .path unit, the UI greys/disables 'Update now' while running, and there is no self-retrigger loop; (4) the POST-returns-requested / transient-idle-after-POST window is treated as still-starting on both backend (test-pinned) and frontend (sawActive ref + apply-flow test); (5) release.yml does not move latest backward, with the don't-move-latest-backward caveat documented. The hard rules all hold: no auth, no DB credentials, generic-CRUD untouched, Podman/Quadlet-only (no Docker reintroduced), the container never calls podman/systemctl (marker file + host .path boundary), GitHub lookups are silent-on-failure, the migration-cannot-be-rolled-back caveat is present at the code (updates.py), script, and docs layers, and the Alembic head is unchanged at 0037 with no migration added. Verification re-run in context: frontend build + VersionFooter/Layout vitest (6 tests) green; backend test_version_updates.py (28 tests) green against vfcmdb_test; bash -n and both workflow YAML parses green. One NIT only (a misworded preflight log line); no HIGH or MEDIUM findings."
+}

@@ -1,0 +1,46 @@
+{
+  "verdict": "CHANGES_REQUESTED",
+  "findings": [
+    {
+      "id": 1,
+      "severity": "MEDIUM",
+      "title": "tsc -b / resolveJsonModule remediation points at a tsconfig that does not type-check vite.config.ts",
+      "location": "PART 1 — Frontend running-version source (Vite define)",
+      "problem": "The design requires ensuring resolveJsonModule:true in 'the tsconfig that tsc -b applies to vite.config.ts' so the import pkg from './package.json' compiles. But frontend/tsconfig.json has include:['src'] and noEmit:true with no references and no tsconfig.node.json, so vite.config.ts (at the frontend root, outside src/) is never type-checked by tsc -b. resolveJsonModule:true is already set for src/**. The guarded risk does not exist for vite.config.ts.",
+      "fix": "Replace the paragraph with the accurate statement: vite.config.ts is outside the tsc -b project (tsconfig.json includes only src), so the package.json import is resolved by Vite's esbuild loader at config-load time and is never seen by tsc -b; no tsconfig change is required. resolveJsonModule:true is already present for src/**, sufficient for the __APP_VERSION__/__APP_GIT_SHA__ consumers and vite-env.d.ts. Drop the tsconfig remediation (or, if pkg.version must be reachable from src code, say so explicitly)."
+    },
+    {
+      "id": 2,
+      "severity": "MEDIUM",
+      "title": "Reworked vf-cmdb-update.service enablement + state-dir precondition for the .path trigger are unspecified",
+      "location": "PART 3 — Host-side systemd units; Task G deploy docs",
+      "problem": "The design adds vf-cmdb-update.path as the one-click trigger but never states that the operator must enable it (systemctl --user enable --now vf-cmdb-update.path) nor that %h/vf-cmdb/state must pre-exist before the .path can watch update.request and before the backend bind-mount works. A .path whose PathChanged parent dir is missing fails to start. On a fresh deploy the UI button writes update.request into a directory nothing watches, so one-click update silently never fires (fails end-to-end AC 4) despite passing unit tests. The live vf-cmdb-update.service also has no [Install], which is correct for a .path/.timer-activated oneshot but is not stated.",
+      "fix": "Add explicit one-time setup to PART 3 and the Task G deploy docs: mkdir -p %h/vf-cmdb/state; systemctl --user daemon-reload; systemctl --user enable --now vf-cmdb-update.path. State that the oneshot .service needs no [Install] (pulled by .path and .timer), that the backend Volume mount and the .path watch target share this pre-created dir, and that the dir MUST exist before the container starts or the .path unit is enabled."
+    },
+    {
+      "id": 3,
+      "severity": "NIT",
+      "title": "PathChanged on an in-place-rewritten marker may drop a click made during an in-flight update",
+      "location": "PART 3 .path unit; PART 2 'second click rewrites the marker'",
+      "problem": "systemd .path with PathChanged does not queue a second activation while the triggered .service is still active, so a click during an in-flight (flock-held) run can be lost rather than merely coalesced. The 'coalesces rapid triggers' wording implies the later click is honored.",
+      "fix": "Either state that a click during an in-flight update is intentionally dropped (operator waits for succeeded/failed, which the UI shows), or have the script re-check the marker mtime at the end of a run and self-retrigger if it changed. Pick one and document it."
+    },
+    {
+      "id": 4,
+      "severity": "NIT",
+      "title": "status 'requested' state lifecycle is underspecified between POST, script, and absent-file defaults",
+      "location": "PART 2 request_update/_read_status; PART 3 write_status; api.ts UpdateStatus",
+      "problem": "POST returns default_state 'requested' (file may be absent), the host script's first on-disk write is 'running', and an absent file reads 'idle'. The design never states who writes 'requested' to disk or how the frontend treats a transient 'requested'/'idle'/absent window right after the POST.",
+      "fix": "Add one sentence: POST returns 'requested' (file may still be absent); the .path-triggered script's first write_status 'running' is the first on-disk status; until then GET status returns 'idle'. Confirm the frontend treats 'requested' and a transient 'idle'/absent as 'still starting', not 'failed'."
+    },
+    {
+      "id": 5,
+      "severity": "NIT",
+      "title": "make_latest:true on workflow_dispatch for an older version can move GitHub 'latest' backward",
+      "location": "PART 4 release.yml (softprops/action-gh-release make_latest:true)",
+      "problem": "An unconditional make_latest:true means dispatching an older version marks that older release as 'latest', so latest_release_tag() reports the older tag and flips updateAvailable logic for all hosts. The 'use a fresh version' guidance mitigates but does not prevent the foot-gun.",
+      "fix": "Document in Task G maintainer docs that dispatching a version lower than the current latest moves GitHub's 'latest' pointer backward; prefer make_latest:'legacy' semantics or state 'only dispatch a version >= the current latest'."
+    }
+  ],
+  "reviewDoc": "/Volumes/development/vf-cmdb/.agents/tasks/deploy-and-auto-update/design-review.md"
+}

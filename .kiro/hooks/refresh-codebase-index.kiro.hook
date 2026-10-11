@@ -1,5 +1,6 @@
 {
   "version": "v1",
+  "_note": "Trigger value 'PostFileSave' follows the v1 envelope used across these hook files but could not be reconfirmed against the current Kiro hooks docs (JS-rendered, not machine-readable at author time). KEPT as-is rather than swapped for an unverified value. If this hook does not fire, re-check the supported trigger enum in the Kiro Agent Hooks UI and update accordingly. The command is now repo-relative (runs from the hook's working dir) so it is not tied to any one checkout path.",
   "hooks": [
     {
       "name": "Refresh codebase index on save",
@@ -7,7 +8,7 @@
       "matcher": "^.*/(backend|frontend)/.*\\.(py|ts|tsx|sql)$",
       "action": {
         "type": "command",
-        "command": "cd /Volumes/development/vf-cmdb && ./cbindex build >/dev/null 2>&1 || true"
+        "command": "./cbindex build >/dev/null 2>&1 || true"
       }
     }
   ]

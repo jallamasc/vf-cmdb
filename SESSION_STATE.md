@@ -751,9 +751,9 @@ without touching `vf_short_name`.
 ## 🆕 (2026-09-04): FEAT-6 spec + Kiro memory infrastructure
 
 **Local working copy** moved to `/Volumes/development/vf-cmdb` (macOS). The old
-`/home/ubuntu/vf_cmdb` path and ports 3001/5433 in these docs are stale — the
-authoritative ports are frontend **8080**, backend **8000**, postgres **5432**,
-pgAdmin **5050** (see `.kiro/steering/tech.md`).
+Linux checkout path and ports 3001/5433 referenced in earlier history are stale
+— the authoritative ports are frontend **8080**, backend **8000**, postgres
+**5432**, pgAdmin **5050** (see `.kiro/steering/tech.md`).
 
 **FEAT-6 spec authored** at `.kiro/specs/rack-back-and-cabling/`
 (requirements.md, design.md, tasks.md — all format-validated). Covers Sprint
@@ -1105,42 +1105,25 @@ embedding model during setup while internet is available.
 
 ## ⚠️ Active Issues & Blockers
 
-### 🔴 Phase 3 Bugs (Must Fix Before Deploying)
+The Phase 3 bug list (BUG-A..D) and the Phase 3 feature backlog that used to
+live here were all resolved during Phases 4–6 and the post-Phase-6 QA rounds
+(see the dated round history above). They are kept only in that history, not as
+live issues.
 
-| ID | Severity | Component | Description |
-|----|----------|-----------|-------------|
-| BUG-A | Medium | Frontend/Backend | VLANs page add-row errors — `Vlan.site_id NOT NULL` but no site_id FK column in Vlans EntityGrid |
-| BUG-B | Medium | Frontend | IPAM shows no subnets — filter by site_id excludes NULL-site subnets; may default to wrong site (test artifact id=2) |
-| BUG-C | High | Frontend/Backend | "Add row" errors on most views — many models have NOT NULL FK fields not exposed as editable columns in the grid |
-| BUG-D | Low | Frontend | IPAM subnet columns incomplete — missing `range_from`, `range_to`, `expansion_ceiling`, `reserved_count`, `reservation_anchor` |
-
-**Full details and fixes**: `docs/PHASE_3_PLAN.md` → Bug section (BUG-A through BUG-D)
-
-### 🟡 Phase 3 Features (User-Requested after QA)
-Full detail in `docs/PHASE_3_PLAN.md`. Summary:
-- **Sites**: Auto-conform simple_name from hierarchy; separate regions from buildings/floors; themed fun names (Star Wars etc.); VF Short Name is too short
-- **Sites**: Add Colombian + international regions (seed change)  
-- **All grids**: No cell content truncation; dropdown arrows on FK/select cells; name fields in all listings
-- **Physical Hierarchy**: Real-time name preview while creating; datacenter = airport code of city
-- **Rack View**: Dual-face (front + back); Visio Café stencils; port-to-port cable connections with labeled from/to
-- **Device Dashboard**: Click device name → comprehensive tabbed detail page (specs, interfaces, IPs, VMs, cables, changelog, Ansible facts)
+Current pending / deferred / known-issue work lives in **`BACKLOG.md`** at the
+repo root — Deferred, Won't-do (with reasons), Known issues, Future
+enhancements, and Shipped-but-was-untracked. Consult it instead of a live
+next-steps list here.
 
 ---
 
 ## 🎯 Immediate Next Steps
 
-### For Agent (START of next session — do this first):
-1. Read `docs/PHASE_3_PLAN.md` — full bug list and Phase 3 feature specs
-2. Fix BUG-C first (most impactful): audit all models for NOT NULL FKs without grid columns
-3. Fix BUG-A (VLANs EntityGrid missing site_id column)
-4. Fix BUG-B (IPAM site filter excludes NULL-site subnets; also delete test site id=2)
-5. Fix BUG-D (subnet columns incomplete)
-6. Then proceed with Sprint 3A UX improvements (per `docs/PHASE_3_PLAN.md`)
-
-### For User:
-1. ⏳ **PENDING**: Proxmox VM deployment (after Phase 3 bugs fixed)
-2. ✅ **DONE**: QA testing session completed
-3. ✅ **DONE**: Phase 3 requirements documented
+Open work is tracked in **`BACKLOG.md`**. In progress now: the
+`deploy-and-auto-update` feature (deploy-anywhere from pre-built ghcr.io images +
+in-app version awareness + one-click update) — see
+`.kiro/specs/deploy-and-auto-update/` (requirements, design, plan, tasks) and its
+`features/FEAT-00*.json`.
 
 ---
 
@@ -1179,19 +1162,9 @@ Full detail in `docs/PHASE_3_PLAN.md`. Summary:
 
 ## 🔧 Technical Debt & Future Enhancements
 
-### Technical Debt (None Critical)
-- None identified currently
-
-### Future Enhancements (User may request)
-1. **Bitwarden CLI Integration**: Auto-fetch credentials using `bw` CLI
-2. **Multi-site Expansion**: Add more sites beyond "Home"
-3. **Custom Reports**: PDF/Excel export of inventory
-4. **REST API Authentication**: JWT tokens, API keys
-5. **Role-Based Access Control**: Read-only vs. admin users
-6. **Network Topology Diagram**: Visual map of connections
-7. **Alert System**: Email/Slack notifications for changes
-8. **Backup Automation**: Scheduled database backups
-9. **Import/Export**: Bulk CSV/Excel import/export
+Future enhancements, known issues, and deferred work moved to **`BACKLOG.md`**
+(Future enhancements + Known issues sections) so this file stays a current-state
+document rather than a long-lived wishlist.
 
 ---
 
@@ -1220,12 +1193,12 @@ Full detail in `docs/PHASE_3_PLAN.md`. Summary:
 ### Session: 2026-09-03 (Current)
 
 **Files Read**:
-- `/home/ubuntu/vf_cmdb/` (full project review)
+- `/Volumes/development/vf-cmdb/` (full project review)
 - System-generated file summaries (latest codebase state)
 
 **Files Created**:
-- `/home/ubuntu/vf_cmdb/MEMORY_BANK.md` (this session)
-- `/home/ubuntu/vf_cmdb/SESSION_STATE.md` (this file)
+- `/Volumes/development/vf-cmdb/MEMORY_BANK.md` (this session)
+- `/Volumes/development/vf-cmdb/SESSION_STATE.md` (this file)
 
 **Files Modified**:
 - None yet (git push only)
@@ -1394,7 +1367,7 @@ Full detail in `docs/PHASE_3_PLAN.md`. Summary:
 → Follow: Model → Registry → Migration → Seed → Frontend page
 
 ### "How do I backup the database?"
-→ Use provided script: `/home/ubuntu/vf_cmdb/deploy/scripts/vf-cmdb-backup.sh`
+→ Use provided script: `/Volumes/development/vf-cmdb/deploy/scripts/vf-cmdb-backup.sh`
 → Or manual: `podman exec vf-cmdb-db pg_dump -U cmdb cmdb > backup.sql`
 
 ### "Can I add custom fields without changing code?"

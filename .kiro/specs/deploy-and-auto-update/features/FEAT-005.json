@@ -1,0 +1,29 @@
+{
+  "id": "FEAT-005",
+  "type": "docs",
+  "description": "Docs + finalize (Task G). Deploy/operations docs for the ghcr.io pull-based Quadlet deploy, the one-time host state-dir + .path enablement, the release flow, the one-click update experience, and the migration-rollback caveat; then refresh SESSION_STATE.md and the codebase index. Runs last because it documents what FEAT-002..004 shipped.",
+  "status": "pending",
+  "steps": [
+    "Update docs/DEPLOYMENT_MANUAL.md and docs/OPERATIONS.md: a from-scratch 'deploy anywhere with Podman Quadlet from pre-built ghcr.io images' procedure (install the Quadlet units, provide .env, start the user services, reach the UI at :8080).",
+    "Document the one-time host state-dir + .path enablement (finding 2): the state dir (default ~/vf-cmdb/state, VF_UPDATE_DIR configurable) MUST pre-exist before the backend container starts (it bind-mounts it) AND before enabling vf-cmdb-update.path (a .path whose watched parent dir is missing fails to start); exact commands: `mkdir -p ~/vf-cmdb/state`; `systemctl --user daemon-reload`; `systemctl --user enable --now vf-cmdb-update.path`; note the oneshot vf-cmdb-update.service has NO [Install] (pulled by the .path + daily .timer) and the backend Volume mount and the .path watch target share this one dir.",
+    "Document the .path drops-an-in-flight-click behavior (finding 3): a click during an in-flight update is intentionally dropped; the operator waits for the UI to show succeeded/failed before clicking again; the UI greys 'Update now' while status is running; there is no self-retrigger loop.",
+    "Document the release workflow for the maintainer: push to master for :edge/:sha-*; tag vX.Y.Z (primary) OR run workflow_dispatch (fallback) to cut :latest + :vX.Y.Z + a GitHub Release. Include the finding-5 caveat: only dispatch/tag a version >= the current latest; do not move GitHub 'latest' backward (that would break update detection); dispatching an already-existing version re-cuts the Release/images in place and does not move the tag.",
+    "Document the in-app update experience (version shown in the footer, update-available badge, one-click 'Update now') and state explicitly it is notify-and-apply, never auto-apply.",
+    "Document the migration-cannot-be-rolled-back caveat PROMINENTLY in the update/operations docs: because entrypoint.sh runs `alembic upgrade head` on every start, re-pulling an older image does NOT undo a migration; the pre-update DB backup (deploy/scripts/vf-cmdb-backup.sh) restored via deploy/scripts/vf-cmdb-restore.sh is the only rollback safety net.",
+    "State the no-auth trust model explicitly (single user, private network, anonymous public image pulls) and the one-time 'flip the GHCR package to PUBLIC after the first release' step (the first release.yml run creates the package private by default; until flipped, anonymous host pulls fail — which degrades silently in the UI, but one-click update reports failed with an image-pull error).",
+    "Refresh SESSION_STATE.md with a new dated round entry: status, current HEAD, and what shipped for deploy-and-auto-update. Update MEMORY_BANK.md only if a hard rule changed (it did not — leave it unless a change is genuinely required).",
+    "Run `./cbindex build` from the repo root so the index matches the new code."
+  ],
+  "acceptance_criteria": [
+    "docs/DEPLOYMENT_MANUAL.md and docs/OPERATIONS.md cover: ghcr.io pull deploy, the state-dir + vf-cmdb-update.path one-time enablement (finding 2), the dropped-in-flight-click note (finding 3), release-by-tag + workflow_dispatch with the don't-move-latest-backward caveat (finding 5), the notify-and-apply update flow, the migration-rollback caveat, the no-auth trust model, and the GHCR-flip-to-public note.",
+    "SESSION_STATE.md has a new dated entry naming the deploy-and-auto-update feature and the current HEAD; the dated history is preserved.",
+    "`./cbindex build` succeeds."
+  ],
+  "verification": [
+    "grep -niE 'ghcr.io|state dir|vf-cmdb-update.path|rollback|workflow_dispatch|notify-and-apply|public' docs/DEPLOYMENT_MANUAL.md docs/OPERATIONS.md",
+    "grep -ni 'deploy-and-auto-update' SESSION_STATE.md",
+    "cd /Volumes/development/vf-cmdb && ./cbindex build"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

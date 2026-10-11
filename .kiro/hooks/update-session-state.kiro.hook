@@ -1,12 +1,13 @@
 {
   "version": "v1",
+  "_note": "Trigger value 'PostTaskExec' follows the v1 envelope used across these hook files but could not be reconfirmed against the current Kiro hooks docs (JS-rendered, not machine-readable at author time). KEPT as-is rather than swapped for an unverified value. If this hook does not fire, re-check the supported trigger enum in the Kiro Agent Hooks UI and update accordingly.",
   "hooks": [
     {
       "name": "Update SESSION_STATE after spec task",
       "trigger": "PostTaskExec",
       "action": {
         "type": "agent",
-        "prompt": "A spec task just completed. Before moving on: (1) verify the change builds (frontend: npm run build / tsc -b; backend: confirm `from app.main import app` imports). (2) Update SESSION_STATE.md with what changed, the current git HEAD, and the next step. (3) Run `./cbindex build` to refresh the semantic index. Keep SESSION_STATE.md concise; move durable decisions to MEMORY_BANK.md. Do not commit unless the user asked."
+        "prompt": "A spec task just completed. Before moving on: (1) verify the change builds and tests pass. Frontend: `cd frontend && npm run build` (tsc -b + vite build) then `cd frontend && npx vitest run` (single-run, never a watcher). Backend: confirm `from app.main import app` imports, then run the pytest suite against the test DB `vfcmdb_test` (from backend/, kill any stray pytest first: `ps aux|grep pytest|grep -v grep`; then `POSTGRES_HOST=127.0.0.1 POSTGRES_PORT=55432 POSTGRES_USER=vfcmdb POSTGRES_PASSWORD=vfcmdb POSTGRES_DB=vfcmdb_test .venv/bin/pytest -q`). (2) Update SESSION_STATE.md with what changed, the current git HEAD, and the next step; move durable decisions to MEMORY_BANK.md and defer open work to BACKLOG.md. (3) Run `./cbindex build` to refresh the semantic index. Keep SESSION_STATE.md concise. Do not commit unless the user asked."
       }
     }
   ]

@@ -1,12 +1,13 @@
 {
   "version": "v1",
+  "_note": "Trigger value 'SessionStart' follows the v1 envelope used across these hook files but could not be reconfirmed against the current Kiro hooks docs (JS-rendered, not machine-readable at author time). KEPT as-is rather than swapped for an unverified value. If this hook does not fire, re-check the supported trigger enum in the Kiro Agent Hooks UI and update accordingly.",
   "hooks": [
     {
       "name": "Surface current state at session start",
       "trigger": "SessionStart",
       "action": {
         "type": "agent",
-        "prompt": "This is the Virtualfactor IT CMDB project. Follow the Memory Protocol steering file: read SESSION_STATE.md for current status and open items, and consult MEMORY_BANK.md for hard rules before any architectural change. The codebase index is available via `./cbindex search`. Briefly note the current phase/next step from SESSION_STATE.md so we resume with fresh context."
+        "prompt": "This is the Virtualfactor IT CMDB project. Follow the Memory Protocol steering file: read SESSION_STATE.md for current status and open items, consult BACKLOG.md for deferred/known-issue work, and consult MEMORY_BANK.md for hard rules before any architectural change. The codebase index is available via `./cbindex search`. Briefly note the current phase/next step from SESSION_STATE.md so we resume with fresh context."
       }
     }
   ]

@@ -19,9 +19,13 @@ library without explicit user approval.
   `naming.apply_naming(...)`). They are NOT raw ORM event listeners. Keep writes
   on the generic CRUD path so audit + naming apply automatically.
 - Name generation lives in `backend/app/naming.py` (`GENERATORS` dispatch).
-- Migrations in `backend/alembic/versions/` — latest is `0005_site_redesign`.
-  New migrations chain `down_revision` and must be idempotent/guarded
-  (inspect for existing columns) like `0005`.
+- Migrations in `backend/alembic/versions/` — latest head is
+  `0037_physical_asset_theme_names`. New migrations chain `down_revision` to the
+  current head and must be idempotent/guarded (inspect for existing
+  columns/tables) like the recent ones. The deployed backend self-migrates and
+  self-seeds on container start via `backend/entrypoint.sh` (`alembic upgrade
+  head` then `python -m app.seed`), so a fresh deploy comes up on the latest
+  schema with seed data automatically.
 
 ## Frontend (`frontend/`)
 - React 18 + TypeScript 5 + Vite 5, AG Grid Community 32, TanStack Query 5,
@@ -43,19 +47,46 @@ Backend local setup: create venv, `pip install -r backend/requirements.txt`,
 Frontend verification (safe to run): `cd frontend && npm install` then
 `npm run build` (this is `tsc -b && vite build`) to confirm changes compile.
 
-Podman stack helper (delegates to podman compose / podman-compose):
+Podman stack helper (delegates to podman compose / podman-compose) — full
+subcommand set:
 - `./deploy-podman.sh up` — build + start (backend auto-migrates + seeds)
 - `./deploy-podman.sh down`
-- `./deploy-podman.sh logs`
+- `./deploy-podman.sh restart`
+- `./deploy-podman.sh build` — rebuild images
+- `./deploy-podman.sh logs [service]`
+- `./deploy-podman.sh ps` — list running containers
 - `./deploy-podman.sh reset` — clears stale containers + pgadmin vol; KEEPS pgdata
+- `./deploy-podman.sh recover` — repair a corrupted podman volume store (backs
+  up DB data first)
 - `./deploy-podman.sh quadlet` — install rootless systemd units
 
-Default ports: frontend 8080, backend 8000 (+/docs), postgres 5432, pgAdmin 5050.
+Default stack ports: frontend 8080, backend 8000 (+ `/docs`), postgres 5432,
+pgAdmin 5050.
+
+Dev-loop ports (how the project is iterated locally, distinct from the full
+stack above): Vite dev server 5173 (proxies `/api` + `/health` to the backend);
+containerized dev backend `vf_cmdb_backend_dev` on host port 8000 via
+`backend/dev-container.sh up` (its live-reload is a `podman cp` + `fswatch` loop
+over `backend/app/` ONLY — a new `backend/alembic/` migration needs a manual
+`podman cp` or an image rebuild before `alembic upgrade head` inside the
+container sees it); dev Postgres `vf_cmdb_dev` (a `postgres:16` container) on
+host port 55432; Semaphore (Ansible automation) on 3000.
 
 ## Testing
-- No automated test framework is installed yet on either side. When adding
-  tests: backend uses pytest (async client); frontend uses Vitest + Testing
-  Library. Use single-run modes; never leave watchers running.
+Both sides have a real automated test framework installed — use single-run
+modes, never leave a watcher running.
+
+- Backend: pytest + pytest-asyncio (auto mode) in `backend/tests/`, run against
+  a REAL Postgres `vfcmdb_test` (NEVER `vfcmdb`). `conftest.py` drops+recreates
+  the schema from ORM metadata each test and forces every external integration
+  unconfigured. First kill any stray pytest (`ps aux|grep pytest|grep -v grep`),
+  then from `backend/`:
+  `POSTGRES_HOST=127.0.0.1 POSTGRES_PORT=55432 POSTGRES_USER=vfcmdb POSTGRES_PASSWORD=vfcmdb POSTGRES_DB=vfcmdb_test .venv/bin/pytest -q`
+  (~4 min). Do NOT point tests at the live dev `vf_cmdb_dev` DB — its schema can
+  be ahead of HEAD and is incompatible; `vfcmdb_test` is managed independently by
+  conftest.py.
+- Frontend: Vitest 2.1.9 + happy-dom (setup `frontend/src/test/setup.ts`), run
+  single-run from `frontend/`: `npx vitest run`.
 
 ## Do NOT
 - Reintroduce Docker (Dockerfile/docker-compose). It is Podman + Containerfile.

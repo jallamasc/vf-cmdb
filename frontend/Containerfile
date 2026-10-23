@@ -1,5 +1,5 @@
 # ---- build stage ----
-FROM node:20-alpine AS build
+FROM node:26-alpine AS build
 
 # Version must reach Vite at BUILD time (vite.config.ts reads process.env.VF_*
 # into the __APP_VERSION__/__APP_GIT_SHA__ `define`, baking them into dist/).
